@@ -3,7 +3,7 @@ services:
   f1-optimizer:
     build: .
     ports:
-      - "5000:5000"
+      - "5055:5000"
     volumes:
       - ./uploads:/app/uploads
       - ./results:/app/results
