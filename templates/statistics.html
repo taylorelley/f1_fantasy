@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Fantasy Statistics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: #e10600;
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        label {
+            font-weight: 500;
+        }
+        
+        select, input[type="text"] {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .button {
+            background: #e10600;
+            color: white;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .button:hover {
+            background: #b30500;
+        }
+        
+        .button-secondary {
+            background: #6c757d;
+        }
+        
+        .button-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .stat-card.selected {
+            border: 2px solid #e10600;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .driver-info h3 {
+            color: #e10600;
+            margin-bottom: 5px;
+        }
+        
+        .team-name {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .cost-vfm {
+            text-align: right;
+        }
+        
+        .cost {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .vfm-score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .vfm-label {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .stat-value {
+            font-weight: 500;
+        }
+        
+        .trend-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .trend-improving {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .trend-stable {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .trend-declining {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .radar-container {
+            width: 100%;
+            height: 200px;
+            margin: 15px 0;
+        }
+        
+        .track-performance {
+            margin-top: 15px;
+        }
+        
+        .track-list {
+            font-size: 13px;
+            margin-top: 5px;
+        }
+        
+        .track-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+        }
+        
+        .track-name {
+            color: #666;
+        }
+        
+        .track-points {
+            font-weight: 500;
+        }
+        
+        .comparison-mode {
+            display: none;
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .comparison-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #e10600;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        
+        .select-checkbox {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        
+        .recent-form {
+            font-size: 12px;
+        }
+        
+        .form-positive {
+            color: #28a745;
+        }
+        
+        .form-negative {
+            color: #dc3545;
+        }
+        
+        #comparison-chart-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>F1 Fantasy Statistics</h1>
+            <nav class="nav-links">
+                <a href="/">Optimizer</a>
+                <a href="/statistics">Statistics</a>
+            </nav>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <div class="filter-group">
+                    <label>Type:</label>
+                    <select id="type-filter" onchange="filterStats()">
+                        <option value="all">All</option>
+                        <option value="drivers">Drivers Only</option>
+                        <option value="constructors">Constructors Only</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Team:</label>
+                    <select id="team-filter" onchange="filterStats()">
+                        <option value="all">All Teams</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Sort by:</label>
+                    <select id="sort-by" onchange="sortStats()">
+                        <option value="vfm">VFM Score</option>
+                        <option value="cost">Cost</option>
+                        <option value="recent">Recent Form</option>
+                        <option value="avg">Average Points</option>
+                        <option value="consistency">Consistency</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Search:</label>
+                    <input type="text" id="search-input" placeholder="Driver/Constructor name..." onkeyup="filterStats()">
+                </div>
+                
+                <button class="button button-secondary" onclick="toggleComparisonMode()">Compare</button>
+                <button class="button" onclick="exportStatistics()">Export Stats</button>
+            </div>
+        </div>
+        
+        <div class="comparison-mode" id="comparison-mode">
+            <h3>Comparison Mode</h3>
+            <p>Select 2-4 drivers or constructors to compare. Click the checkboxes on the cards.</p>
+            <div class="control-group">
+                <button class="button" onclick="showComparison()">Show Comparison</button>
+                <button class="button button-secondary" onclick="clearSelection()">Clear Selection</button>
+                <button class="button button-secondary" onclick="toggleComparisonMode()">Exit Comparison</button>
+            </div>
+            <div id="comparison-chart-container">
+                <canvas id="comparison-chart"></canvas>
+            </div>
+            <div class="comparison-grid" id="comparison-grid"></div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading statistics...</p>
+        </div>
+        
+        <div class="error" id="error-message" style="display: none;"></div>
+        
+        <div id="drivers-section">
+            <h2>Drivers</h2>
+            <div class="stats-grid" id="drivers-grid"></div>
+        </div>
+        
+        <div id="constructors-section">
+            <h2>Constructors</h2>
+            <div class="stats-grid" id="constructors-grid"></div>
+        </div>
+    </div>
+    
+    <script>
+        let allStats = null;
+        let radarCharts = {};
+        let selectedItems = new Set();
+        let comparisonChart = null;
+        
+        // Load statistics on page load
+        window.onload = function() {
+            loadStatistics();
+        };
+        
+        async function loadStatistics() {
+            try {
+                const response = await fetch('/api/statistics');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allStats = data;
+                    populateTeamFilter(data.drivers);
+                    renderStatistics(data);
+                    document.getElementById('loading').style.display = 'none';
+                } else {
+                    showError(data.message);
+                }
+            } catch (error) {
+                showError('Error loading statistics: ' + error.message);
+            }
+        }
+        
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error-message').style.display = 'block';
+        }
+        
+        function populateTeamFilter(drivers) {
+            const teamFilter = document.getElementById('team-filter');
+            const teams = [...new Set(drivers.map(d => d.team))].sort();
+            
+            teams.forEach(team => {
+                const option = document.createElement('option');
+                option.value = team;
+                option.textContent = team;
+                teamFilter.appendChild(option);
+            });
+        }
+        
+        function renderStatistics(data) {
+            renderDrivers(data.drivers);
+            renderConstructors(data.constructors);
+        }
+        
+        function renderDrivers(drivers) {
+            const grid = document.getElementById('drivers-grid');
+            grid.innerHTML = '';
+            
+            drivers.forEach(driver => {
+                const card = createDriverCard(driver);
+                grid.appendChild(card);
+            });
+        }
+        
+        function renderConstructors(constructors) {
+            const grid = document.getElementById('constructors-grid');
+            grid.innerHTML = '';
+            
+            constructors.forEach(constructor => {
+                const card = createConstructorCard(constructor);
+                grid.appendChild(card);
+            });
+        }
+        
+        function createDriverCard(driver) {
+            const card = document.createElement('div');
+            card.className = 'stat-card';
+            card.dataset.type = 'driver';
+            card.dataset.name = driver.name;
+            card.dataset.team = driver.team;
+            card.dataset.vfm = driver.vfm;
+            card.dataset.cost = driver.cost_value;
+            card.dataset.recent = driver.recent_form;
+            card.dataset.avg = driver.avg_points;
+            card.dataset.consistency = driver.consistency;
+            
+            const formClass = driver.recent_form > 0 ? 'form-positive' : driver.recent_form < 0 ? 'form-negative' : '';
+            const formSymbol = driver.recent_form > 0 ? '↑' : driver.recent_form < 0 ? '↓' : '→';
+            
+            card.innerHTML = `
+                <input type="checkbox" class="select-checkbox" style="display: none;" 
+                       onchange="toggleSelection('${driver.name}', 'driver')">
+                <div class="card-header">
+                    <div class="driver-info">
+                        <h3>${driver.name}</h3>
+                        <div class="team-name">${driver.team}</div>
+                        <span class="trend-badge trend-${driver.trend.toLowerCase()}">${driver.trend}</span>
+                        <span class="recent-form ${formClass}">${formSymbol} ${Math.abs(driver.recent_form).toFixed(1)}</span>
+                    </div>
+                    <div class="cost-vfm">
+                        <div class="cost">${driver.cost}</div>
+                        <div class="vfm-score">${driver.vfm}</div>
+                        <div class="vfm-label">VFM #${driver.vfm_rank}</div>
+                    </div>
+                </div>
+                
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <span class="stat-label">Avg Points</span>
+                        <span class="stat-value">${driver.avg_points.toFixed(1)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Points</span>
+                        <span class="stat-value">${driver.total_points}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Consistency</span>
+                        <span class="stat-value">±${driver.consistency.toFixed(1)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Best/Worst</span>
+                        <span class="stat-value">${driver.best_race}/${driver.worst_race}</span>
+                    </div>
+                </div>
+                
+                <div class="radar-container">
+                    <canvas id="radar-${driver.name.replace(/\s+/g, '-')}"></canvas>
+                </div>
+                
+                <div class="track-performance">
+                    <strong>Best Tracks:</strong>
+                    <div class="track-list">
+                        ${driver.best_tracks.slice(0, 3).map(t => `
+                            <div class="track-item">
+                                <span class="track-name">${t.circuit}</span>
+                                <span class="track-points">${t.points} pts</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="track-performance">
+                    <strong>Upcoming Races:</strong>
+                    <div class="track-list">
+                        ${driver.upcoming_races.map(r => `
+                            <div class="track-item">
+                                <span class="track-name">${r.circuit}</span>
+                                <span class="track-points">Affinity: ${r.affinity.toFixed(3)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            // Create radar chart after card is added to DOM
+            setTimeout(() => createRadarChart(driver.name, driver.char_affinities, 'driver'), 100);
+            
+            return card;
+        }
+        
+        function createConstructorCard(constructor) {
+            const card = document.createElement('div');
+            card.className = 'stat-card';
+            card.dataset.type = 'constructor';
+            card.dataset.name = constructor.name;
+            card.dataset.team = constructor.name;
+            card.dataset.vfm = constructor.vfm;
+            card.dataset.cost = constructor.cost_value;
+            card.dataset.recent = constructor.recent_form;
+            card.dataset.avg = constructor.avg_points;
+            card.dataset.consistency = constructor.consistency;
+            
+            const formClass = constructor.recent_form > 0 ? 'form-positive' : constructor.recent_form < 0 ? 'form-negative' : '';
+            const formSymbol = constructor.recent_form > 0 ? '↑' : constructor.recent_form < 0 ? '↓' : '→';
+            
+            card.innerHTML = `
+                <input type="checkbox" class="select-checkbox" style="display: none;" 
+                       onchange="toggleSelection('${constructor.name}', 'constructor')">
+                <div class="card-header">
+                    <div class="driver-info">
+                        <h3>${constructor.name}</h3>
+                        <span class="trend-badge trend-${constructor.trend.toLowerCase()}">${constructor.trend}</span>
+                        <span class="recent-form ${formClass}">${formSymbol} ${Math.abs(constructor.recent_form).toFixed(1)}</span>
+                    </div>
+                    <div class="cost-vfm">
+                        <div class="cost">${constructor.cost}</div>
+                        <div class="vfm-score">${constructor.vfm}</div>
+                        <div class="vfm-label">VFM #${constructor.vfm_rank}</div>
+                    </div>
+                </div>
+                
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <span class="stat-label">Avg Points</span>
+                        <span class="stat-value">${constructor.avg_points.toFixed(1)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Points</span>
+                        <span class="stat-value">${constructor.total_points}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Consistency</span>
+                        <span class="stat-value">±${constructor.consistency.toFixed(1)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Best/Worst</span>
+                        <span class="stat-value">${constructor.best_race}/${constructor.worst_race}</span>
+                    </div>
+                </div>
+                
+                <div class="radar-container">
+                    <canvas id="radar-${constructor.name.replace(/\s+/g, '-')}"></canvas>
+                </div>
+                
+                <div class="track-performance">
+                    <strong>Best Tracks:</strong>
+                    <div class="track-list">
+                        ${constructor.best_tracks.slice(0, 3).map(t => `
+                            <div class="track-item">
+                                <span class="track-name">${t.circuit}</span>
+                                <span class="track-points">${t.points} pts</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="track-performance">
+                    <strong>Upcoming Races:</strong>
+                    <div class="track-list">
+                        ${constructor.upcoming_races.map(r => `
+                            <div class="track-item">
+                                <span class="track-name">${r.circuit}</span>
+                                <span class="track-points">Affinity: ${r.affinity.toFixed(3)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            // Create radar chart after card is added to DOM
+            setTimeout(() => createRadarChart(constructor.name, constructor.char_affinities, 'constructor'), 100);
+            
+            return card;
+        }
+        
+        function createRadarChart(name, affinities, type) {
+            const canvasId = `radar-${name.replace(/\s+/g, '-')}`;
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Destroy existing chart if any
+            if (radarCharts[canvasId]) {
+                radarCharts[canvasId].destroy();
+            }
+            
+            const data = {
+                labels: ['Corners', 'Length', 'Overtaking', 'Speed', 'Temperature'],
+                datasets: [{
+                    label: name,
+                    data: [
+                        affinities.Corners,
+                        affinities.Length,
+                        affinities.Overtaking,
+                        affinities.Speed,
+                        affinities.Temperature
+                    ],
+                    fill: true,
+                    backgroundColor: type === 'driver' ? 'rgba(225, 6, 0, 0.2)' : 'rgba(40, 167, 69, 0.2)',
+                    borderColor: type === 'driver' ? 'rgb(225, 6, 0)' : 'rgb(40, 167, 69)',
+                    pointBackgroundColor: type === 'driver' ? 'rgb(225, 6, 0)' : 'rgb(40, 167, 69)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: type === 'driver' ? 'rgb(225, 6, 0)' : 'rgb(40, 167, 69)'
+                }]
+            };
+            
+            const config = {
+                type: 'radar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: {
+                                display: true
+                            },
+                            suggestedMin: -0.5,
+                            suggestedMax: 0.5,
+                            ticks: {
+                                stepSize: 0.25
+                            }
+                        }
+                    }
+                }
+            };
+            
+            radarCharts[canvasId] = new Chart(ctx, config);
+        }
+        
+        function filterStats() {
+            const typeFilter = document.getElementById('type-filter').value;
+            const teamFilter = document.getElementById('team-filter').value;
+            const searchInput = document.getElementById('search-input').value.toLowerCase();
+            
+            const cards = document.querySelectorAll('.stat-card');
+            
+            cards.forEach(card => {
+                let show = true;
+                
+                // Type filter
+                if (typeFilter !== 'all') {
+                    if (typeFilter === 'drivers' && card.dataset.type !== 'driver') show = false;
+                    if (typeFilter === 'constructors' && card.dataset.type !== 'constructor') show = false;
+                }
+                
+                // Team filter
+                if (teamFilter !== 'all' && card.dataset.team !== teamFilter) {
+                    show = false;
+                }
+                
+                // Search filter
+                if (searchInput && !card.dataset.name.toLowerCase().includes(searchInput)) {
+                    show = false;
+                }
+                
+                card.style.display = show ? 'block' : 'none';
+            });
+            
+            // Update section visibility
+            const driversSection = document.getElementById('drivers-section');
+            const constructorsSection = document.getElementById('constructors-section');
+            
+            if (typeFilter === 'drivers') {
+                driversSection.style.display = 'block';
+                constructorsSection.style.display = 'none';
+            } else if (typeFilter === 'constructors') {
+                driversSection.style.display = 'none';
+                constructorsSection.style.display = 'block';
+            } else {
+                driversSection.style.display = 'block';
+                constructorsSection.style.display = 'block';
+            }
+        }
+        
+        function sortStats() {
+            const sortBy = document.getElementById('sort-by').value;
+            const driversGrid = document.getElementById('drivers-grid');
+            const constructorsGrid = document.getElementById('constructors-grid');
+            
+            sortGrid(driversGrid, sortBy);
+            sortGrid(constructorsGrid, sortBy);
+        }
+        
+        function sortGrid(grid, sortBy) {
+            const cards = Array.from(grid.children);
+            
+            cards.sort((a, b) => {
+                const aVal = parseFloat(a.dataset[sortBy]);
+                const bVal = parseFloat(b.dataset[sortBy]);
+                return bVal - aVal; // Descending order
+            });
+            
+            cards.forEach(card => grid.appendChild(card));
+        }
+        
+        function toggleComparisonMode() {
+            const comparisonMode = document.getElementById('comparison-mode');
+            const checkboxes = document.querySelectorAll('.select-checkbox');
+            
+            if (comparisonMode.style.display === 'block') {
+                comparisonMode.style.display = 'none';
+                checkboxes.forEach(cb => {
+                    cb.style.display = 'none';
+                    cb.checked = false;
+                });
+                selectedItems.clear();
+                document.querySelectorAll('.stat-card').forEach(card => {
+                    card.classList.remove('selected');
+                });
+            } else {
+                comparisonMode.style.display = 'block';
+                checkboxes.forEach(cb => cb.style.display = 'block');
+            }
+        }
+        
+        function toggleSelection(name, type) {
+            const key = `${type}:${name}`;
+            
+            if (selectedItems.has(key)) {
+                selectedItems.delete(key);
+            } else {
+                if (selectedItems.size >= 4) {
+                    alert('You can compare up to 4 items at a time');
+                    event.target.checked = false;
+                    return;
+                }
+                selectedItems.add(key);
+            }
+            
+            // Update visual selection
+            updateSelectionVisuals();
+        }
+        
+        function updateSelectionVisuals() {
+            document.querySelectorAll('.stat-card').forEach(card => {
+                const type = card.dataset.type;
+                const name = card.dataset.name;
+                const key = `${type}:${name}`;
+                
+                if (selectedItems.has(key)) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+        }
+        
+        function clearSelection() {
+            selectedItems.clear();
+            document.querySelectorAll('.select-checkbox').forEach(cb => cb.checked = false);
+            updateSelectionVisuals();
+        }
+        
+        function showComparison() {
+            if (selectedItems.size < 2) {
+                alert('Please select at least 2 items to compare');
+                return;
+            }
+            
+            const comparisonData = [];
+            
+            selectedItems.forEach(key => {
+                const [type, name] = key.split(':');
+                const items = type === 'driver' ? allStats.drivers : allStats.constructors;
+                const item = items.find(i => i.name === name);
+                if (item) {
+                    comparisonData.push({...item, type});
+                }
+            });
+            
+            renderComparison(comparisonData);
+        }
+        
+        function renderComparison(items) {
+            const grid = document.getElementById('comparison-grid');
+            grid.innerHTML = '';
+            
+            // Create comparison table
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            table.style.borderCollapse = 'collapse';
+            
+            // Header
+            const headerRow = document.createElement('tr');
+            headerRow.innerHTML = '<th>Metric</th>' + items.map(item => `<th>${item.name}</th>`).join('');
+            table.appendChild(headerRow);
+            
+            // Metrics to compare
+            const metrics = [
+                {label: 'Type', key: 'type'},
+                {label: 'Cost', key: 'cost'},
+                {label: 'VFM Score', key: 'vfm'},
+                {label: 'VFM Rank', key: 'vfm_rank'},
+                {label: 'Avg Points', key: 'avg_points', format: v => v.toFixed(1)},
+                {label: 'Total Points', key: 'total_points'},
+                {label: 'Consistency', key: 'consistency', format: v => `±${v.toFixed(1)}`},
+                {label: 'Recent Form', key: 'recent_form', format: v => v.toFixed(1)},
+                {label: 'Best Race', key: 'best_race'},
+                {label: 'Worst Race', key: 'worst_race'}
+            ];
+            
+            metrics.forEach(metric => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td style="font-weight: 500; padding: 8px;">${metric.label}</td>`;
+                items.forEach(item => {
+                    const value = item[metric.key];
+                    const formatted = metric.format ? metric.format(value) : value;
+                    row.innerHTML += `<td style="padding: 8px; text-align: center;">${formatted}</td>`;
+                });
+                table.appendChild(row);
+            });
+            
+            grid.appendChild(table);
+            
+            // Update comparison radar chart
+            updateComparisonChart(items);
+        }
+        
+        function updateComparisonChart(items) {
+            const canvas = document.getElementById('comparison-chart');
+            const ctx = canvas.getContext('2d');
+            
+            if (comparisonChart) {
+                comparisonChart.destroy();
+            }
+            
+            const datasets = items.map((item, index) => {
+                const colors = ['rgba(225, 6, 0, 0.6)', 'rgba(40, 167, 69, 0.6)', 
+                               'rgba(255, 193, 7, 0.6)', 'rgba(0, 123, 255, 0.6)'];
+                const borderColors = ['rgb(225, 6, 0)', 'rgb(40, 167, 69)', 
+                                     'rgb(255, 193, 7)', 'rgb(0, 123, 255)'];
+                
+                return {
+                    label: item.name,
+                    data: [
+                        item.char_affinities.Corners,
+                        item.char_affinities.Length,
+                        item.char_affinities.Overtaking,
+                        item.char_affinities.Speed,
+                        item.char_affinities.Temperature
+                    ],
+                    fill: true,
+                    backgroundColor: colors[index],
+                    borderColor: borderColors[index],
+                    pointBackgroundColor: borderColors[index],
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: borderColors[index]
+                };
+            });
+            
+            const config = {
+                type: 'radar',
+                data: {
+                    labels: ['Corners', 'Length', 'Overtaking', 'Speed', 'Temperature'],
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: {
+                                display: true
+                            },
+                            suggestedMin: -0.5,
+                            suggestedMax: 0.5,
+                            ticks: {
+                                stepSize: 0.25
+                            }
+                        }
+                    }
+                }
+            };
+            
+            comparisonChart = new Chart(ctx, config);
+        }
+        
+        async function exportStatistics() {
+            window.location.href = '/api/export_statistics';
+        }
+    </script>
+</body>
+</html>
