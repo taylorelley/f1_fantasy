@@ -1,0 +1,12 @@
+# docker-compose.yml
+services:
+  f1-optimizer:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
