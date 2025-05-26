@@ -3,37 +3,106 @@ import os
 import json
 import traceback
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, session
 import pandas as pd
 import numpy as np
 import re
 from werkzeug.utils import secure_filename
+import shutil
 from f1_optimizer import F1VFMCalculator, F1TrackAffinityCalculator, F1TeamOptimizer, get_races_completed
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['RESULTS_FOLDER'] = 'results'
+app.config['DEFAULT_DATA_FOLDER'] = 'default_data'
+app.secret_key = 'your-secret-key-here'  # Change this to a random secret key
 
 # Ensure directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['RESULTS_FOLDER'], exist_ok=True)
+os.makedirs(app.config['DEFAULT_DATA_FOLDER'], exist_ok=True)
 
 # Store session data (in production, use proper session management)
 sessions = {}
+
+def get_data_folder(session_id=None):
+    """Get the appropriate data folder - either session-specific or default"""
+    if session_id and session_id in sessions:
+        return sessions[session_id]['folder']
+    elif has_default_data():
+        return app.config['DEFAULT_DATA_FOLDER'] + '/'
+    return None
+
+def has_default_data():
+    """Check if default data files exist"""
+    required_files = [
+        'driver_race_data.csv',
+        'constructor_race_data.csv',
+        'calendar.csv',
+        'tracks.csv'
+    ]
+    
+    for file in required_files:
+        if not os.path.exists(os.path.join(app.config['DEFAULT_DATA_FOLDER'], file)):
+            return False
+    return True
+
+def load_default_data():
+    """Load default data if available"""
+    if not has_default_data():
+        return None
+    
+    try:
+        # Calculate races completed
+        races_completed = get_races_completed(app.config['DEFAULT_DATA_FOLDER'] + '/')
+        
+        # Read drivers and constructors
+        driver_df = pd.read_csv(os.path.join(app.config['DEFAULT_DATA_FOLDER'], 'driver_race_data.csv'))
+        constructor_df = pd.read_csv(os.path.join(app.config['DEFAULT_DATA_FOLDER'], 'constructor_race_data.csv'))
+        
+        drivers_list = sorted(driver_df['Driver'].unique().tolist())
+        constructors_list = sorted(constructor_df['Constructor'].unique().tolist())
+        
+        return {
+            'races_completed': races_completed,
+            'drivers': drivers_list,
+            'constructors': constructors_list
+        }
+    except Exception as e:
+        print(f"Error loading default data: {e}")
+        return None
 
 @app.route('/')
 def index():
     """Render the main page"""
     return render_template('index.html')
 
+@app.route('/check_default_data')
+def check_default_data():
+    """Check if default data exists"""
+    default_data = load_default_data()
+    return jsonify({
+        'has_default': default_data is not None,
+        'data': default_data
+    })
+
 @app.route('/upload', methods=['POST'])
 def upload_files():
     """Handle file uploads"""
     try:
+        # Check if we should update default data
+        update_default = request.form.get('update_default', 'false') == 'true'
+        
         session_id = request.form.get('session_id', datetime.now().strftime('%Y%m%d_%H%M%S'))
-        session_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
-        os.makedirs(session_folder, exist_ok=True)
+        
+        # Determine target folder
+        if update_default:
+            target_folder = app.config['DEFAULT_DATA_FOLDER']
+            print("Updating default data files...")
+        else:
+            target_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
+            os.makedirs(target_folder, exist_ok=True)
         
         required_files = [
             'driver_race_data.csv',
@@ -46,8 +115,15 @@ def upload_files():
         for file_key in request.files:
             file = request.files[file_key]
             if file and file.filename:
-                filename = secure_filename(file.filename)
-                filepath = os.path.join(session_folder, filename)
+                # Use the required filename, not the uploaded filename
+                for required_file in required_files:
+                    if required_file in file_key:
+                        filename = required_file
+                        break
+                else:
+                    filename = secure_filename(file.filename)
+                
+                filepath = os.path.join(target_folder, filename)
                 file.save(filepath)
                 uploaded_files.append(filename)
         
@@ -60,29 +136,31 @@ def upload_files():
             })
         
         # Calculate races completed
-        races_completed = get_races_completed(session_folder + '/')
+        races_completed = get_races_completed(target_folder + '/')
         
         # Read drivers and constructors for selection
-        driver_df = pd.read_csv(os.path.join(session_folder, 'driver_race_data.csv'))
-        constructor_df = pd.read_csv(os.path.join(session_folder, 'constructor_race_data.csv'))
+        driver_df = pd.read_csv(os.path.join(target_folder, 'driver_race_data.csv'))
+        constructor_df = pd.read_csv(os.path.join(target_folder, 'constructor_race_data.csv'))
         
         drivers_list = sorted(driver_df['Driver'].unique().tolist())
         constructors_list = sorted(constructor_df['Constructor'].unique().tolist())
         
         # Store session info
-        sessions[session_id] = {
-            'folder': session_folder,
-            'races_completed': races_completed,
-            'drivers': drivers_list,
-            'constructors': constructors_list
-        }
+        if not update_default:
+            sessions[session_id] = {
+                'folder': target_folder,
+                'races_completed': races_completed,
+                'drivers': drivers_list,
+                'constructors': constructors_list
+            }
         
         return jsonify({
             'success': True,
-            'session_id': session_id,
+            'session_id': session_id if not update_default else 'default',
             'races_completed': races_completed,
             'drivers': drivers_list,
-            'constructors': constructors_list
+            'constructors': constructors_list,
+            'updated_default': update_default
         })
         
     except Exception as e:
@@ -96,18 +174,32 @@ def optimize():
     """Run the optimization"""
     try:
         data = request.json
-        session_id = data['session_id']
+        session_id = data.get('session_id', 'default')
         
-        if session_id not in sessions:
-            return jsonify({
-                'success': False,
-                'message': 'Session not found. Please upload files first.'
-            })
+        # Get data folder
+        if session_id == 'default':
+            data_folder = app.config['DEFAULT_DATA_FOLDER'] + '/'
+            if not has_default_data():
+                return jsonify({
+                    'success': False,
+                    'message': 'No default data available. Please upload files first.'
+                })
+            # Load default data info
+            default_info = load_default_data()
+            races_completed = default_info['races_completed']
+        else:
+            if session_id not in sessions:
+                return jsonify({
+                    'success': False,
+                    'message': 'Session not found. Please upload files first.'
+                })
+            data_folder = sessions[session_id]['folder'] + '/'
+            races_completed = sessions[session_id]['races_completed']
         
         # Build configuration
         config = {
-            'base_path': sessions[session_id]['folder'] + '/',
-            'races_completed': sessions[session_id]['races_completed'],
+            'base_path': data_folder,
+            'races_completed': races_completed,
             'current_drivers': data['current_drivers'],
             'current_constructors': data['current_constructors'],
             'remaining_budget': float(data['remaining_budget']),
@@ -118,6 +210,20 @@ def optimize():
             'multiplier': int(data['multiplier']),
             'use_parallel': False  # Disable for web app
         }
+        
+        # Save configuration for easy reuse
+        config_file = os.path.join(app.config['RESULTS_FOLDER'], 'last_config.json')
+        with open(config_file, 'w') as f:
+            json.dump({
+                'current_drivers': data['current_drivers'],
+                'current_constructors': data['current_constructors'],
+                'remaining_budget': data['remaining_budget'],
+                'step1_swaps': data['step1_swaps'],
+                'step2_swaps': data['step2_swaps'],
+                'weighting_scheme': data['weighting_scheme'],
+                'risk_tolerance': data['risk_tolerance'],
+                'multiplier': data['multiplier']
+            }, f)
         
         results = {
             'status': 'running',
@@ -198,9 +304,12 @@ def optimize():
         results['success'] = True
         
         # Save results
-        result_file = os.path.join(app.config['RESULTS_FOLDER'], f'optimization_{session_id}.json')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        result_file = os.path.join(app.config['RESULTS_FOLDER'], f'optimization_{timestamp}.json')
         with open(result_file, 'w') as f:
             json.dump(results, f, indent=2)
+        
+        results['result_id'] = timestamp
         
         return jsonify(results)
         
@@ -211,14 +320,24 @@ def optimize():
             'message': f'Error during optimization: {str(e)}'
         })
 
-@app.route('/download/<session_id>')
-def download_results(session_id):
+@app.route('/download/<result_id>')
+def download_results(result_id):
     """Download optimization results"""
-    result_file = os.path.join(app.config['RESULTS_FOLDER'], f'optimization_{session_id}.json')
+    result_file = os.path.join(app.config['RESULTS_FOLDER'], f'optimization_{result_id}.json')
     if os.path.exists(result_file):
-        return send_file(result_file, as_attachment=True, download_name=f'f1_optimization_{session_id}.json')
+        return send_file(result_file, as_attachment=True, download_name=f'f1_optimization_{result_id}.json')
     else:
         return jsonify({'error': 'Results not found'}), 404
+
+@app.route('/load_config')
+def load_config():
+    """Load last used configuration"""
+    config_file = os.path.join(app.config['RESULTS_FOLDER'], 'last_config.json')
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+        return jsonify({'success': True, 'config': config})
+    return jsonify({'success': False})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
