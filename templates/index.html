@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F1 Fantasy Optimizer</title>
+    <title>F1 Fantasy Team Optimiser</title>
     <style>
         * {
             margin: 0;
@@ -107,6 +108,22 @@
         .button:disabled {
             background: #999;
             cursor: not-allowed;
+        }
+        
+        .button-secondary {
+            background: #6c757d;
+        }
+        
+        .button-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .button-success {
+            background: #28a745;
+        }
+        
+        .button-success:hover {
+            background: #218838;
         }
         
         .progress {
@@ -217,43 +234,93 @@
             border-radius: 4px;
             margin: 15px 0;
         }
+        
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        
+        .default-data-status {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #e8f4f8;
+            border-radius: 4px;
+            border: 1px solid #bee5eb;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .checkbox-group {
+            margin: 20px 0;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
     <header>
         <div class="container">
-            <h1>F1 Fantasy Optimizer</h1>
+            <h1>F1 Fantasy Team Optimiser</h1>
         </div>
     </header>
     
     <div class="container">
+        <!-- Default Data Status -->
+        <div class="section default-data-status" id="default-data-status" style="display: none;">
+            <h3>📁 Default Data Status</h3>
+            <p id="default-data-message"></p>
+        </div>
+        
         <!-- File Upload Section -->
         <div class="section" id="upload-section">
-            <h2>Step 1: Upload Data Files</h2>
+            <h2>Step 1: Data Files</h2>
+            <p style="margin-bottom: 20px;">Upload new data files or use existing default data if available.</p>
+            
             <div class="file-upload">
                 <div class="form-group">
                     <label for="driver-data">Driver Race Data (CSV)</label>
-                    <input type="file" id="driver-data" accept=".csv" required>
+                    <input type="file" id="driver-data" accept=".csv">
                 </div>
                 <div class="form-group">
                     <label for="constructor-data">Constructor Race Data (CSV)</label>
-                    <input type="file" id="constructor-data" accept=".csv" required>
+                    <input type="file" id="constructor-data" accept=".csv">
                 </div>
                 <div class="form-group">
                     <label for="calendar-data">Race Calendar (CSV)</label>
-                    <input type="file" id="calendar-data" accept=".csv" required>
+                    <input type="file" id="calendar-data" accept=".csv">
                 </div>
                 <div class="form-group">
                     <label for="tracks-data">Track Characteristics (CSV)</label>
-                    <input type="file" id="tracks-data" accept=".csv" required>
+                    <input type="file" id="tracks-data" accept=".csv">
                 </div>
             </div>
-            <button class="button" onclick="uploadFiles()">Upload Files</button>
+            
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" id="update-default-checkbox">
+                    Save these files as default data (will replace existing default data)
+                </label>
+            </div>
+            
+            <div class="button-group">
+                <button class="button" onclick="uploadFiles()">Upload New Files</button>
+                <button class="button button-success" id="use-default-btn" onclick="useDefaultData()" style="display: none;">Use Default Data</button>
+            </div>
         </div>
         
         <!-- Configuration Section -->
         <div class="section" id="config-section" style="display: none;">
-            <h2>Step 2: Configure Optimization</h2>
+            <h2>Step 2: Configure Optimisation</h2>
             
             <div class="form-group">
                 <label>Races Completed: <span id="races-completed">-</span></label>
@@ -317,22 +384,25 @@
                 </div>
             </div>
             
-            <button class="button" onclick="runOptimization()">Run Optimization</button>
+            <div class="button-group">
+                <button class="button" onclick="runOptimization()">Run Optimisation</button>
+                <button class="button button-secondary" onclick="resetToUpload()">Change Data Files</button>
+            </div>
         </div>
         
         <!-- Progress Section -->
         <div class="section progress" id="progress-section">
-            <h2>Optimization Progress</h2>
+            <h2>Optimisation Progress</h2>
             <div class="loading">
                 <div class="spinner"></div>
-                <p>Running optimization...</p>
+                <p>Running optimisation...</p>
             </div>
             <div id="progress-messages"></div>
         </div>
         
         <!-- Results Section -->
         <div class="section results" id="results-section">
-            <h2>Optimization Results</h2>
+            <h2>Optimisation Results</h2>
             <div id="results-content"></div>
         </div>
     </div>
@@ -340,6 +410,98 @@
     <script>
         let sessionId = null;
         let sessionData = null;
+        let usingDefaultData = false;
+        
+        // Check for default data on page load
+        window.onload = async function() {
+            await checkDefaultData();
+            await loadLastConfig();
+        };
+        
+        async function checkDefaultData() {
+            try {
+                const response = await fetch('/check_default_data');
+                const data = await response.json();
+                
+                if (data.has_default) {
+                    document.getElementById('default-data-status').style.display = 'block';
+                    document.getElementById('default-data-message').innerHTML = 
+                        `Default data available with ${data.data.races_completed} races completed. ` +
+                        `You can use this data or upload new files.`;
+                    document.getElementById('use-default-btn').style.display = 'inline-block';
+                }
+            } catch (error) {
+                console.error('Error checking default data:', error);
+            }
+        }
+        
+        async function loadLastConfig() {
+            try {
+                const response = await fetch('/load_config');
+                const data = await response.json();
+                
+                if (data.success && data.config) {
+                    // Store the config for later use
+                    window.lastConfig = data.config;
+                }
+            } catch (error) {
+                console.error('Error loading last config:', error);
+            }
+        }
+        
+        function useDefaultData() {
+            fetch('/check_default_data')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.has_default) {
+                        sessionId = 'default';
+                        sessionData = data.data;
+                        usingDefaultData = true;
+                        
+                        document.getElementById('races-completed').textContent = data.data.races_completed;
+                        populateTeamSelects(data.data.drivers, data.data.constructors);
+                        
+                        // Load last config if available
+                        if (window.lastConfig) {
+                            applyLastConfig();
+                        }
+                        
+                        document.getElementById('config-section').style.display = 'block';
+                        document.getElementById('upload-section').style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    alert('Error loading default data: ' + error.message);
+                });
+        }
+        
+        function applyLastConfig() {
+            const config = window.lastConfig;
+            
+            // Set drivers
+            const driverSelects = document.querySelectorAll('.driver-select');
+            config.current_drivers.forEach((driver, index) => {
+                if (driverSelects[index]) {
+                    driverSelects[index].value = driver;
+                }
+            });
+            
+            // Set constructors
+            const constructorSelects = document.querySelectorAll('.constructor-select');
+            config.current_constructors.forEach((constructor, index) => {
+                if (constructorSelects[index]) {
+                    constructorSelects[index].value = constructor;
+                }
+            });
+            
+            // Set other values
+            document.getElementById('remaining-budget').value = config.remaining_budget;
+            document.getElementById('step1-swaps').value = config.step1_swaps;
+            document.getElementById('step2-swaps').value = config.step2_swaps;
+            document.getElementById('weighting-scheme').value = config.weighting_scheme;
+            document.getElementById('risk-tolerance').value = config.risk_tolerance;
+            document.getElementById('multiplier').value = config.multiplier;
+        }
         
         async function uploadFiles() {
             const files = {
@@ -350,17 +512,27 @@
             };
             
             // Check all files are selected
+            let allFilesSelected = true;
             for (const [name, file] of Object.entries(files)) {
                 if (!file) {
-                    alert(`Please select ${name}`);
-                    return;
+                    allFilesSelected = false;
+                    break;
                 }
+            }
+            
+            if (!allFilesSelected) {
+                alert('Please select all 4 CSV files');
+                return;
             }
             
             const formData = new FormData();
             for (const [name, file] of Object.entries(files)) {
                 formData.append(name, file, name);
             }
+            
+            // Check if we should update default data
+            const updateDefault = document.getElementById('update-default-checkbox').checked;
+            formData.append('update_default', updateDefault);
             
             try {
                 const response = await fetch('/upload', {
@@ -373,12 +545,23 @@
                 if (data.success) {
                     sessionId = data.session_id;
                     sessionData = data;
-                    document.getElementById('races-completed').textContent = data.races_completed;
+                    usingDefaultData = false;
                     
-                    // Populate driver and constructor selects
+                    document.getElementById('races-completed').textContent = data.races_completed;
                     populateTeamSelects(data.drivers, data.constructors);
                     
-                    // Show configuration section
+                    if (data.updated_default) {
+                        alert('Files uploaded and saved as default data successfully!');
+                        await checkDefaultData(); // Refresh default data status
+                    } else {
+                        alert('Files uploaded successfully!');
+                    }
+                    
+                    // Load last config if available
+                    if (window.lastConfig) {
+                        applyLastConfig();
+                    }
+                    
                     document.getElementById('config-section').style.display = 'block';
                     document.getElementById('upload-section').style.display = 'none';
                 } else {
@@ -387,6 +570,19 @@
             } catch (error) {
                 alert('Error uploading files: ' + error.message);
             }
+        }
+        
+        function resetToUpload() {
+            document.getElementById('config-section').style.display = 'none';
+            document.getElementById('upload-section').style.display = 'block';
+            document.getElementById('results-section').style.display = 'none';
+            
+            // Clear file inputs
+            document.getElementById('driver-data').value = '';
+            document.getElementById('constructor-data').value = '';
+            document.getElementById('calendar-data').value = '';
+            document.getElementById('tracks-data').value = '';
+            document.getElementById('update-default-checkbox').checked = false;
         }
         
         function populateTeamSelects(drivers, constructors) {
@@ -513,8 +709,8 @@
                     <p><strong>Expected Points:</strong> ${opt.step2.expected_points.toFixed(1)} 
                        <span class="improvement">(+${opt.step2.improvement.toFixed(1)})</span></p>
                     <p><strong>Boost Driver:</strong> ${opt.step2.boost_driver}</p>
-                    <p><strong>Budget:</strong> $${opt.step2.budget_used.toFixed(1)}M used, 
-                       $${opt.step2.budget_remaining.toFixed(1)}M remaining</p>
+                    <p><strong>Budget:</strong> ${opt.step2.budget_used.toFixed(1)}M used, 
+                       ${opt.step2.budget_remaining.toFixed(1)}M remaining</p>
                 </div>
                 
                 <div class="result-card">
@@ -561,16 +757,23 @@
                     </table>
                 </div>
                 
-                <button class="button" onclick="downloadResults()">Download Full Results</button>
+                <div class="button-group">
+                    <button class="button" onclick="downloadResults('${data.result_id}')">Download Full Results</button>
+                    <button class="button button-secondary" onclick="runAnotherOptimization()">Run Another Optimization</button>
+                </div>
             `;
             
             resultsContent.innerHTML = html;
             document.getElementById('results-section').style.display = 'block';
         }
         
-        function downloadResults() {
-            window.location.href = `/download/${sessionId}`;
+        function downloadResults(resultId) {
+            window.location.href = `/download/${resultId}`;
+        }
+        
+        function runAnotherOptimization() {
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('config-section').style.display = 'block';
         }
     </script>
 </body>
-</html>
