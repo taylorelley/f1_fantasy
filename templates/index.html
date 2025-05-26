@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F1 Fantasy Team Optimiser</title>
+    <title>F1 Fantasy Optimizer</title>
     <style>
         * {
             margin: 0;
@@ -33,10 +32,39 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
         h1 {
-            text-align: center;
             font-size: 2.5em;
             font-weight: 300;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .nav-links a.active {
+            background: rgba(255,255,255,0.2);
         }
         
         .section {
@@ -269,8 +297,12 @@
 </head>
 <body>
     <header>
-        <div class="container">
-            <h1>F1 Fantasy Team Optimiser</h1>
+        <div class="header-content">
+            <h1>F1 Fantasy Optimizer</h1>
+            <nav class="nav-links">
+                <a href="/" class="active">Optimizer</a>
+                <a href="/statistics">Statistics</a>
+            </nav>
         </div>
     </header>
     
@@ -320,7 +352,7 @@
         
         <!-- Configuration Section -->
         <div class="section" id="config-section" style="display: none;">
-            <h2>Step 2: Configure Optimisation</h2>
+            <h2>Step 2: Configure Optimization</h2>
             
             <div class="form-group">
                 <label>Races Completed: <span id="races-completed">-</span></label>
@@ -385,24 +417,24 @@
             </div>
             
             <div class="button-group">
-                <button class="button" onclick="runOptimization()">Run Optimisation</button>
+                <button class="button" onclick="runOptimization()">Run Optimization</button>
                 <button class="button button-secondary" onclick="resetToUpload()">Change Data Files</button>
             </div>
         </div>
         
         <!-- Progress Section -->
         <div class="section progress" id="progress-section">
-            <h2>Optimisation Progress</h2>
+            <h2>Optimization Progress</h2>
             <div class="loading">
                 <div class="spinner"></div>
-                <p>Running optimisation...</p>
+                <p>Running optimization...</p>
             </div>
             <div id="progress-messages"></div>
         </div>
         
         <!-- Results Section -->
         <div class="section results" id="results-section">
-            <h2>Optimisation Results</h2>
+            <h2>Optimization Results</h2>
             <div id="results-content"></div>
         </div>
     </div>
