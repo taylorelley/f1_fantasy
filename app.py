@@ -339,5 +339,376 @@ def load_config():
         return jsonify({'success': True, 'config': config})
     return jsonify({'success': False})
 
+@app.route('/statistics')
+def statistics():
+    """Render the statistics page"""
+    return render_template('statistics.html')
+
+@app.route('/api/statistics')
+def get_statistics():
+    """Get comprehensive statistics for all drivers and constructors"""
+    try:
+        # Check if we have default data
+        data_folder = get_data_folder('default')
+        if not data_folder:
+            return jsonify({
+                'success': False,
+                'message': 'No data available. Please upload data files first.'
+            })
+        
+        # Load all necessary data
+        driver_race_df = pd.read_csv(os.path.join(data_folder, 'driver_race_data.csv'))
+        constructor_race_df = pd.read_csv(os.path.join(data_folder, 'constructor_race_data.csv'))
+        calendar_df = pd.read_csv(os.path.join(data_folder, 'calendar.csv'))
+        tracks_df = pd.read_csv(os.path.join(data_folder, 'tracks.csv'))
+        
+        # Load affinity data if available
+        driver_affinity_path = os.path.join(data_folder, 'driver_affinity.csv')
+        constructor_affinity_path = os.path.join(data_folder, 'constructor_affinity.csv')
+        driver_char_affinity_path = os.path.join(data_folder, 'driver_characteristic_affinities.csv')
+        constructor_char_affinity_path = os.path.join(data_folder, 'constructor_characteristic_affinities.csv')
+        
+        # Run calculations if affinity files don't exist
+        if not all(os.path.exists(p) for p in [driver_affinity_path, constructor_affinity_path, 
+                                                driver_char_affinity_path, constructor_char_affinity_path]):
+            config = {
+                'base_path': data_folder,
+                'races_completed': get_races_completed(data_folder),
+                'weighting_scheme': 'trend_based'
+            }
+            
+            # Calculate VFM
+            vfm_calc = F1VFMCalculator(config)
+            vfm_calc.run()
+            
+            # Calculate affinities
+            affinity_calc = F1TrackAffinityCalculator(config)
+            affinity_calc.run()
+        
+        # Load the calculated data
+        driver_vfm_df = pd.read_csv(os.path.join(data_folder, 'driver_vfm.csv'))
+        constructor_vfm_df = pd.read_csv(os.path.join(data_folder, 'constructor_vfm.csv'))
+        driver_affinity_df = pd.read_csv(driver_affinity_path)
+        constructor_affinity_df = pd.read_csv(constructor_affinity_path)
+        driver_char_affinity_df = pd.read_csv(driver_char_affinity_path, index_col=0)
+        constructor_char_affinity_df = pd.read_csv(constructor_char_affinity_path, index_col=0)
+        
+        # Process driver statistics
+        driver_stats = process_driver_statistics(
+            driver_race_df, driver_vfm_df, driver_affinity_df, 
+            driver_char_affinity_df, calendar_df, tracks_df
+        )
+        
+        # Process constructor statistics
+        constructor_stats = process_constructor_statistics(
+            constructor_race_df, constructor_vfm_df, constructor_affinity_df,
+            constructor_char_affinity_df, calendar_df, tracks_df
+        )
+        
+        return jsonify({
+            'success': True,
+            'drivers': driver_stats,
+            'constructors': constructor_stats,
+            'races_completed': get_races_completed(data_folder)
+        })
+        
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Error calculating statistics: {str(e)}'
+        })
+
+def process_driver_statistics(driver_race_df, driver_vfm_df, driver_affinity_df, 
+                            driver_char_affinity_df, calendar_df, tracks_df):
+    """Process comprehensive statistics for all drivers"""
+    driver_stats = []
+    race_columns = [col for col in driver_race_df.columns if col.startswith('Race')]
+    
+    for _, driver_row in driver_vfm_df.iterrows():
+        driver_name = driver_row['Driver']
+        
+        # Get race data for this driver
+        race_data = driver_race_df[driver_race_df['Driver'] == driver_name]
+        if race_data.empty:
+            continue
+            
+        race_points = race_data[race_columns].values[0]
+        valid_points = [p for p in race_points if not np.isnan(p)]
+        
+        # Basic statistics
+        stats = {
+            'name': driver_name,
+            'team': driver_row.get('Team', 'Unknown'),
+            'cost': driver_row['Cost'],
+            'cost_value': float(re.sub(r'[^\d.]', '', str(driver_row['Cost']))),
+            'vfm': driver_row['VFM'],
+            'trend': driver_row.get('Performance_Trend', 'Unknown'),
+            'avg_points': np.mean(valid_points) if valid_points else 0,
+            'total_points': np.sum(valid_points) if valid_points else 0,
+            'races_completed': len(valid_points),
+            'consistency': np.std(valid_points) if len(valid_points) > 1 else 0,
+            'best_race': np.max(valid_points) if valid_points else 0,
+            'worst_race': np.min(valid_points) if valid_points else 0,
+        }
+        
+        # Recent form (last 3 races vs overall)
+        if len(valid_points) >= 3:
+            recent_avg = np.mean(valid_points[-3:])
+            stats['recent_form'] = recent_avg - stats['avg_points']
+        else:
+            stats['recent_form'] = 0
+        
+        # Track characteristic affinities (for radar chart)
+        if driver_name in driver_char_affinity_df.index:
+            char_affinities = driver_char_affinity_df.loc[driver_name]
+            stats['char_affinities'] = {
+                'Corners': char_affinities.get('Corners', 0),
+                'Length': char_affinities.get('Length (km)', 0),
+                'Overtaking': char_affinities.get('Overtaking Opportunities_encoded', 0),
+                'Speed': char_affinities.get('Track Speed_encoded', 0),
+                'Temperature': char_affinities.get('Expected Temperatures_encoded', 0)
+            }
+        else:
+            stats['char_affinities'] = {
+                'Corners': 0, 'Length': 0, 'Overtaking': 0, 'Speed': 0, 'Temperature': 0
+            }
+        
+        # Track-specific performance
+        track_performance = []
+        for _, cal_row in calendar_df.iterrows():
+            race = cal_row['Race']
+            if race in race_columns:
+                race_idx = race_columns.index(race)
+                if race_idx < len(race_points) and not np.isnan(race_points[race_idx]):
+                    circuit = cal_row['Circuit']
+                    affinity_col = f'{driver_name}_affinity'
+                    
+                    # Get affinity score for this circuit
+                    circuit_affinity = 0
+                    if affinity_col in driver_affinity_df.columns:
+                        circuit_row = driver_affinity_df[driver_affinity_df['Circuit'] == circuit]
+                        if not circuit_row.empty:
+                            circuit_affinity = circuit_row.iloc[0][affinity_col]
+                    
+                    track_performance.append({
+                        'circuit': circuit,
+                        'points': race_points[race_idx],
+                        'affinity': circuit_affinity
+                    })
+        
+        # Sort by points to get best/worst tracks
+        track_performance.sort(key=lambda x: x['points'], reverse=True)
+        stats['best_tracks'] = track_performance[:3] if len(track_performance) >= 3 else track_performance
+        stats['worst_tracks'] = track_performance[-3:] if len(track_performance) >= 3 else []
+        
+        # Upcoming races affinity
+        upcoming_races = []
+        races_completed = len([r for r in race_columns if r in calendar_df['Race'].values])
+        for i in range(races_completed + 1, min(races_completed + 4, len(race_columns) + 1)):
+            race_name = f'Race{i}'
+            race_info = calendar_df[calendar_df['Race'] == race_name]
+            if not race_info.empty:
+                circuit = race_info.iloc[0]['Circuit']
+                affinity_col = f'{driver_name}_affinity'
+                
+                circuit_affinity = 0
+                if affinity_col in driver_affinity_df.columns:
+                    circuit_row = driver_affinity_df[driver_affinity_df['Circuit'] == circuit]
+                    if not circuit_row.empty:
+                        circuit_affinity = circuit_row.iloc[0][affinity_col]
+                
+                upcoming_races.append({
+                    'race': race_name,
+                    'circuit': circuit,
+                    'affinity': circuit_affinity
+                })
+        
+        stats['upcoming_races'] = upcoming_races
+        driver_stats.append(stats)
+    
+    # Calculate cost efficiency rankings
+    driver_stats.sort(key=lambda x: x['vfm'], reverse=True)
+    for i, driver in enumerate(driver_stats):
+        driver['vfm_rank'] = i + 1
+    
+    return driver_stats
+
+def process_constructor_statistics(constructor_race_df, constructor_vfm_df, constructor_affinity_df,
+                                 constructor_char_affinity_df, calendar_df, tracks_df):
+    """Process comprehensive statistics for all constructors"""
+    constructor_stats = []
+    race_columns = [col for col in constructor_race_df.columns if col.startswith('Race')]
+    
+    for _, constructor_row in constructor_vfm_df.iterrows():
+        constructor_name = constructor_row['Constructor']
+        
+        # Get race data for this constructor
+        race_data = constructor_race_df[constructor_race_df['Constructor'] == constructor_name]
+        if race_data.empty:
+            continue
+            
+        race_points = race_data[race_columns].values[0]
+        valid_points = [p for p in race_points if not np.isnan(p)]
+        
+        # Basic statistics
+        stats = {
+            'name': constructor_name,
+            'cost': constructor_row['Cost'],
+            'cost_value': float(re.sub(r'[^\d.]', '', str(constructor_row['Cost']))),
+            'vfm': constructor_row['VFM'],
+            'trend': constructor_row.get('Performance_Trend', 'Unknown'),
+            'avg_points': np.mean(valid_points) if valid_points else 0,
+            'total_points': np.sum(valid_points) if valid_points else 0,
+            'races_completed': len(valid_points),
+            'consistency': np.std(valid_points) if len(valid_points) > 1 else 0,
+            'best_race': np.max(valid_points) if valid_points else 0,
+            'worst_race': np.min(valid_points) if valid_points else 0,
+        }
+        
+        # Recent form
+        if len(valid_points) >= 3:
+            recent_avg = np.mean(valid_points[-3:])
+            stats['recent_form'] = recent_avg - stats['avg_points']
+        else:
+            stats['recent_form'] = 0
+        
+        # Track characteristic affinities
+        if constructor_name in constructor_char_affinity_df.index:
+            char_affinities = constructor_char_affinity_df.loc[constructor_name]
+            stats['char_affinities'] = {
+                'Corners': char_affinities.get('Corners', 0),
+                'Length': char_affinities.get('Length (km)', 0),
+                'Overtaking': char_affinities.get('Overtaking Opportunities_encoded', 0),
+                'Speed': char_affinities.get('Track Speed_encoded', 0),
+                'Temperature': char_affinities.get('Expected Temperatures_encoded', 0)
+            }
+        else:
+            stats['char_affinities'] = {
+                'Corners': 0, 'Length': 0, 'Overtaking': 0, 'Speed': 0, 'Temperature': 0
+            }
+        
+        # Track-specific performance
+        track_performance = []
+        for _, cal_row in calendar_df.iterrows():
+            race = cal_row['Race']
+            if race in race_columns:
+                race_idx = race_columns.index(race)
+                if race_idx < len(race_points) and not np.isnan(race_points[race_idx]):
+                    circuit = cal_row['Circuit']
+                    affinity_col = f'{constructor_name}_affinity'
+                    
+                    circuit_affinity = 0
+                    if affinity_col in constructor_affinity_df.columns:
+                        circuit_row = constructor_affinity_df[constructor_affinity_df['Circuit'] == circuit]
+                        if not circuit_row.empty:
+                            circuit_affinity = circuit_row.iloc[0][affinity_col]
+                    
+                    track_performance.append({
+                        'circuit': circuit,
+                        'points': race_points[race_idx],
+                        'affinity': circuit_affinity
+                    })
+        
+        track_performance.sort(key=lambda x: x['points'], reverse=True)
+        stats['best_tracks'] = track_performance[:3] if len(track_performance) >= 3 else track_performance
+        stats['worst_tracks'] = track_performance[-3:] if len(track_performance) >= 3 else []
+        
+        # Upcoming races affinity
+        upcoming_races = []
+        races_completed = len([r for r in race_columns if r in calendar_df['Race'].values])
+        for i in range(races_completed + 1, min(races_completed + 4, len(race_columns) + 1)):
+            race_name = f'Race{i}'
+            race_info = calendar_df[calendar_df['Race'] == race_name]
+            if not race_info.empty:
+                circuit = race_info.iloc[0]['Circuit']
+                affinity_col = f'{constructor_name}_affinity'
+                
+                circuit_affinity = 0
+                if affinity_col in constructor_affinity_df.columns:
+                    circuit_row = constructor_affinity_df[constructor_affinity_df['Circuit'] == circuit]
+                    if not circuit_row.empty:
+                        circuit_affinity = circuit_row.iloc[0][affinity_col]
+                
+                upcoming_races.append({
+                    'race': race_name,
+                    'circuit': circuit,
+                    'affinity': circuit_affinity
+                })
+        
+        stats['upcoming_races'] = upcoming_races
+        constructor_stats.append(stats)
+    
+    # Calculate rankings
+    constructor_stats.sort(key=lambda x: x['vfm'], reverse=True)
+    for i, constructor in enumerate(constructor_stats):
+        constructor['vfm_rank'] = i + 1
+    
+    return constructor_stats
+
+@app.route('/api/export_statistics')
+def export_statistics():
+    """Export all statistics as CSV"""
+    try:
+        stats_response = get_statistics()
+        stats_data = stats_response.get_json()
+        
+        if not stats_data['success']:
+            return stats_response
+        
+        # Create CSV for drivers
+        driver_rows = []
+        for driver in stats_data['drivers']:
+            row = {
+                'Driver': driver['name'],
+                'Team': driver['team'],
+                'Cost': driver['cost'],
+                'VFM': driver['vfm'],
+                'VFM_Rank': driver['vfm_rank'],
+                'Avg_Points': round(driver['avg_points'], 2),
+                'Total_Points': driver['total_points'],
+                'Consistency': round(driver['consistency'], 2),
+                'Recent_Form': round(driver['recent_form'], 2),
+                'Trend': driver['trend']
+            }
+            driver_rows.append(row)
+        
+        driver_df = pd.DataFrame(driver_rows)
+        
+        # Create CSV for constructors
+        constructor_rows = []
+        for constructor in stats_data['constructors']:
+            row = {
+                'Constructor': constructor['name'],
+                'Cost': constructor['cost'],
+                'VFM': constructor['vfm'],
+                'VFM_Rank': constructor['vfm_rank'],
+                'Avg_Points': round(constructor['avg_points'], 2),
+                'Total_Points': constructor['total_points'],
+                'Consistency': round(constructor['consistency'], 2),
+                'Recent_Form': round(constructor['recent_form'], 2),
+                'Trend': constructor['trend']
+            }
+            constructor_rows.append(row)
+        
+        constructor_df = pd.DataFrame(constructor_rows)
+        
+        # Save to temporary file
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_file = os.path.join(app.config['RESULTS_FOLDER'], f'statistics_{timestamp}.xlsx')
+        
+        with pd.ExcelWriter(output_file) as writer:
+            driver_df.to_excel(writer, sheet_name='Drivers', index=False)
+            constructor_df.to_excel(writer, sheet_name='Constructors', index=False)
+        
+        return send_file(output_file, as_attachment=True, 
+                        download_name=f'f1_statistics_{timestamp}.xlsx')
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error exporting statistics: {str(e)}'
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
