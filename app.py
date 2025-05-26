@@ -434,44 +434,44 @@ def process_driver_statistics(driver_race_df, driver_vfm_df, driver_affinity_df,
             continue
             
         race_points = race_data[race_columns].values[0]
-        valid_points = [p for p in race_points if not np.isnan(p)]
+        valid_points = [float(p) for p in race_points if not np.isnan(p)]
         
         # Basic statistics
         stats = {
-            'name': driver_name,
-            'team': driver_row.get('Team', 'Unknown'),
-            'cost': driver_row['Cost'],
+            'name': str(driver_name),
+            'team': str(driver_row.get('Team', 'Unknown')),
+            'cost': str(driver_row['Cost']),
             'cost_value': float(re.sub(r'[^\d.]', '', str(driver_row['Cost']))),
-            'vfm': driver_row['VFM'],
-            'trend': driver_row.get('Performance_Trend', 'Unknown'),
-            'avg_points': np.mean(valid_points) if valid_points else 0,
-            'total_points': np.sum(valid_points) if valid_points else 0,
-            'races_completed': len(valid_points),
-            'consistency': np.std(valid_points) if len(valid_points) > 1 else 0,
-            'best_race': np.max(valid_points) if valid_points else 0,
-            'worst_race': np.min(valid_points) if valid_points else 0,
+            'vfm': float(driver_row['VFM']),
+            'trend': str(driver_row.get('Performance_Trend', 'Unknown')),
+            'avg_points': float(np.mean(valid_points)) if valid_points else 0.0,
+            'total_points': float(np.sum(valid_points)) if valid_points else 0.0,
+            'races_completed': int(len(valid_points)),
+            'consistency': float(np.std(valid_points)) if len(valid_points) > 1 else 0.0,
+            'best_race': float(np.max(valid_points)) if valid_points else 0.0,
+            'worst_race': float(np.min(valid_points)) if valid_points else 0.0,
         }
         
         # Recent form (last 3 races vs overall)
         if len(valid_points) >= 3:
             recent_avg = np.mean(valid_points[-3:])
-            stats['recent_form'] = recent_avg - stats['avg_points']
+            stats['recent_form'] = float(recent_avg - stats['avg_points'])
         else:
-            stats['recent_form'] = 0
+            stats['recent_form'] = 0.0
         
         # Track characteristic affinities (for radar chart)
         if driver_name in driver_char_affinity_df.index:
             char_affinities = driver_char_affinity_df.loc[driver_name]
             stats['char_affinities'] = {
-                'Corners': char_affinities.get('Corners', 0),
-                'Length': char_affinities.get('Length (km)', 0),
-                'Overtaking': char_affinities.get('Overtaking Opportunities_encoded', 0),
-                'Speed': char_affinities.get('Track Speed_encoded', 0),
-                'Temperature': char_affinities.get('Expected Temperatures_encoded', 0)
+                'Corners': float(char_affinities.get('Corners', 0)),
+                'Length': float(char_affinities.get('Length (km)', 0)),
+                'Overtaking': float(char_affinities.get('Overtaking Opportunities_encoded', 0)),
+                'Speed': float(char_affinities.get('Track Speed_encoded', 0)),
+                'Temperature': float(char_affinities.get('Expected Temperatures_encoded', 0))
             }
         else:
             stats['char_affinities'] = {
-                'Corners': 0, 'Length': 0, 'Overtaking': 0, 'Speed': 0, 'Temperature': 0
+                'Corners': 0.0, 'Length': 0.0, 'Overtaking': 0.0, 'Speed': 0.0, 'Temperature': 0.0
             }
         
         # Track-specific performance
@@ -481,19 +481,19 @@ def process_driver_statistics(driver_race_df, driver_vfm_df, driver_affinity_df,
             if race in race_columns:
                 race_idx = race_columns.index(race)
                 if race_idx < len(race_points) and not np.isnan(race_points[race_idx]):
-                    circuit = cal_row['Circuit']
+                    circuit = str(cal_row['Circuit'])
                     affinity_col = f'{driver_name}_affinity'
                     
                     # Get affinity score for this circuit
-                    circuit_affinity = 0
+                    circuit_affinity = 0.0
                     if affinity_col in driver_affinity_df.columns:
                         circuit_row = driver_affinity_df[driver_affinity_df['Circuit'] == circuit]
                         if not circuit_row.empty:
-                            circuit_affinity = circuit_row.iloc[0][affinity_col]
+                            circuit_affinity = float(circuit_row.iloc[0][affinity_col])
                     
                     track_performance.append({
                         'circuit': circuit,
-                        'points': race_points[race_idx],
+                        'points': float(race_points[race_idx]),
                         'affinity': circuit_affinity
                     })
         
@@ -509,14 +509,14 @@ def process_driver_statistics(driver_race_df, driver_vfm_df, driver_affinity_df,
             race_name = f'Race{i}'
             race_info = calendar_df[calendar_df['Race'] == race_name]
             if not race_info.empty:
-                circuit = race_info.iloc[0]['Circuit']
+                circuit = str(race_info.iloc[0]['Circuit'])
                 affinity_col = f'{driver_name}_affinity'
                 
-                circuit_affinity = 0
+                circuit_affinity = 0.0
                 if affinity_col in driver_affinity_df.columns:
                     circuit_row = driver_affinity_df[driver_affinity_df['Circuit'] == circuit]
                     if not circuit_row.empty:
-                        circuit_affinity = circuit_row.iloc[0][affinity_col]
+                        circuit_affinity = float(circuit_row.iloc[0][affinity_col])
                 
                 upcoming_races.append({
                     'race': race_name,
@@ -549,43 +549,43 @@ def process_constructor_statistics(constructor_race_df, constructor_vfm_df, cons
             continue
             
         race_points = race_data[race_columns].values[0]
-        valid_points = [p for p in race_points if not np.isnan(p)]
+        valid_points = [float(p) for p in race_points if not np.isnan(p)]
         
         # Basic statistics
         stats = {
-            'name': constructor_name,
-            'cost': constructor_row['Cost'],
+            'name': str(constructor_name),
+            'cost': str(constructor_row['Cost']),
             'cost_value': float(re.sub(r'[^\d.]', '', str(constructor_row['Cost']))),
-            'vfm': constructor_row['VFM'],
-            'trend': constructor_row.get('Performance_Trend', 'Unknown'),
-            'avg_points': np.mean(valid_points) if valid_points else 0,
-            'total_points': np.sum(valid_points) if valid_points else 0,
-            'races_completed': len(valid_points),
-            'consistency': np.std(valid_points) if len(valid_points) > 1 else 0,
-            'best_race': np.max(valid_points) if valid_points else 0,
-            'worst_race': np.min(valid_points) if valid_points else 0,
+            'vfm': float(constructor_row['VFM']),
+            'trend': str(constructor_row.get('Performance_Trend', 'Unknown')),
+            'avg_points': float(np.mean(valid_points)) if valid_points else 0.0,
+            'total_points': float(np.sum(valid_points)) if valid_points else 0.0,
+            'races_completed': int(len(valid_points)),
+            'consistency': float(np.std(valid_points)) if len(valid_points) > 1 else 0.0,
+            'best_race': float(np.max(valid_points)) if valid_points else 0.0,
+            'worst_race': float(np.min(valid_points)) if valid_points else 0.0,
         }
         
         # Recent form
         if len(valid_points) >= 3:
             recent_avg = np.mean(valid_points[-3:])
-            stats['recent_form'] = recent_avg - stats['avg_points']
+            stats['recent_form'] = float(recent_avg - stats['avg_points'])
         else:
-            stats['recent_form'] = 0
+            stats['recent_form'] = 0.0
         
         # Track characteristic affinities
         if constructor_name in constructor_char_affinity_df.index:
             char_affinities = constructor_char_affinity_df.loc[constructor_name]
             stats['char_affinities'] = {
-                'Corners': char_affinities.get('Corners', 0),
-                'Length': char_affinities.get('Length (km)', 0),
-                'Overtaking': char_affinities.get('Overtaking Opportunities_encoded', 0),
-                'Speed': char_affinities.get('Track Speed_encoded', 0),
-                'Temperature': char_affinities.get('Expected Temperatures_encoded', 0)
+                'Corners': float(char_affinities.get('Corners', 0)),
+                'Length': float(char_affinities.get('Length (km)', 0)),
+                'Overtaking': float(char_affinities.get('Overtaking Opportunities_encoded', 0)),
+                'Speed': float(char_affinities.get('Track Speed_encoded', 0)),
+                'Temperature': float(char_affinities.get('Expected Temperatures_encoded', 0))
             }
         else:
             stats['char_affinities'] = {
-                'Corners': 0, 'Length': 0, 'Overtaking': 0, 'Speed': 0, 'Temperature': 0
+                'Corners': 0.0, 'Length': 0.0, 'Overtaking': 0.0, 'Speed': 0.0, 'Temperature': 0.0
             }
         
         # Track-specific performance
@@ -595,18 +595,18 @@ def process_constructor_statistics(constructor_race_df, constructor_vfm_df, cons
             if race in race_columns:
                 race_idx = race_columns.index(race)
                 if race_idx < len(race_points) and not np.isnan(race_points[race_idx]):
-                    circuit = cal_row['Circuit']
+                    circuit = str(cal_row['Circuit'])
                     affinity_col = f'{constructor_name}_affinity'
                     
-                    circuit_affinity = 0
+                    circuit_affinity = 0.0
                     if affinity_col in constructor_affinity_df.columns:
                         circuit_row = constructor_affinity_df[constructor_affinity_df['Circuit'] == circuit]
                         if not circuit_row.empty:
-                            circuit_affinity = circuit_row.iloc[0][affinity_col]
+                            circuit_affinity = float(circuit_row.iloc[0][affinity_col])
                     
                     track_performance.append({
                         'circuit': circuit,
-                        'points': race_points[race_idx],
+                        'points': float(race_points[race_idx]),
                         'affinity': circuit_affinity
                     })
         
@@ -621,14 +621,14 @@ def process_constructor_statistics(constructor_race_df, constructor_vfm_df, cons
             race_name = f'Race{i}'
             race_info = calendar_df[calendar_df['Race'] == race_name]
             if not race_info.empty:
-                circuit = race_info.iloc[0]['Circuit']
+                circuit = str(race_info.iloc[0]['Circuit'])
                 affinity_col = f'{constructor_name}_affinity'
                 
-                circuit_affinity = 0
+                circuit_affinity = 0.0
                 if affinity_col in constructor_affinity_df.columns:
                     circuit_row = constructor_affinity_df[constructor_affinity_df['Circuit'] == circuit]
                     if not circuit_row.empty:
-                        circuit_affinity = circuit_row.iloc[0][affinity_col]
+                        circuit_affinity = float(circuit_row.iloc[0][affinity_col])
                 
                 upcoming_races.append({
                     'race': race_name,
