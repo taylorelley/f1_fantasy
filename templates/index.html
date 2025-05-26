@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -33,10 +32,39 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
         h1 {
-            text-align: center;
             font-size: 2.5em;
             font-weight: 300;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .nav-links a.active {
+            background: rgba(255,255,255,0.2);
         }
         
         .section {
@@ -269,15 +297,19 @@
 </head>
 <body>
     <header>
-        <div class="container">
+        <div class="header-content">
             <h1>F1 Fantasy Team Optimiser</h1>
+            <nav class="nav-links">
+                <a href="/" class="active">Optimiser</a>
+                <a href="/statistics">Statistics</a>
+            </nav>
         </div>
     </header>
     
     <div class="container">
         <!-- Default Data Status -->
         <div class="section default-data-status" id="default-data-status" style="display: none;">
-            <h3>📁 Default Data Status</h3>
+            <h3>📁 Default Data</h3>
             <p id="default-data-message"></p>
         </div>
         
