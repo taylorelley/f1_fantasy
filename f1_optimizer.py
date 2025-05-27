@@ -261,18 +261,38 @@ class F1VFMCalculator:
         
         for entity in df_clean[entity_col].unique():
             entity_mask = df_clean[entity_col] == entity
-            entity_data = df_clean.loc[entity_mask, race_columns].values.flatten()
+            entity_rows = df_clean.loc[entity_mask, race_columns]
             
-            entity_mean = np.mean(entity_data)
-            entity_std = np.std(entity_data)
-            
-            lower_bound = entity_mean - 2 * entity_std
-            upper_bound = entity_mean + 2 * entity_std
-            
-            for race_col in race_columns:
-                value = df_clean.loc[entity_mask, race_col].values[0]
-                if value < lower_bound or value > upper_bound:
-                    df_clean.loc[entity_mask, race_col] = np.nan
+            # Get all race values for this entity
+            if len(entity_rows) > 0:
+                entity_data = entity_rows.values
+                if entity_data.ndim == 1:
+                    entity_data = entity_data.reshape(1, -1)
+                
+                # Flatten to get all values
+                all_values = entity_data.flatten()
+                valid_values = all_values[~np.isnan(all_values)]
+                
+                if len(valid_values) > 0:
+                    entity_mean = np.mean(valid_values)
+                    entity_std = np.std(valid_values)
+                    
+                    lower_bound = entity_mean - 2 * entity_std
+                    upper_bound = entity_mean + 2 * entity_std
+                    
+                    # Apply bounds to each race
+                    for race_col in race_columns:
+                        values = df_clean.loc[entity_mask, race_col].values
+                        if len(values) > 0:
+                            value = values[0] if np.isscalar(values) or len(values) == 1 else values
+                            if np.isscalar(value):
+                                if value < lower_bound or value > upper_bound:
+                                    df_clean.loc[entity_mask, race_col] = np.nan
+                            else:
+                                # Handle array case
+                                mask = (value < lower_bound) | (value > upper_bound)
+                                value[mask] = np.nan
+                                df_clean.loc[entity_mask, race_col] = value
         
         return df_clean
     
