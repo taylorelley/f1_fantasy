@@ -302,15 +302,19 @@ class F1VFMCalculator:
         trend_types = {}
         
         for entity in df[entity_col].unique():
+            entity_mask = df[entity_col] == entity
             entity_data = df[df[entity_col] == entity]
             points = []
             valid_indices = []
             
+            # Safely extract race points
             for i, col in enumerate(race_columns):
-                val = entity_data[col].values[0]
-                if not np.isnan(val):
-                    points.append(val)
-                    valid_indices.append(i)
+                values = entity_data[col].values
+                if len(values) > 0:
+                    val = values[0] if len(values) == 1 else values.item() if values.size == 1 else values[0]
+                    if not np.isnan(val):
+                        points.append(val)
+                        valid_indices.append(i)
             
             if len(points) >= 3:
                 x = np.array(valid_indices)
@@ -357,12 +361,14 @@ class F1VFMCalculator:
             weight_sum = 0.0
             
             for i, race_col in enumerate(race_columns):
-                race_value = df.loc[entity_mask, race_col].values[0]
-                weight = entity_weights[entity][i]
-                
-                if not np.isnan(race_value) and not np.isnan(weight):
-                    weighted_sum += race_value * weight
-                    weight_sum += weight
+                race_values = df.loc[entity_mask, race_col].values
+                if len(race_values) > 0:
+                    race_value = race_values[0] if len(race_values) == 1 else race_values.item() if race_values.size == 1 else race_values[0]
+                    weight = entity_weights[entity][i]
+                    
+                    if not np.isnan(race_value) and not np.isnan(weight):
+                        weighted_sum += race_value * weight
+                        weight_sum += weight
             
             if weight_sum > 0:
                 df.loc[entity_mask, 'Weighted_Points'] = weighted_sum / weight_sum
@@ -400,7 +406,13 @@ class F1VFMCalculator:
             weight_sum = 0.0
             
             for i, race_col in enumerate(race_columns):
-                race_value = df.loc[idx, race_col]
+                race_values = df.loc[idx, race_col]
+                
+                # Handle both scalar and array values
+                if hasattr(race_values, '__len__') and not isinstance(race_values, str):
+                    race_value = race_values[0] if len(race_values) > 0 else np.nan
+                else:
+                    race_value = race_values
                 
                 if not np.isnan(race_value):
                     weighted_sum += race_value * weights[i]
@@ -683,15 +695,23 @@ class F1TrackAffinityCalculator:
                         char_values = valid_data[char].values
                         points_values = valid_data['adjusted_points'].values
                         
-                        # Calculate weighted correlation
-                        weights = time_weights[-len(valid_data):]
-                        weighted_cov = np.cov(char_values, points_values, aweights=weights)[0, 1]
-                        weighted_var_char = np.cov(char_values, aweights=weights)[0, 0]
-                        weighted_var_points = np.cov(points_values, aweights=weights)[0, 0]
+                        # Ensure we have the right number of weights
+                        weights = time_weights[-len(valid_data):] if len(time_weights) >= len(valid_data) else time_weights
                         
-                        if weighted_var_char > 0 and weighted_var_points > 0:
-                            correlation = weighted_cov / np.sqrt(weighted_var_char * weighted_var_points)
-                        else:
+                        try:
+                            # Calculate weighted correlation safely
+                            if len(char_values) > 1 and len(points_values) > 1:
+                                weighted_cov = np.cov(char_values, points_values, aweights=weights)[0, 1]
+                                weighted_var_char = np.var(char_values, aweights=weights)
+                                weighted_var_points = np.var(points_values, aweights=weights)
+                                
+                                if weighted_var_char > 0 and weighted_var_points > 0:
+                                    correlation = weighted_cov / np.sqrt(weighted_var_char * weighted_var_points)
+                                else:
+                                    correlation = 0
+                            else:
+                                correlation = 0
+                        except Exception:
                             correlation = 0
                         
                         # Confidence weight based on sample size
@@ -714,20 +734,23 @@ class F1TrackAffinityCalculator:
                         
                         # Quadratic term
                         char_squared = char_values ** 2
-                        correlation_squared = np.corrcoef(char_squared, points_values)[0, 1]
-                        if not np.isnan(correlation_squared):
-                            affinity_scores[f'{char}_squared'] = correlation_squared * 0.5  # Lower weight
+                        try:
+                            correlation_squared = np.corrcoef(char_squared, points_values)[0, 1]
+                            if not np.isnan(correlation_squared):
+                                affinity_scores[f'{char}_squared'] = correlation_squared * 0.5  # Lower weight
+                        except Exception:
+                            pass
             
             # Cluster-based affinity
             if 'track_cluster' in entity_data.columns:
                 cluster_performance = entity_data.groupby('track_cluster')['adjusted_points'].agg(['mean', 'count'])
                 for cluster in cluster_performance.index:
                     if cluster_performance.loc[cluster, 'count'] >= 2:
-                        affinity_scores[f'cluster_{cluster}'] = cluster_performance.loc[cluster, 'mean']
+                        affinity_scores[f'cluster_{cluster}'] = float(cluster_performance.loc[cluster, 'mean'])
             
             # Consistency factor
             consistency = 1 / (1 + entity_data['adjusted_points'].std()) if len(entity_data) > 1 else 1
-            affinity_scores['consistency'] = consistency
+            affinity_scores['consistency'] = float(consistency)
             
             entity_affinities[entity] = affinity_scores
         
