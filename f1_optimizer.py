@@ -2,6 +2,7 @@
 """
 F1 Fantasy Optimizer Suite
 Complete pipeline for VFM calculation, track affinity analysis, and team optimization
+Enhanced with improved affinity calculations
 """
 
 import pandas as pd
@@ -15,8 +16,6 @@ import time
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 from sklearn.preprocessing import LabelEncoder
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -261,38 +260,18 @@ class F1VFMCalculator:
         
         for entity in df_clean[entity_col].unique():
             entity_mask = df_clean[entity_col] == entity
-            entity_rows = df_clean.loc[entity_mask, race_columns]
+            entity_data = df_clean.loc[entity_mask, race_columns].values.flatten()
             
-            # Get all race values for this entity
-            if len(entity_rows) > 0:
-                entity_data = entity_rows.values
-                if entity_data.ndim == 1:
-                    entity_data = entity_data.reshape(1, -1)
-                
-                # Flatten to get all values
-                all_values = entity_data.flatten()
-                valid_values = all_values[~np.isnan(all_values)]
-                
-                if len(valid_values) > 0:
-                    entity_mean = np.mean(valid_values)
-                    entity_std = np.std(valid_values)
-                    
-                    lower_bound = entity_mean - 2 * entity_std
-                    upper_bound = entity_mean + 2 * entity_std
-                    
-                    # Apply bounds to each race
-                    for race_col in race_columns:
-                        values = df_clean.loc[entity_mask, race_col].values
-                        if len(values) > 0:
-                            value = values[0] if np.isscalar(values) or len(values) == 1 else values
-                            if np.isscalar(value):
-                                if value < lower_bound or value > upper_bound:
-                                    df_clean.loc[entity_mask, race_col] = np.nan
-                            else:
-                                # Handle array case
-                                mask = (value < lower_bound) | (value > upper_bound)
-                                value[mask] = np.nan
-                                df_clean.loc[entity_mask, race_col] = value
+            entity_mean = np.mean(entity_data)
+            entity_std = np.std(entity_data)
+            
+            lower_bound = entity_mean - 2 * entity_std
+            upper_bound = entity_mean + 2 * entity_std
+            
+            for race_col in race_columns:
+                value = df_clean.loc[entity_mask, race_col].values[0]
+                if value < lower_bound or value > upper_bound:
+                    df_clean.loc[entity_mask, race_col] = np.nan
         
         return df_clean
     
@@ -302,19 +281,15 @@ class F1VFMCalculator:
         trend_types = {}
         
         for entity in df[entity_col].unique():
-            entity_mask = df[entity_col] == entity
             entity_data = df[df[entity_col] == entity]
             points = []
             valid_indices = []
             
-            # Safely extract race points
             for i, col in enumerate(race_columns):
-                values = entity_data[col].values
-                if len(values) > 0:
-                    val = values[0] if len(values) == 1 else values.item() if values.size == 1 else values[0]
-                    if not np.isnan(val):
-                        points.append(val)
-                        valid_indices.append(i)
+                val = entity_data[col].values[0]
+                if not np.isnan(val):
+                    points.append(val)
+                    valid_indices.append(i)
             
             if len(points) >= 3:
                 x = np.array(valid_indices)
@@ -361,14 +336,12 @@ class F1VFMCalculator:
             weight_sum = 0.0
             
             for i, race_col in enumerate(race_columns):
-                race_values = df.loc[entity_mask, race_col].values
-                if len(race_values) > 0:
-                    race_value = race_values[0] if len(race_values) == 1 else race_values.item() if race_values.size == 1 else race_values[0]
-                    weight = entity_weights[entity][i]
-                    
-                    if not np.isnan(race_value) and not np.isnan(weight):
-                        weighted_sum += race_value * weight
-                        weight_sum += weight
+                race_value = df.loc[entity_mask, race_col].values[0]
+                weight = entity_weights[entity][i]
+                
+                if not np.isnan(race_value) and not np.isnan(weight):
+                    weighted_sum += race_value * weight
+                    weight_sum += weight
             
             if weight_sum > 0:
                 df.loc[entity_mask, 'Weighted_Points'] = weighted_sum / weight_sum
@@ -406,13 +379,7 @@ class F1VFMCalculator:
             weight_sum = 0.0
             
             for i, race_col in enumerate(race_columns):
-                race_values = df.loc[idx, race_col]
-                
-                # Handle both scalar and array values
-                if hasattr(race_values, '__len__') and not isinstance(race_values, str):
-                    race_value = race_values[0] if len(race_values) > 0 else np.nan
-                else:
-                    race_value = race_values
+                race_value = df.loc[idx, race_col]
                 
                 if not np.isnan(race_value):
                     weighted_sum += race_value * weights[i]
@@ -443,7 +410,7 @@ class F1VFMCalculator:
 
 
 class F1TrackAffinityCalculator:
-    """Calculate track affinity scores based on historical performance with advanced features"""
+    """Calculate track affinity scores based on historical performance with enhanced algorithms"""
     
     def __init__(self, config):
         self.config = config
@@ -451,7 +418,7 @@ class F1TrackAffinityCalculator:
         
     def run(self):
         """Run track affinity calculations"""
-        print("Calculating track affinities with enhanced model...")
+        print("Calculating track affinities with enhanced algorithms...")
         
         # Load data
         driver_points = pd.read_csv(f'{self.base_path}driver_race_data.csv')
@@ -463,8 +430,8 @@ class F1TrackAffinityCalculator:
         race_columns = [col for col in driver_points.columns if col.startswith('Race')]
         constructor_race_columns = [col for col in constructor_points.columns if col.startswith('Race')]
         
-        driver_points_clean = self._remove_outliers(driver_points, 'Driver', race_columns)
-        constructor_points_clean = self._remove_outliers(constructor_points, 'Constructor', constructor_race_columns)
+        driver_points_clean = self._remove_outliers_advanced(driver_points, 'Driver', race_columns)
+        constructor_points_clean = self._remove_outliers_advanced(constructor_points, 'Constructor', constructor_race_columns)
         
         # Process data
         driver_performance = self._prepare_performance_data(driver_points_clean, race_columns, 'Driver')
@@ -479,29 +446,20 @@ class F1TrackAffinityCalculator:
             driver_circuit_performance, constructor_circuit_performance, track_characteristics
         )
         
-        # Add track clustering
-        track_clusters = self._cluster_tracks(track_chars_encoded)
-        driver_perf_encoded['track_cluster'] = driver_perf_encoded['Circuit'].map(track_clusters)
-        constructor_perf_encoded['track_cluster'] = constructor_perf_encoded['Circuit'].map(track_clusters)
-        
-        # Calculate track difficulty adjustments
-        track_difficulty = self._calculate_track_difficulty(driver_perf_encoded, constructor_perf_encoded)
-        
-        # Apply difficulty adjustments
-        driver_perf_encoded = self._apply_difficulty_adjustment(driver_perf_encoded, track_difficulty, 'Driver')
-        constructor_perf_encoded = self._apply_difficulty_adjustment(constructor_perf_encoded, track_difficulty, 'Constructor')
+        # Calculate characteristic importance weights
+        char_importance = self._calculate_characteristic_importance(track_chars_encoded)
         
         # Calculate enhanced affinities
-        driver_char_affinity = self._calculate_enhanced_affinity(driver_perf_encoded, 'Driver')
-        constructor_char_affinity = self._calculate_enhanced_affinity(constructor_perf_encoded, 'Constructor')
+        driver_char_affinity = self._calculate_enhanced_affinity(driver_perf_encoded, 'Driver', char_importance)
+        constructor_char_affinity = self._calculate_enhanced_affinity(constructor_perf_encoded, 'Constructor', char_importance)
         
         # Convert to DataFrames
         driver_char_affinity_df = pd.DataFrame(driver_char_affinity).T.fillna(0)
         constructor_char_affinity_df = pd.DataFrame(constructor_char_affinity).T.fillna(0)
         
-        # Calculate track affinities with enhanced scoring
-        driver_track_affinity = self._calculate_enhanced_track_affinity(driver_char_affinity_df, track_chars_encoded, track_clusters)
-        constructor_track_affinity = self._calculate_enhanced_track_affinity(constructor_char_affinity_df, track_chars_encoded, track_clusters)
+        # Calculate track affinities
+        driver_track_affinity = self._calculate_track_affinity(driver_char_affinity_df, track_chars_encoded)
+        constructor_track_affinity = self._calculate_track_affinity(constructor_char_affinity_df, track_chars_encoded)
         
         # Create final output
         driver_final_output = self._create_final_output(track_characteristics, driver_track_affinity)
@@ -516,36 +474,58 @@ class F1TrackAffinityCalculator:
         print(f"Enhanced track affinity calculation complete. Files saved to {self.base_path}")
         return driver_final_output, constructor_final_output
     
-    def _remove_outliers(self, df, entity_col, race_columns):
-        """Remove outliers from race data"""
+    def _remove_outliers_advanced(self, df, entity_col, race_columns):
+        """Enhanced outlier detection using IQR and rolling statistics"""
         df_clean = df.copy()
         
         for entity in df_clean[entity_col].unique():
             entity_mask = df_clean[entity_col] == entity
             entity_data = df_clean.loc[entity_mask, race_columns].values.flatten()
+            entity_data = entity_data[~np.isnan(entity_data)]
             
-            entity_mean = np.mean(entity_data)
-            entity_std = np.std(entity_data)
+            if len(entity_data) < 4:
+                continue
+                
+            # Use IQR method for more robust outlier detection
+            Q1 = np.percentile(entity_data, 25)
+            Q3 = np.percentile(entity_data, 75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
             
-            lower_bound = entity_mean - 2 * entity_std
-            upper_bound = entity_mean + 2 * entity_std
+            # Also consider rolling variance for seasonal outliers
+            if len(entity_data) >= 6:
+                rolling_std = pd.Series(entity_data).rolling(window=3, center=True).std()
+                dynamic_threshold = rolling_std.mean() * 2.5
+                
+                # Apply more conservative bounds if rolling variance suggests high volatility
+                if not np.isnan(dynamic_threshold):
+                    entity_mean = np.mean(entity_data)
+                    lower_bound = max(lower_bound, entity_mean - dynamic_threshold)
+                    upper_bound = min(upper_bound, entity_mean + dynamic_threshold)
             
             for race_col in race_columns:
                 value = df_clean.loc[entity_mask, race_col].values[0]
-                if value < lower_bound or value > upper_bound:
+                if not np.isnan(value) and (value < lower_bound or value > upper_bound):
                     df_clean.loc[entity_mask, race_col] = np.nan
         
         return df_clean
     
     def _prepare_performance_data(self, df, race_columns, entity_type):
-        """Prepare performance data in long format"""
+        """Prepare performance data in long format with race ordering"""
         id_vars = ['Driver', 'Team'] if entity_type == 'Driver' else ['Constructor']
-        return df.melt(
+        melted_df = df.melt(
             id_vars=id_vars,
             value_vars=race_columns,
             var_name='Race',
             value_name='Points'
         )
+        
+        # Extract race number for proper ordering
+        melted_df['Race_Number'] = melted_df['Race'].str.extract('(\d+)').astype(int)
+        melted_df = melted_df.sort_values(['Race_Number'])
+        
+        return melted_df
     
     def _merge_track_data(self, performance_df, race_calendar, track_characteristics):
         """Merge performance data with track information"""
@@ -573,194 +553,236 @@ class F1TrackAffinityCalculator:
             if col in constructor_perf_encoded.columns:
                 constructor_perf_encoded[col + '_encoded'] = label_encoders[col].transform(constructor_perf_encoded[col])
         
-        # Add interaction features
-        for df in [track_chars_encoded, driver_perf_encoded, constructor_perf_encoded]:
-            if all(col in df.columns for col in ['Corners', 'Length (km)', 'Track Speed_encoded']):
-                df['Corners_per_km'] = df['Corners'] / df['Length (km)']
-                df['High_speed_corners'] = df['Track Speed_encoded'] * df['Corners']
-                df['Technical_score'] = df['Corners_per_km'] * (2 - df['Track Speed_encoded'])
-        
         return driver_perf_encoded, constructor_perf_encoded, track_chars_encoded
     
-    def _cluster_tracks(self, track_chars_encoded):
-        """Cluster tracks based on characteristics"""
-        from sklearn.cluster import KMeans
-        from sklearn.preprocessing import StandardScaler
-        
-        # Features for clustering
-        features = ['Corners', 'Length (km)', 'Overtaking Opportunities_encoded', 
-                   'Track Speed_encoded', 'Expected Temperatures_encoded',
-                   'Corners_per_km', 'High_speed_corners', 'Technical_score']
-        
-        X = track_chars_encoded[features].values
-        
-        # Standardize features
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        
-        # Perform clustering
-        n_clusters = min(5, len(track_chars_encoded) // 3)  # Ensure reasonable cluster size
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-        clusters = kmeans.fit_predict(X_scaled)
-        
-        # Create circuit to cluster mapping
-        circuit_clusters = dict(zip(track_chars_encoded['Circuit'], clusters))
-        
-        return circuit_clusters
-    
-    def _calculate_track_difficulty(self, driver_perf, constructor_perf):
-        """Calculate track difficulty based on performance variance"""
-        track_difficulty = {}
-        
-        # Combine all performance data
-        all_performances = []
-        
-        for circuit in driver_perf['Circuit'].unique():
-            circuit_data = driver_perf[driver_perf['Circuit'] == circuit]
-            valid_points = circuit_data.dropna(subset=['Points'])['Points'].values
-            
-            if len(valid_points) > 3:
-                # Calculate difficulty metrics
-                mean_points = np.mean(valid_points)
-                std_points = np.std(valid_points)
-                cv = std_points / mean_points if mean_points > 0 else 0
-                
-                # Higher CV = more difficult/unpredictable track
-                track_difficulty[circuit] = {
-                    'mean': mean_points,
-                    'std': std_points,
-                    'cv': cv,
-                    'difficulty_score': cv
-                }
-            else:
-                track_difficulty[circuit] = {
-                    'mean': np.mean(valid_points) if len(valid_points) > 0 else 0,
-                    'std': 0,
-                    'cv': 0,
-                    'difficulty_score': 0
-                }
-        
-        return track_difficulty
-    
-    def _apply_difficulty_adjustment(self, perf_df, track_difficulty, entity_type):
-        """Apply track difficulty adjustments to performance data"""
-        perf_df = perf_df.copy()
-        perf_df['adjusted_points'] = perf_df['Points']
-        perf_df['difficulty_score'] = 0
-        
-        for circuit, difficulty in track_difficulty.items():
-            circuit_mask = perf_df['Circuit'] == circuit
-            if difficulty['std'] > 0:
-                # Z-score normalization
-                perf_df.loc[circuit_mask, 'adjusted_points'] = (
-                    (perf_df.loc[circuit_mask, 'Points'] - difficulty['mean']) / difficulty['std']
-                )
-            perf_df.loc[circuit_mask, 'difficulty_score'] = difficulty['difficulty_score']
-        
-        return perf_df
-    
-    def _calculate_enhanced_affinity(self, df, entity_col):
-        """Calculate enhanced affinity with multiple improvements"""
-        df_valid = df.dropna(subset=['Points', 'adjusted_points'])
-        
-        # All features to consider
-        base_chars = ['Corners', 'Length (km)', 'Overtaking Opportunities_encoded',
+    def _calculate_characteristic_importance(self, track_chars_encoded):
+        """Calculate dynamic weights for each characteristic based on variance and impact"""
+        char_cols = ['Corners', 'Length (km)', 'Overtaking Opportunities_encoded',
                      'Track Speed_encoded', 'Expected Temperatures_encoded']
-        interaction_chars = ['Corners_per_km', 'High_speed_corners', 'Technical_score']
-        all_chars = base_chars + interaction_chars
         
-        entity_affinities = {}
+        importance_weights = {}
+        variances = []
+        
+        for char in char_cols:
+            variance = np.var(track_chars_encoded[char])
+            variances.append(variance)
+        
+        max_variance = max(variances)
+        
+        for i, char in enumerate(char_cols):
+            # Higher variance = more discriminative = higher weight
+            # Normalize to 0.5-2.0 range
+            if max_variance > 0:
+                importance_weights[char] = 0.5 + (variances[i] / max_variance) * 1.5
+            else:
+                importance_weights[char] = 1.0
+        
+        return importance_weights
+    
+    def _weighted_correlation(self, x, y, weights):
+        """Calculate weighted correlation coefficient"""
+        if len(x) != len(y) or len(x) != len(weights):
+            return np.nan
+        
+        # Remove NaN values
+        valid_mask = ~(np.isnan(x) | np.isnan(y) | np.isnan(weights))
+        if valid_mask.sum() < 2:
+            return np.nan
+        
+        x_valid = x[valid_mask]
+        y_valid = y[valid_mask]
+        w_valid = weights[valid_mask]
+        
+        # Calculate weighted means
+        w_sum = np.sum(w_valid)
+        if w_sum == 0:
+            return np.nan
+            
+        x_mean = np.sum(w_valid * x_valid) / w_sum
+        y_mean = np.sum(w_valid * y_valid) / w_sum
+        
+        # Calculate weighted covariance and variances
+        cov = np.sum(w_valid * (x_valid - x_mean) * (y_valid - y_mean)) / w_sum
+        var_x = np.sum(w_valid * (x_valid - x_mean)**2) / w_sum
+        var_y = np.sum(w_valid * (y_valid - y_mean)**2) / w_sum
+        
+        # Calculate correlation
+        if var_x == 0 or var_y == 0:
+            return np.nan
+        
+        return cov / np.sqrt(var_x * var_y)
+    
+    def _calculate_enhanced_affinity(self, df, entity_col, char_importance):
+        """Calculate enhanced entity affinity to track characteristics"""
+        df_valid = df.dropna(subset=['Points'])
+        
+        char_cols = ['Corners', 'Length (km)', 'Overtaking Opportunities_encoded',
+                     'Track Speed_encoded', 'Expected Temperatures_encoded']
+        
+        # Add interaction terms
+        interaction_pairs = [
+            ('Corners', 'Track Speed_encoded'),
+            ('Length (km)', 'Overtaking Opportunities_encoded'),
+            ('Track Speed_encoded', 'Expected Temperatures_encoded')
+        ]
+        
+        entity_char_affinity = {}
         
         for entity in df_valid[entity_col].unique():
-            entity_data = df_valid[df_valid[entity_col] == entity]
+            entity_data = df_valid[df_valid[entity_col] == entity].copy()
             
             if len(entity_data) < 3:
                 continue
             
+            # Sort by race number for time-weighted analysis
+            entity_data = entity_data.sort_values('Race_Number')
+            
             affinity_scores = {}
             
-            # Time weights (exponential decay)
+            # Create time weights (recent races weighted more heavily)
             n_races = len(entity_data)
-            time_weights = np.exp(-0.1 * (n_races - np.arange(n_races)))
-            time_weights = time_weights / time_weights.sum()
+            time_weights = np.exp(np.linspace(-1.5, 0, n_races))
             
-            # Base linear affinities
-            for char in all_chars:
-                if char in entity_data.columns and entity_data[char].notna().sum() > 2:
-                    valid_mask = entity_data[char].notna() & entity_data['adjusted_points'].notna()
-                    valid_data = entity_data.loc[valid_mask]
+            # Analyze base characteristics
+            for char in char_cols:
+                if char in entity_data.columns and entity_data[char].notna().sum() >= 2:
+                    char_data = entity_data[char].values
+                    points_data = entity_data['Points'].values
                     
-                    if len(valid_data) >= 3:
-                        # Weighted correlation
-                        char_values = valid_data[char].values
-                        points_values = valid_data['adjusted_points'].values
+                    # Multi-scale temporal analysis
+                    long_term_corr = self._calculate_robust_correlation(char_data, points_data)
+                    
+                    # Short-term analysis (last 40% of races)
+                    short_term_threshold = max(2, int(0.4 * n_races))
+                    if n_races >= short_term_threshold:
+                        recent_char = char_data[-short_term_threshold:]
+                        recent_points = points_data[-short_term_threshold:]
+                        short_term_corr = self._calculate_robust_correlation(recent_char, recent_points)
                         
-                        # Ensure we have the right number of weights
-                        weights = time_weights[-len(valid_data):] if len(time_weights) >= len(valid_data) else time_weights
-                        
-                        try:
-                            # Calculate weighted correlation safely
-                            if len(char_values) > 1 and len(points_values) > 1:
-                                weighted_cov = np.cov(char_values, points_values, aweights=weights)[0, 1]
-                                weighted_var_char = np.var(char_values, aweights=weights)
-                                weighted_var_points = np.var(points_values, aweights=weights)
-                                
-                                if weighted_var_char > 0 and weighted_var_points > 0:
-                                    correlation = weighted_cov / np.sqrt(weighted_var_char * weighted_var_points)
-                                else:
-                                    correlation = 0
-                            else:
-                                correlation = 0
-                        except Exception:
-                            correlation = 0
-                        
-                        # Confidence weight based on sample size
-                        confidence = min(len(valid_data) / 7, 1.0)
-                        affinity_scores[char] = correlation * confidence
+                        # Blend correlations (70% long-term, 30% short-term)
+                        if not np.isnan(short_term_corr):
+                            blended_corr = 0.7 * long_term_corr + 0.3 * short_term_corr
+                        else:
+                            blended_corr = long_term_corr
                     else:
-                        affinity_scores[char] = 0
+                        blended_corr = long_term_corr
+                    
+                    # Apply confidence weighting using bootstrap
+                    confidence_weight = self._calculate_confidence_weight(char_data, points_data)
+                    
+                    # Apply characteristic importance weighting
+                    importance_weight = char_importance.get(char, 1.0)
+                    
+                    final_affinity = blended_corr * confidence_weight * importance_weight
+                    affinity_scores[char] = final_affinity
                 else:
                     affinity_scores[char] = 0
             
-            # Non-linear affinities (polynomial features)
-            for char in base_chars[:2]:  # Only for continuous variables (Corners, Length)
-                if char in entity_data.columns:
-                    valid_mask = entity_data[char].notna() & entity_data['adjusted_points'].notna()
-                    valid_data = entity_data.loc[valid_mask]
+            # Calculate interaction effects
+            for char1, char2 in interaction_pairs:
+                if (char1 in entity_data.columns and char2 in entity_data.columns and 
+                    entity_data[char1].notna().sum() >= 2 and entity_data[char2].notna().sum() >= 2):
                     
-                    if len(valid_data) >= 5:  # Need more data for polynomial
-                        char_values = valid_data[char].values
-                        points_values = valid_data['adjusted_points'].values
-                        
-                        # Quadratic term
-                        char_squared = char_values ** 2
-                        try:
-                            correlation_squared = np.corrcoef(char_squared, points_values)[0, 1]
-                            if not np.isnan(correlation_squared):
-                                affinity_scores[f'{char}_squared'] = correlation_squared * 0.5  # Lower weight
-                        except Exception:
-                            pass
+                    # Create interaction term
+                    interaction_data = entity_data[char1].values * entity_data[char2].values
+                    points_data = entity_data['Points'].values
+                    
+                    # Calculate interaction correlation
+                    interaction_corr = self._calculate_robust_correlation(interaction_data, points_data)
+                    confidence_weight = self._calculate_confidence_weight(interaction_data, points_data)
+                    
+                    # Store interaction effect (weighted less than main effects)
+                    interaction_name = f"{char1}_x_{char2}"
+                    affinity_scores[interaction_name] = interaction_corr * confidence_weight * 0.5
             
-            # Cluster-based affinity
-            if 'track_cluster' in entity_data.columns:
-                cluster_performance = entity_data.groupby('track_cluster')['adjusted_points'].agg(['mean', 'count'])
-                for cluster in cluster_performance.index:
-                    if cluster_performance.loc[cluster, 'count'] >= 2:
-                        affinity_scores[f'cluster_{cluster}'] = float(cluster_performance.loc[cluster, 'mean'])
-            
-            # Consistency factor
-            consistency = 1 / (1 + entity_data['adjusted_points'].std()) if len(entity_data) > 1 else 1
-            affinity_scores['consistency'] = float(consistency)
-            
-            entity_affinities[entity] = affinity_scores
+            entity_char_affinity[entity] = affinity_scores
         
-        return entity_affinities
+        return entity_char_affinity
     
-    def _calculate_enhanced_track_affinity(self, char_affinity_df, track_chars_encoded, track_clusters):
-        """Calculate track affinity scores with enhanced model"""
-        base_chars = ['Corners', 'Length (km)', 'Overtaking Opportunities_encoded',
-                     'Track Speed_encoded', 'Expected Temperatures_encoded']
-        interaction_chars = ['Corners_per_km', 'High_speed_corners', 'Technical_score']
+    def _calculate_robust_correlation(self, x, y):
+        """Calculate robust correlation using multiple methods"""
+        # Remove NaN values
+        valid_mask = ~(np.isnan(x) | np.isnan(y))
+        if valid_mask.sum() < 2:
+            return 0
+        
+        x_valid = x[valid_mask]
+        y_valid = y[valid_mask]
+        
+        # Test multiple relationship types
+        correlations = []
+        
+        # Linear correlation
+        linear_corr = np.corrcoef(x_valid, y_valid)[0, 1]
+        if not np.isnan(linear_corr):
+            correlations.append(linear_corr)
+        
+        # Quadratic relationship
+        if len(x_valid) >= 3:
+            x_squared = x_valid ** 2
+            quad_corr = np.corrcoef(x_squared, y_valid)[0, 1]
+            if not np.isnan(quad_corr):
+                correlations.append(quad_corr)
+        
+        # Threshold relationship (performance above/below median)
+        if len(np.unique(x_valid)) > 2:
+            median_x = np.median(x_valid)
+            threshold_mask = x_valid > median_x
+            if len(np.unique(threshold_mask)) > 1:
+                threshold_corr = np.corrcoef(threshold_mask.astype(int), y_valid)[0, 1]
+                if not np.isnan(threshold_corr):
+                    correlations.append(threshold_corr)
+        
+        # Return strongest relationship (by absolute value)
+        if correlations:
+            return max(correlations, key=abs)
+        else:
+            return 0
+    
+    def _calculate_confidence_weight(self, x, y):
+        """Calculate confidence weight using bootstrap resampling"""
+        valid_mask = ~(np.isnan(x) | np.isnan(y))
+        if valid_mask.sum() < 3:
+            return 0.1  # Low confidence for insufficient data
+        
+        x_valid = x[valid_mask]
+        y_valid = y[valid_mask]
+        
+        # Bootstrap resampling for confidence intervals
+        bootstrap_correlations = []
+        n_bootstrap = min(50, len(x_valid) * 10)  # Adaptive bootstrap sample size
+        
+        for _ in range(n_bootstrap):
+            sample_indices = np.random.choice(len(x_valid), size=len(x_valid), replace=True)
+            sample_x = x_valid[sample_indices]
+            sample_y = y_valid[sample_indices]
+            
+            sample_corr = np.corrcoef(sample_x, sample_y)[0, 1]
+            if not np.isnan(sample_corr):
+                bootstrap_correlations.append(sample_corr)
+        
+        if len(bootstrap_correlations) < 5:
+            return 0.1
+        
+        # Calculate confidence interval width
+        confidence_interval = np.percentile(bootstrap_correlations, [25, 75])
+        confidence_width = confidence_interval[1] - confidence_interval[0]
+        
+        # Convert width to confidence weight (narrow CI = higher confidence)
+        # Normalize to 0.1-1.0 range
+        max_expected_width = 1.0  # Maximum reasonable correlation width
+        confidence_weight = max(0.1, 1.0 - min(confidence_width / max_expected_width, 0.9))
+        
+        return confidence_weight
+    
+    def _calculate_track_affinity(self, char_affinity_df, track_chars_encoded):
+        """Calculate entity affinity for each track with interaction effects"""
+        base_char_cols = ['Corners', 'Length (km)', 'Overtaking Opportunities_encoded',
+                         'Track Speed_encoded', 'Expected Temperatures_encoded']
+        
+        # Include interaction terms in calculation
+        interaction_cols = [col for col in char_affinity_df.columns if '_x_' in col]
+        all_char_cols = base_char_cols + interaction_cols
         
         track_affinity_scores = {}
         
@@ -769,73 +791,72 @@ class F1TrackAffinityCalculator:
             entity_affinities = char_affinity_df.loc[entity]
             
             for _, track in track_chars_encoded.iterrows():
-                # Base linear score
-                base_score = 0
-                base_weight = 0
+                track_score = 0
+                total_weight = 0
                 
-                for char in base_chars + interaction_chars:
+                # Calculate base characteristic contributions
+                for char in base_char_cols:
                     if char in track and char in entity_affinities:
                         char_value = track[char]
                         entity_affinity = entity_affinities[char]
                         
                         # Normalize characteristic values
                         if char == 'Corners':
-                            normalized_value = (char_value - 10) / 17
+                            normalized_value = (char_value - 10) / (27 - 10)
                         elif char == 'Length (km)':
-                            normalized_value = (char_value - 3.337) / 3.667
-                        elif char == 'Corners_per_km':
-                            normalized_value = min(char_value / 10, 1)
+                            normalized_value = (char_value - 3.337) / (7.004 - 3.337)
                         else:
-                            max_val = track_chars_encoded[char].max()
-                            normalized_value = char_value / max_val if max_val > 0 else 0
+                            max_encoded = track_chars_encoded[char].max()
+                            normalized_value = char_value / max_encoded if max_encoded > 0 else 0
+                        
+                        # Clip to [0, 1] range
+                        normalized_value = np.clip(normalized_value, 0, 1)
                         
                         contribution = entity_affinity * normalized_value
-                        base_score += contribution
-                        base_weight += abs(entity_affinity)
+                        track_score += contribution
+                        total_weight += abs(entity_affinity)
                 
-                # Non-linear score
-                nonlinear_score = 0
-                nonlinear_weight = 0
-                
-                for char in ['Corners', 'Length (km)']:
-                    squared_key = f'{char}_squared'
-                    if squared_key in entity_affinities and char in track:
-                        char_value = track[char]
-                        # Normalize and square
-                        if char == 'Corners':
-                            normalized_value = (char_value - 10) / 17
-                        else:
-                            normalized_value = (char_value - 3.337) / 3.667
+                # Add interaction effects
+                for interaction_col in interaction_cols:
+                    if interaction_col in entity_affinities:
+                        # Parse interaction column name
+                        char1, char2 = interaction_col.split('_x_')
                         
-                        squared_value = normalized_value ** 2
-                        contribution = entity_affinities[squared_key] * squared_value
-                        nonlinear_score += contribution
-                        nonlinear_weight += abs(entity_affinities[squared_key])
+                        if char1 in track and char2 in track:
+                            # Calculate interaction value
+                            char1_value = track[char1]
+                            char2_value = track[char2]
+                            
+                            # Normalize both characteristics
+                            if char1 == 'Corners':
+                                norm1 = (char1_value - 10) / (27 - 10)
+                            elif char1 == 'Length (km)':
+                                norm1 = (char1_value - 3.337) / (7.004 - 3.337)
+                            else:
+                                max1 = track_chars_encoded[char1].max()
+                                norm1 = char1_value / max1 if max1 > 0 else 0
+                            
+                            if char2 == 'Corners':
+                                norm2 = (char2_value - 10) / (27 - 10)
+                            elif char2 == 'Length (km)':
+                                norm2 = (char2_value - 3.337) / (7.004 - 3.337)
+                            else:
+                                max2 = track_chars_encoded[char2].max()
+                                norm2 = char2_value / max2 if max2 > 0 else 0
+                            
+                            norm1 = np.clip(norm1, 0, 1)
+                            norm2 = np.clip(norm2, 0, 1)
+                            
+                            interaction_value = norm1 * norm2
+                            entity_interaction_affinity = entity_affinities[interaction_col]
+                            
+                            contribution = entity_interaction_affinity * interaction_value
+                            track_score += contribution
+                            total_weight += abs(entity_interaction_affinity)
                 
-                # Cluster score
-                cluster_score = 0
-                if track['Circuit'] in track_clusters:
-                    cluster = track_clusters[track['Circuit']]
-                    cluster_key = f'cluster_{cluster}'
-                    if cluster_key in entity_affinities:
-                        cluster_score = entity_affinities[cluster_key]
-                
-                # Consistency bonus
-                consistency_bonus = entity_affinities.get('consistency', 0)
-                
-                # Combine scores with weights
-                total_weight = base_weight + nonlinear_weight
+                # Calculate final normalized score
                 if total_weight > 0:
-                    linear_component = (base_score / base_weight) if base_weight > 0 else 0
-                    nonlinear_component = (nonlinear_score / nonlinear_weight) if nonlinear_weight > 0 else 0
-                    
-                    # Weighted combination
-                    final_score = (
-                        0.5 * linear_component +
-                        0.2 * nonlinear_component +
-                        0.2 * cluster_score +
-                        0.1 * consistency_bonus
-                    )
+                    final_score = track_score / total_weight
                 else:
                     final_score = 0
                 
@@ -1310,74 +1331,61 @@ class F1TeamOptimizer:
 
 def main():
     """Main execution function"""
-    print("F1 Fantasy Optimizer Suite")
-    print("="*80)
+    print("F1 Fantasy Optimizer Suite - Enhanced Edition")
+    print("=" * 80)
     
-    # Check if there's a saved configuration
-    CONFIG = None
-    config_file = None
-    
-    # Try common paths
-    possible_paths = [
-        '/content/drive/MyDrive/F1 Fantasy/last_config.json',
-        './last_config.json',
-        'last_config.json'
-    ]
-    
-    for path in possible_paths:
-        if os.path.exists(path):
-            config_file = path
-            break
-    
-    if config_file:
-        use_saved = input(f"\nFound saved configuration at {config_file}. Use it? (y/n) [n]: ").strip().lower()
-        if use_saved == 'y':
-            try:
-                with open(config_file, 'r') as f:
-                    saved_config = json.load(f)
-                
-                # Recalculate races_completed
-                races_completed = get_races_completed(saved_config['base_path'])
-                if races_completed is not None:
-                    saved_config['races_completed'] = races_completed
-                    print(f"\nLoaded configuration with {races_completed} races completed.")
-                    CONFIG = saved_config
-                else:
-                    print("Error reading race data. Starting fresh configuration.")
-            except Exception as e:
-                print(f"Error loading saved configuration: {e}")
-                print("Starting fresh configuration.")
-    
-    # Get configuration from user if not loaded
-    if CONFIG is None:
-        CONFIG = get_user_configuration()
-    
-    # Step 1: Calculate VFM
-    print("\n\nStep 1: Calculating VFM scores...")
-    vfm_calculator = F1VFMCalculator(CONFIG)
-    driver_vfm, constructor_vfm = vfm_calculator.run()
-    
-    # Step 2: Calculate Track Affinities
-    print("\nStep 2: Calculating track affinities...")
-    affinity_calculator = F1TrackAffinityCalculator(CONFIG)
-    driver_affinities, constructor_affinities = affinity_calculator.run()
-    
-    # Step 3: Optimize Team
-    print("\nStep 3: Optimizing team selection...")
-    optimizer = F1TeamOptimizer(CONFIG)
-    optimizer.run()
-    
-    print("\n" + "="*80)
-    print("Optimization complete!")
-    
-    # Save configuration for future reference
-    config_file = f"{CONFIG['base_path']}last_config.json"
-    with open(config_file, 'w') as f:
-        json.dump(CONFIG, f, indent=2)
-    print(f"\nConfiguration saved to {config_file}")
-    
-    # Ask if user wants to load this config next time
-    print("\nTip: To reuse this configuration next time, select 'y' when prompted at startup.")
+    try:
+        # Get user configuration
+        config = get_user_configuration()
+        
+        # Initialize components
+        vfm_calculator = F1VFMCalculator(config)
+        affinity_calculator = F1TrackAffinityCalculator(config)
+        team_optimizer = F1TeamOptimizer(config)
+        
+        # Run pipeline
+        print("\nStarting optimization pipeline...")
+        
+        # Step 1: Calculate VFM scores
+        print("\n" + "="*50)
+        print("STEP 1: VFM CALCULATION")
+        print("="*50)
+        driver_vfm, constructor_vfm = vfm_calculator.run()
+        
+        # Step 2: Calculate track affinities
+        print("\n" + "="*50)
+        print("STEP 2: TRACK AFFINITY ANALYSIS")
+        print("="*50)
+        driver_affinity, constructor_affinity = affinity_calculator.run()
+        
+        # Step 3: Optimize team
+        print("\n" + "="*50)
+        print("STEP 3: TEAM OPTIMIZATION")
+        print("="*50)
+        success = team_optimizer.run()
+        
+        if success:
+            print("\n" + "="*80)
+            print("PIPELINE COMPLETED SUCCESSFULLY")
+            print("="*80)
+            print(f"All results saved to: {config['base_path']}")
+            print("\nGenerated files:")
+            print("- driver_vfm.csv (VFM scores for drivers)")
+            print("- constructor_vfm.csv (VFM scores for constructors)")
+            print("- driver_characteristic_affinities.csv (Driver characteristic correlations)")
+            print("- driver_affinity.csv (Driver track affinities)")
+            print("- constructor_characteristic_affinities.csv (Constructor characteristic correlations)")
+            print("- constructor_affinity.csv (Constructor track affinities)")
+            print("- optimization_[timestamp].json (Optimization results)")
+        else:
+            print("\nOptimization failed. Please check your data files and configuration.")
+            
+    except KeyboardInterrupt:
+        print("\n\nOperation cancelled by user.")
+        sys.exit(0)
+    except Exception as e:
+        print(f"\nError during execution: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
