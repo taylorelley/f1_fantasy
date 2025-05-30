@@ -747,7 +747,6 @@
                 </div>
                 
                 <div class="button-group">
-                    <button class="button" onclick="downloadResults('${data.result_id}')">Download Full Results</button>
                     <button class="button button-secondary" onclick="runAnotherOptimization()">Run Another Optimization</button>
                 </div>
             `;
@@ -756,9 +755,7 @@
             document.getElementById('results-section').style.display = 'block';
         }
         
-        function downloadResults(resultId) {
-            window.location.href = `/download/${resultId}`;
-        }
+
         
         function runAnotherOptimization() {
             document.getElementById('results-section').style.display = 'none';
