@@ -430,6 +430,11 @@
         window.onload = async function() {
             await checkDefaultData();
             await loadLastConfig();
+            
+            // If default data is available, go straight to configuration
+            if (document.getElementById('use-default-btn').style.display !== 'none') {
+                useDefaultData();
+            }
         };
         
         async function checkDefaultData() {
@@ -440,12 +445,15 @@
                 if (data.has_default) {
                     document.getElementById('default-data-status').style.display = 'block';
                     document.getElementById('default-data-message').innerHTML = 
-                        `Default data available with ${data.data.races_completed} races completed. ` +
-                        `You can use this data or upload new files.`;
+                        `Using default data with ${data.data.races_completed} races completed. ` +
+                        `<a href="#" onclick="showUploadSection()">Click here to upload new files instead.</a>`;
                     document.getElementById('use-default-btn').style.display = 'inline-block';
+                    return true;
                 }
+                return false;
             } catch (error) {
                 console.error('Error checking default data:', error);
+                return false;
             }
         }
         
@@ -586,10 +594,11 @@
             }
         }
         
-        function resetToUpload() {
+        function showUploadSection() {
             document.getElementById('config-section').style.display = 'none';
             document.getElementById('upload-section').style.display = 'block';
             document.getElementById('results-section').style.display = 'none';
+            document.getElementById('default-data-status').style.display = 'none';
             
             // Clear file inputs
             document.getElementById('driver-data').value = '';
@@ -597,6 +606,10 @@
             document.getElementById('calendar-data').value = '';
             document.getElementById('tracks-data').value = '';
             document.getElementById('update-default-checkbox').checked = false;
+        }
+        
+        function resetToUpload() {
+            showUploadSection();
         }
         
         function populateTeamSelects(drivers, constructors) {
