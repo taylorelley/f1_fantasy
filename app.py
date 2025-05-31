@@ -211,20 +211,6 @@ def optimize():
             'use_parallel': False  # Disable for web app
         }
         
-        # Save configuration for easy reuse
-        config_file = os.path.join(app.config['RESULTS_FOLDER'], 'last_config.json')
-        with open(config_file, 'w') as f:
-            json.dump({
-                'current_drivers': data['current_drivers'],
-                'current_constructors': data['current_constructors'],
-                'remaining_budget': data['remaining_budget'],
-                'step1_swaps': data['step1_swaps'],
-                'step2_swaps': data['step2_swaps'],
-                'weighting_scheme': data['weighting_scheme'],
-                'risk_tolerance': data['risk_tolerance'],
-                'multiplier': data['multiplier']
-            }, f)
-        
         results = {
             'status': 'running',
             'progress': []
@@ -306,15 +292,7 @@ def optimize():
             'message': f'Error during optimization: {str(e)}'
         })
 
-@app.route('/load_config')
-def load_config():
-    """Load last used configuration"""
-    config_file = os.path.join(app.config['RESULTS_FOLDER'], 'last_config.json')
-    if os.path.exists(config_file):
-        with open(config_file, 'r') as f:
-            config = json.load(f)
-        return jsonify({'success': True, 'config': config})
-    return jsonify({'success': False})
+
 
 @app.route('/statistics')
 def statistics():
