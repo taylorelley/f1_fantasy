@@ -209,24 +209,6 @@
             border: 1px solid #e0e0e0;
         }
         
-        .vfm-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        
-        .vfm-table th,
-        .vfm-table td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        .vfm-table th {
-            background: #f5f5f5;
-            font-weight: 600;
-        }
-        
         .loading {
             text-align: center;
             padding: 40px;
@@ -315,7 +297,7 @@
         
         <!-- File Upload Section -->
         <div class="section" id="upload-section">
-            <h2>Step 1: Data Files</h2>
+            <h2>Load Data Files</h2>
             <p style="margin-bottom: 20px;">Upload new data files or use existing default data if available.</p>
             
             <div class="file-upload">
@@ -352,7 +334,7 @@
         
         <!-- Configuration Section -->
         <div class="section" id="config-section" style="display: none;">
-            <h2>Step 2: Configure Optimisation</h2>
+            <h2>Configure Optimisation</h2>
             
             <div class="form-group">
                 <label>Races Completed: <span id="races-completed">-</span></label>
@@ -448,6 +430,11 @@
         window.onload = async function() {
             await checkDefaultData();
             await loadLastConfig();
+            
+            // If default data is available, go straight to configuration
+            if (document.getElementById('use-default-btn').style.display !== 'none') {
+                useDefaultData();
+            }
         };
         
         async function checkDefaultData() {
@@ -458,12 +445,15 @@
                 if (data.has_default) {
                     document.getElementById('default-data-status').style.display = 'block';
                     document.getElementById('default-data-message').innerHTML = 
-                        `Default data available with ${data.data.races_completed} races completed. ` +
-                        `You can use this data or upload new files.`;
+                        `Using default data with ${data.data.races_completed} races completed. ` +
+                        `<a href="#" onclick="showUploadSection()">Click here to upload new files instead.</a>`;
                     document.getElementById('use-default-btn').style.display = 'inline-block';
+                    return true;
                 }
+                return false;
             } catch (error) {
                 console.error('Error checking default data:', error);
+                return false;
             }
         }
         
@@ -604,10 +594,11 @@
             }
         }
         
-        function resetToUpload() {
+        function showUploadSection() {
             document.getElementById('config-section').style.display = 'none';
             document.getElementById('upload-section').style.display = 'block';
             document.getElementById('results-section').style.display = 'none';
+            document.getElementById('default-data-status').style.display = 'none';
             
             // Clear file inputs
             document.getElementById('driver-data').value = '';
@@ -615,6 +606,10 @@
             document.getElementById('calendar-data').value = '';
             document.getElementById('tracks-data').value = '';
             document.getElementById('update-default-checkbox').checked = false;
+        }
+        
+        function resetToUpload() {
+            showUploadSection();
         }
         
         function populateTeamSelects(drivers, constructors) {
@@ -764,33 +759,7 @@
                     <p><strong>Optimization Time:</strong> ${opt.summary.optimization_time.toFixed(1)}s</p>
                 </div>
                 
-                <div class="result-card">
-                    <h3>Top VFM Scores</h3>
-                    <h4>Drivers:</h4>
-                    <table class="vfm-table">
-                        <thead>
-                            <tr>
-                                <th>Driver</th>
-                                <th>Team</th>
-                                <th>Cost</th>
-                                <th>VFM</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${data.vfm_data.drivers.map(d => `
-                                <tr>
-                                    <td>${d.Driver}</td>
-                                    <td>${d.Team}</td>
-                                    <td>${d.Cost}</td>
-                                    <td>${d.VFM}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                
                 <div class="button-group">
-                    <button class="button" onclick="downloadResults('${data.result_id}')">Download Full Results</button>
                     <button class="button button-secondary" onclick="runAnotherOptimization()">Run Another Optimization</button>
                 </div>
             `;
@@ -799,9 +768,7 @@
             document.getElementById('results-section').style.display = 'block';
         }
         
-        function downloadResults(resultId) {
-            window.location.href = `/download/${resultId}`;
-        }
+
         
         function runAnotherOptimization() {
             document.getElementById('results-section').style.display = 'none';

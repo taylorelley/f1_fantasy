@@ -294,22 +294,8 @@ def optimize():
             }
         }
         
-        # Get VFM data for display
-        results['vfm_data'] = {
-            'drivers': driver_vfm.head(10).to_dict('records'),
-            'constructors': constructor_vfm.to_dict('records')
-        }
-        
         results['status'] = 'complete'
         results['success'] = True
-        
-        # Save results
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        result_file = os.path.join(app.config['RESULTS_FOLDER'], f'optimization_{timestamp}.json')
-        with open(result_file, 'w') as f:
-            json.dump(results, f, indent=2)
-        
-        results['result_id'] = timestamp
         
         return jsonify(results)
         
@@ -319,15 +305,6 @@ def optimize():
             'success': False,
             'message': f'Error during optimization: {str(e)}'
         })
-
-@app.route('/download/<result_id>')
-def download_results(result_id):
-    """Download optimization results"""
-    result_file = os.path.join(app.config['RESULTS_FOLDER'], f'optimization_{result_id}.json')
-    if os.path.exists(result_file):
-        return send_file(result_file, as_attachment=True, download_name=f'f1_optimization_{result_id}.json')
-    else:
-        return jsonify({'error': 'Results not found'}), 404
 
 @app.route('/load_config')
 def load_config():
