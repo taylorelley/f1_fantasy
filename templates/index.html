@@ -400,7 +400,7 @@
             
             <div class="button-group">
                 <button class="button" onclick="runOptimization()">Run Optimisation</button>
-                <button class="button button-secondary" onclick="resetToUpload()">Change Data Files</button>
+                <button class="button button-secondary" onclick="showUploadSection()">Change Data Files</button>
             </div>
         </div>
         
@@ -429,7 +429,6 @@
         // Check for default data on page load
         window.onload = async function() {
             await checkDefaultData();
-            await loadLastConfig();
             
             // If default data is available, go straight to configuration
             if (document.getElementById('use-default-btn').style.display !== 'none') {
@@ -458,17 +457,8 @@
         }
         
         async function loadLastConfig() {
-            try {
-                const response = await fetch('/load_config');
-                const data = await response.json();
-                
-                if (data.success && data.config) {
-                    // Store the config for later use
-                    window.lastConfig = data.config;
-                }
-            } catch (error) {
-                console.error('Error loading last config:', error);
-            }
+            // Load configuration from cookies instead of server
+            loadConfigFromCookie();
         }
         
         function useDefaultData() {
@@ -484,9 +474,7 @@
                         populateTeamSelects(data.data.drivers, data.data.constructors);
                         
                         // Load last config if available
-                        if (window.lastConfig) {
-                            applyLastConfig();
-                        }
+                        loadConfigFromCookie();
                         
                         document.getElementById('config-section').style.display = 'block';
                         document.getElementById('upload-section').style.display = 'none';
@@ -497,32 +485,92 @@
                 });
         }
         
-        function applyLastConfig() {
-            const config = window.lastConfig;
+        // Cookie management functions
+        function setCookie(name, value, days = 30) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+            document.cookie = `${name}=${JSON.stringify(value)};expires=${expires.toUTCString()};path=/`;
+        }
+        
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) {
+                    try {
+                        return JSON.parse(c.substring(nameEQ.length, c.length));
+                    } catch (e) {
+                        return null;
+                    }
+                }
+            }
+            return null;
+        }
+        
+        function saveConfigToCookie() {
+            // Get selected drivers
+            const drivers = [];
+            document.querySelectorAll('.driver-select').forEach(select => {
+                if (select.value) drivers.push(select.value);
+            });
             
+            // Get selected constructors
+            const constructors = [];
+            document.querySelectorAll('.constructor-select').forEach(select => {
+                if (select.value) constructors.push(select.value);
+            });
+            
+            const config = {
+                current_drivers: drivers,
+                current_constructors: constructors,
+                remaining_budget: document.getElementById('remaining-budget').value,
+                step1_swaps: document.getElementById('step1-swaps').value,
+                step2_swaps: document.getElementById('step2-swaps').value,
+                weighting_scheme: document.getElementById('weighting-scheme').value,
+                risk_tolerance: document.getElementById('risk-tolerance').value,
+                multiplier: document.getElementById('multiplier').value
+            };
+            
+            setCookie('f1_optimizer_config', config);
+        }
+        
+        function loadConfigFromCookie() {
+            const config = getCookie('f1_optimizer_config');
+            if (config) {
+                applyConfig(config);
+            }
+        }
+        
+        function applyConfig(config) {
             // Set drivers
             const driverSelects = document.querySelectorAll('.driver-select');
-            config.current_drivers.forEach((driver, index) => {
-                if (driverSelects[index]) {
-                    driverSelects[index].value = driver;
-                }
-            });
+            if (config.current_drivers) {
+                config.current_drivers.forEach((driver, index) => {
+                    if (driverSelects[index]) {
+                        driverSelects[index].value = driver;
+                    }
+                });
+            }
             
             // Set constructors
             const constructorSelects = document.querySelectorAll('.constructor-select');
-            config.current_constructors.forEach((constructor, index) => {
-                if (constructorSelects[index]) {
-                    constructorSelects[index].value = constructor;
-                }
-            });
+            if (config.current_constructors) {
+                config.current_constructors.forEach((constructor, index) => {
+                    if (constructorSelects[index]) {
+                        constructorSelects[index].value = constructor;
+                    }
+                });
+            }
             
             // Set other values
-            document.getElementById('remaining-budget').value = config.remaining_budget;
-            document.getElementById('step1-swaps').value = config.step1_swaps;
-            document.getElementById('step2-swaps').value = config.step2_swaps;
-            document.getElementById('weighting-scheme').value = config.weighting_scheme;
-            document.getElementById('risk-tolerance').value = config.risk_tolerance;
-            document.getElementById('multiplier').value = config.multiplier;
+            if (config.remaining_budget) document.getElementById('remaining-budget').value = config.remaining_budget;
+            if (config.step1_swaps) document.getElementById('step1-swaps').value = config.step1_swaps;
+            if (config.step2_swaps) document.getElementById('step2-swaps').value = config.step2_swaps;
+            if (config.weighting_scheme) document.getElementById('weighting-scheme').value = config.weighting_scheme;
+            if (config.risk_tolerance) document.getElementById('risk-tolerance').value = config.risk_tolerance;
+            if (config.multiplier) document.getElementById('multiplier').value = config.multiplier;
         }
         
         async function uploadFiles() {
@@ -580,9 +628,7 @@
                     }
                     
                     // Load last config if available
-                    if (window.lastConfig) {
-                        applyLastConfig();
-                    }
+                    loadConfigFromCookie();
                     
                     document.getElementById('config-section').style.display = 'block';
                     document.getElementById('upload-section').style.display = 'none';
@@ -675,6 +721,9 @@
                 risk_tolerance: document.getElementById('risk-tolerance').value,
                 multiplier: document.getElementById('multiplier').value
             };
+            
+            // Save configuration to cookies
+            saveConfigToCookie();
             
             // Show progress
             document.getElementById('progress-section').style.display = 'block';
