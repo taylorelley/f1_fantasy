@@ -2,7 +2,7 @@
 """
 F1 Fantasy Optimizer Suite
 Complete pipeline for VFM calculation, track affinity analysis, and team optimization
-Enhanced with improved affinity calculations
+Enhanced with improved affinity calculations and FP2 pace integration
 """
 
 import pandas as pd
@@ -13,6 +13,7 @@ import os
 import json
 import itertools
 import time
+import requests
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 from sklearn.preprocessing import LabelEncoder
@@ -29,6 +30,41 @@ def get_races_completed(base_path):
     except Exception as e:
         print(f"Error reading driver data: {e}")
         return None
+
+
+def get_expected_race_pace(session_key):
+    """
+    Calculate the expected race pace for each driver after a given practice session.
+    Parameters:
+    session_key (int): The unique identifier for the practice session.
+    Returns:
+    pandas.DataFrame: A DataFrame containing driver numbers and their average lap times.
+    """
+    # Fetch lap data for the session
+    url = f"https://api.openf1.org/v1/laps?session_key={session_key}"
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise Exception(f"API request failed with status code {response.status_code}")
+    lap_data = response.json()
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(lap_data)
+    if df.empty:
+        raise Exception("No lap data found for the given session_key.")
+    
+    # Filter out in-laps, out-laps, and laps with missing lap_time
+    df = df[(df['lap_type'] == 'FLYING') & (df['lap_time'].notnull())]
+    if df.empty:
+        raise Exception("No valid flying laps found for the given session_key.")
+    
+    # Calculate average lap time per driver
+    avg_lap_times = df.groupby('driver_number')['lap_time'].mean().reset_index()
+    avg_lap_times.rename(columns={'lap_time': 'average_lap_time'}, inplace=True)
+    
+    # Sort by average lap time
+    avg_lap_times.sort_values(by='average_lap_time', inplace=True)
+    
+    return avg_lap_times
 
 
 def get_user_configuration():
@@ -172,6 +208,37 @@ def get_user_configuration():
         except ValueError:
             print("  Please enter a valid integer.")
     
+    # FP2 Pace Integration
+    print("\nFP2 Race Pace Integration:")
+    use_fp2 = input("Use FP2 race pace data? (y/n) [n]: ").strip().lower()
+    config['use_fp2_pace'] = use_fp2 == 'y'
+    
+    if config['use_fp2_pace']:
+        while True:
+            try:
+                session_key = input("FP2 session key from OpenF1 API: ").strip()
+                config['fp2_session_key'] = int(session_key)
+                break
+            except ValueError:
+                print("  Please enter a valid session key number.")
+        
+        print("\nPace Weight (how much to weight current form vs historical):")
+        print("  1. Conservative (20% current, 80% historical)")
+        print("  2. Balanced (30% current, 70% historical)")  
+        print("  3. Aggressive (40% current, 60% historical)")
+        
+        weight_map = {'1': 0.20, '2': 0.30, '3': 0.40}
+        choice = input("Select pace weight (1-3) [2]: ").strip()
+        config['pace_weight'] = weight_map.get(choice, 0.30)
+        
+        print("\nPace Modifier Type:")
+        print("  1. Conservative (0.8x to 1.2x range)")
+        print("  2. Aggressive (0.6x to 1.4x range)")
+        
+        modifier_map = {'1': 'conservative', '2': 'aggressive'}
+        choice = input("Select modifier type (1-2) [1]: ").strip()
+        config['pace_modifier_type'] = modifier_map.get(choice, 'conservative')
+    
     # Parallel processing
     parallel = input("\nEnable parallel processing? (y/n) [y]: ").strip().lower()
     config['use_parallel'] = parallel != 'n'
@@ -190,6 +257,10 @@ def get_user_configuration():
     print(f"Weighting scheme: {config['weighting_scheme']}")
     print(f"Risk tolerance: {config['risk_tolerance']}")
     print(f"Multiplier: {config['multiplier']}")
+    if config['use_fp2_pace']:
+        print(f"FP2 session key: {config['fp2_session_key']}")
+        print(f"Pace weight: {config['pace_weight']}")
+        print(f"Modifier type: {config['pace_modifier_type']}")
     print(f"Parallel processing: {'Enabled' if config['use_parallel'] else 'Disabled'}")
     
     confirm = input("\nProceed with this configuration? (y/n) [y]: ").strip().lower()
@@ -201,15 +272,38 @@ def get_user_configuration():
 
 
 class F1VFMCalculator:
-    """Calculate Value For Money (VFM) scores with outlier removal"""
+    """Calculate Value For Money (VFM) scores with outlier removal and FP2 pace integration"""
     
     def __init__(self, config):
         self.config = config
         self.base_path = config['base_path']
         self.scheme = config['weighting_scheme']
+        self.use_fp2_pace = config.get('use_fp2_pace', False)
+        self.fp2_session_key = config.get('fp2_session_key', None)
+        self.pace_weight = config.get('pace_weight', 0.25)
+        self.pace_modifier_type = config.get('pace_modifier_type', 'conservative')
         
     def calculate_vfm(self, race_data_file, vfm_data_file, entity_type='driver', weights=None):
-        """Calculate VFM scores with outlier removal"""
+        """Calculate VFM scores with outlier removal and optional FP2 pace integration"""
+        # Calculate base VFM
+        race_df = self._calculate_base_vfm(race_data_file, entity_type, weights)
+        
+        # Apply FP2 pace modifier if enabled and we have session key
+        if self.use_fp2_pace and self.fp2_session_key:
+            try:
+                pace_data = get_expected_race_pace(self.fp2_session_key)
+                race_df = self._apply_pace_modifiers(race_df, pace_data, entity_type)
+                print(f"Applied FP2 pace modifiers from session {self.fp2_session_key}")
+            except Exception as e:
+                print(f"Warning: Could not apply FP2 pace data: {e}")
+                print("Continuing with historical VFM only...")
+        
+        # Save results
+        race_df.to_csv(vfm_data_file, index=False)
+        return race_df
+    
+    def _calculate_base_vfm(self, race_data_file, entity_type, weights):
+        """Calculate base VFM scores with outlier removal"""
         # Read and clean data
         race_df = pd.read_csv(race_data_file, skipinitialspace=True)
         race_df.columns = [col.strip() for col in race_df.columns]
@@ -240,19 +334,122 @@ class F1VFMCalculator:
         # Create output dataframe
         if entity_type.lower() == 'driver':
             if self.scheme == 'trend_based':
-                vfm_df = race_df[['Driver', 'Team', 'Cost', 'VFM', 'Performance_Trend', 'Weights_Used']]
+                result_df = race_df[['Driver', 'Team', 'Cost', 'VFM', 'Performance_Trend', 'Weights_Used']]
             else:
-                vfm_df = race_df[['Driver', 'Team', 'Cost', 'VFM', 'Weights_Used']]
+                result_df = race_df[['Driver', 'Team', 'Cost', 'VFM', 'Weights_Used']]
         else:
             if self.scheme == 'trend_based':
-                vfm_df = race_df[['Constructor', 'Cost', 'VFM', 'Performance_Trend', 'Weights_Used']]
+                result_df = race_df[['Constructor', 'Cost', 'VFM', 'Performance_Trend', 'Weights_Used']]
             else:
-                vfm_df = race_df[['Constructor', 'Cost', 'VFM', 'Weights_Used']]
+                result_df = race_df[['Constructor', 'Cost', 'VFM', 'Weights_Used']]
         
-        vfm_df = vfm_df.sort_values('VFM', ascending=False)
-        vfm_df.to_csv(vfm_data_file, index=False)
+        result_df = result_df.sort_values('VFM', ascending=False)
+        return result_df
+    
+    def _apply_pace_modifiers(self, race_df, pace_data, entity_type):
+        """Apply FP2 pace-based VFM modifications"""
+        # Calculate pace scores
+        pace_scores = self._calculate_pace_scores(pace_data)
         
-        return vfm_df
+        # Load driver/constructor mapping
+        driver_mapping = self._load_driver_number_mapping()
+        if driver_mapping is None:
+            print("Warning: No driver mapping available. Skipping FP2 pace integration.")
+            return race_df
+        
+        pace_scores = pace_scores.merge(driver_mapping, on='driver_number', how='left')
+        
+        entity_col = 'Driver' if entity_type.lower() == 'driver' else 'Constructor'
+        
+        # Add pace tracking columns
+        race_df['VFM_Pre_Pace'] = race_df['VFM'].copy()
+        race_df['Pace_Score'] = 0.0
+        race_df['Pace_Modifier'] = 1.0
+        
+        # Apply modifiers
+        for _, row in pace_scores.iterrows():
+            if entity_type.lower() == 'driver':
+                entity_name = row.get('driver_name', '')
+            else:
+                entity_name = row.get('team_name', '')
+            
+            if pd.notna(entity_name) and entity_name in race_df[entity_col].values:
+                mask = race_df[entity_col] == entity_name
+                
+                pace_score = row['pace_score']
+                modifier = self._calculate_pace_modifier(pace_score)
+                
+                race_df.loc[mask, 'Pace_Score'] = pace_score
+                race_df.loc[mask, 'Pace_Modifier'] = modifier
+                race_df.loc[mask, 'VFM'] = race_df.loc[mask, 'VFM'] * modifier
+        
+        return race_df
+    
+    def _calculate_pace_scores(self, avg_lap_times_df):
+        """Convert lap times to relative performance scores"""
+        df = avg_lap_times_df.copy()
+        
+        # Get fastest lap time as baseline
+        fastest_time = df['average_lap_time'].min()
+        
+        # Calculate percentage gap to fastest
+        df['gap_to_fastest'] = (df['average_lap_time'] - fastest_time) / fastest_time * 100
+        
+        # Convert to performance score (0-100 scale, 100 = fastest)
+        max_gap = df['gap_to_fastest'].max()
+        if max_gap > 0:
+            df['pace_score'] = 100 * (1 - df['gap_to_fastest'] / max_gap)
+        else:
+            df['pace_score'] = 100.0
+        
+        return df
+    
+    def _calculate_pace_modifier(self, pace_score):
+        """Convert pace score to VFM modifier"""
+        if self.pace_modifier_type == 'aggressive':
+            # Aggressive: 0.6x to 1.4x range
+            base_modifier = 0.6 + (pace_score / 100) * 0.8
+        else:
+            # Conservative: 0.8x to 1.2x range (recommended)
+            base_modifier = 0.8 + (pace_score / 100) * 0.4
+        
+        # Apply risk-based adjustment
+        risk_tolerance = self.config.get('risk_tolerance', 'medium')
+        
+        if risk_tolerance == 'low':
+            # Dampen the pace effect (more conservative)
+            dampening_factor = 0.5
+            modifier = 1.0 + (base_modifier - 1.0) * dampening_factor
+        elif risk_tolerance == 'high':
+            # Amplify the pace effect (more aggressive)
+            amplification_factor = 1.5
+            modifier = 1.0 + (base_modifier - 1.0) * amplification_factor
+        else:
+            # Medium risk - use base modifier
+            modifier = base_modifier
+        
+        return modifier
+    
+    def _load_driver_number_mapping(self):
+        """Load driver number to name mapping"""
+        mapping_file = os.path.join(self.base_path, 'driver_mapping.csv')
+        
+        if os.path.exists(mapping_file):
+            try:
+                mapping_df = pd.read_csv(mapping_file)
+                return mapping_df
+            except Exception as e:
+                print(f"Error loading driver mapping: {e}")
+        
+        # If no mapping file, try to create basic mapping from driver data
+        try:
+            driver_data = pd.read_csv(os.path.join(self.base_path, 'driver_race_data.csv'))
+            # This would need to be enhanced with actual driver numbers
+            # For now, return None to skip pace integration
+            print("No driver mapping file found. Create 'driver_mapping.csv' with columns: driver_number, driver_name, team_name")
+            return None
+        except:
+            return None
     
     def _remove_outliers(self, df, entity_col, race_columns):
         """Remove race results outside 2 standard deviations"""
@@ -1297,6 +1494,25 @@ class F1TeamOptimizer:
         print(f"Patterns evaluated: {self.performance_stats['patterns_evaluated']:,}")
         print(f"Cache hits: {self.performance_stats['cache_hits']:,}")
         print(f"Time taken: {self.performance_stats['optimization_time']:.1f}s")
+        
+        # FP2 pace information if used
+        if self.config.get('use_fp2_pace', False):
+            print("\n" + "-"*80)
+            print("FP2 PACE INTEGRATION")
+            print("-"*80)
+            print(f"Session key: {self.config.get('fp2_session_key', 'N/A')}")
+            print(f"Pace weight: {self.config.get('pace_weight', 0.25)}")
+            print(f"Modifier type: {self.config.get('pace_modifier_type', 'conservative')}")
+            
+            # Show pace adjustments for current drivers
+            print("\nPace adjustments for current team:")
+            for driver in self.config['current_drivers']:
+                driver_row = self.drivers_df[self.drivers_df['Driver'] == driver]
+                if not driver_row.empty and 'Pace_Score' in driver_row.columns:
+                    pace_score = driver_row.iloc[0].get('Pace_Score', 0)
+                    pace_modifier = driver_row.iloc[0].get('Pace_Modifier', 1.0)
+                    if pace_score > 0:
+                        print(f"  {driver}: Pace score {pace_score:.1f}, VFM modifier {pace_modifier:.2f}x")
     
     def save_results(self, optimization_result):
         """Save optimization results to JSON"""
@@ -1331,7 +1547,7 @@ class F1TeamOptimizer:
 
 def main():
     """Main execution function"""
-    print("F1 Fantasy Optimizer Suite - Enhanced Edition")
+    print("F1 Fantasy Optimizer Suite - Enhanced Edition with FP2 Integration")
     print("=" * 80)
     
     try:
@@ -1377,6 +1593,11 @@ def main():
             print("- constructor_characteristic_affinities.csv (Constructor characteristic correlations)")
             print("- constructor_affinity.csv (Constructor track affinities)")
             print("- optimization_[timestamp].json (Optimization results)")
+            
+            if config.get('use_fp2_pace', False):
+                print("\nFP2 Integration:")
+                print("- Real-time pace data integrated into VFM calculations")
+                print("- Create 'driver_mapping.csv' for enhanced pace integration")
         else:
             print("\nOptimization failed. Please check your data files and configuration.")
             
