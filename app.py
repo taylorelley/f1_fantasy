@@ -9,7 +9,7 @@ import numpy as np
 import re
 from werkzeug.utils import secure_filename
 import shutil
-from f1_optimizer import F1VFMCalculator, F1TrackAffinityCalculator, F1TeamOptimizer, get_races_completed
+from f1_optimizer import F1VFMCalculator, F1TrackAffinityCalculator, F1TeamOptimizer, get_races_completed, get_expected_race_pace
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -48,6 +48,11 @@ def has_default_data():
             return False
     return True
 
+def has_driver_mapping():
+    """Check if driver mapping file exists"""
+    mapping_path = os.path.join(app.config['DEFAULT_DATA_FOLDER'], 'driver_mapping.csv')
+    return os.path.exists(mapping_path)
+
 def load_default_data():
     """Load default data if available"""
     if not has_default_data():
@@ -67,7 +72,8 @@ def load_default_data():
         return {
             'races_completed': races_completed,
             'drivers': drivers_list,
-            'constructors': constructors_list
+            'constructors': constructors_list,
+            'has_driver_mapping': has_driver_mapping()
         }
     except Exception as e:
         print(f"Error loading default data: {e}")
@@ -85,6 +91,13 @@ def check_default_data():
     return jsonify({
         'has_default': default_data is not None,
         'data': default_data
+    })
+
+@app.route('/check_driver_mapping')
+def check_driver_mapping():
+    """Check if driver mapping file exists"""
+    return jsonify({
+        'exists': has_driver_mapping()
     })
 
 @app.route('/upload', methods=['POST'])
@@ -160,7 +173,8 @@ def upload_files():
             'races_completed': races_completed,
             'drivers': drivers_list,
             'constructors': constructors_list,
-            'updated_default': update_default
+            'updated_default': update_default,
+            'has_driver_mapping': has_driver_mapping() if update_default else False
         })
         
     except Exception as e:
@@ -169,9 +183,121 @@ def upload_files():
             'message': f'Error uploading files: {str(e)}'
         })
 
+@app.route('/upload_driver_mapping', methods=['POST'])
+def upload_driver_mapping():
+    """Handle driver mapping file upload"""
+    try:
+        if 'driver_mapping' not in request.files:
+            return jsonify({
+                'success': False,
+                'message': 'No driver mapping file provided'
+            })
+        
+        file = request.files['driver_mapping']
+        if file.filename == '':
+            return jsonify({
+                'success': False,
+                'message': 'No file selected'
+            })
+        
+        # Save to default data folder
+        mapping_path = os.path.join(app.config['DEFAULT_DATA_FOLDER'], 'driver_mapping.csv')
+        file.save(mapping_path)
+        
+        # Validate the file
+        try:
+            mapping_df = pd.read_csv(mapping_path)
+            required_columns = ['driver_number', 'driver_name', 'team_name']
+            if not all(col in mapping_df.columns for col in required_columns):
+                os.remove(mapping_path)
+                return jsonify({
+                    'success': False,
+                    'message': f'Driver mapping file must contain columns: {", ".join(required_columns)}'
+                })
+            
+            # Additional validation
+            if mapping_df.empty:
+                os.remove(mapping_path)
+                return jsonify({
+                    'success': False,
+                    'message': 'Driver mapping file is empty'
+                })
+            
+            # Check for required data types
+            if not pd.api.types.is_numeric_dtype(mapping_df['driver_number']):
+                os.remove(mapping_path)
+                return jsonify({
+                    'success': False,
+                    'message': 'driver_number column must contain numeric values'
+                })
+                
+        except Exception as e:
+            if os.path.exists(mapping_path):
+                os.remove(mapping_path)
+            return jsonify({
+                'success': False,
+                'message': f'Invalid CSV file: {str(e)}'
+            })
+        
+        return jsonify({
+            'success': True,
+            'message': f'Driver mapping file uploaded successfully. Found {len(mapping_df)} driver mappings.',
+            'driver_count': len(mapping_df)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error uploading driver mapping: {str(e)}'
+        })
+
+@app.route('/test_fp2_connection', methods=['POST'])
+def test_fp2_connection():
+    """Test FP2 API connection with given session key"""
+    try:
+        data = request.json
+        session_key = data.get('session_key')
+        
+        if not session_key:
+            return jsonify({
+                'success': False,
+                'message': 'Session key is required'
+            })
+        
+        try:
+            session_key = int(session_key)
+        except (ValueError, TypeError):
+            return jsonify({
+                'success': False,
+                'message': 'Session key must be a number'
+            })
+        
+        # Test the API connection
+        pace_data = get_expected_race_pace(session_key)
+        
+        if pace_data.empty:
+            return jsonify({
+                'success': False,
+                'message': f'No pace data found for session {session_key}'
+            })
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully connected to FP2 session {session_key}',
+            'driver_count': len(pace_data),
+            'fastest_driver': pace_data.iloc[0]['driver_number'] if not pace_data.empty else None,
+            'session_key': session_key
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error connecting to FP2 API: {str(e)}'
+        })
+
 @app.route('/optimize', methods=['POST'])
 def optimize():
-    """Run the optimization"""
+    """Run the optimization with optional FP2 pace integration"""
     try:
         data = request.json
         session_id = data.get('session_id', 'default')
@@ -196,6 +322,33 @@ def optimize():
             data_folder = sessions[session_id]['folder'] + '/'
             races_completed = sessions[session_id]['races_completed']
         
+        # Validate FP2 configuration if enabled
+        use_fp2_pace = data.get('use_fp2_pace', False)
+        fp2_session_key = data.get('fp2_session_key')
+        pace_weight = data.get('pace_weight', 0.25)
+        pace_modifier_type = data.get('pace_modifier_type', 'conservative')
+        
+        if use_fp2_pace:
+            if not fp2_session_key:
+                return jsonify({
+                    'success': False,
+                    'message': 'FP2 session key is required when using pace data.'
+                })
+            try:
+                fp2_session_key = int(fp2_session_key)
+            except (ValueError, TypeError):
+                return jsonify({
+                    'success': False,
+                    'message': 'Invalid FP2 session key. Must be a number.'
+                })
+            
+            # Check if driver mapping exists
+            if not has_driver_mapping():
+                return jsonify({
+                    'success': False,
+                    'message': 'Driver mapping file is required for FP2 integration. Please upload it first.'
+                })
+        
         # Build configuration
         config = {
             'base_path': data_folder,
@@ -208,7 +361,12 @@ def optimize():
             'weighting_scheme': data['weighting_scheme'],
             'risk_tolerance': data['risk_tolerance'],
             'multiplier': int(data['multiplier']),
-            'use_parallel': False  # Disable for web app
+            'use_parallel': False,  # Disable for web app
+            # FP2 configuration
+            'use_fp2_pace': use_fp2_pace,
+            'fp2_session_key': fp2_session_key,
+            'pace_weight': float(pace_weight),
+            'pace_modifier_type': pace_modifier_type
         }
         
         results = {
@@ -216,8 +374,11 @@ def optimize():
             'progress': []
         }
         
-        # Step 1: Calculate VFM
+        # Step 1: Calculate VFM (with optional FP2 integration)
+        if config['use_fp2_pace']:
+            results['progress'].append(f'Fetching FP2 pace data from session {config["fp2_session_key"]}...')
         results['progress'].append('Calculating VFM scores...')
+        
         vfm_calculator = F1VFMCalculator(config)
         driver_vfm, constructor_vfm = vfm_calculator.run()
         results['progress'].append('VFM calculation complete')
@@ -280,6 +441,36 @@ def optimize():
             }
         }
         
+        # Add FP2 information if used
+        if config['use_fp2_pace']:
+            results['optimization']['fp2_info'] = {
+                'session_key': config['fp2_session_key'],
+                'pace_weight': config['pace_weight'],
+                'modifier_type': config['pace_modifier_type'],
+                'applied': True
+            }
+            
+            # Add pace adjustment information for current drivers
+            pace_adjustments = []
+            for driver in config['current_drivers']:
+                driver_row = optimizer.drivers_df[optimizer.drivers_df['Driver'] == driver]
+                if not driver_row.empty:
+                    pace_score = driver_row.iloc[0].get('Pace_Score', 0)
+                    pace_modifier = driver_row.iloc[0].get('Pace_Modifier', 1.0)
+                    vfm_original = driver_row.iloc[0].get('VFM_Pre_Pace', driver_row.iloc[0].get('VFM', 0))
+                    vfm_adjusted = driver_row.iloc[0].get('VFM', 0)
+                    
+                    if pace_score > 0:
+                        pace_adjustments.append({
+                            'driver': driver,
+                            'pace_score': round(pace_score, 1),
+                            'pace_modifier': round(pace_modifier, 3),
+                            'vfm_original': round(vfm_original, 2),
+                            'vfm_adjusted': round(vfm_adjusted, 2)
+                        })
+            
+            results['optimization']['fp2_info']['pace_adjustments'] = pace_adjustments
+        
         results['status'] = 'complete'
         results['success'] = True
         
@@ -291,8 +482,6 @@ def optimize():
             'success': False,
             'message': f'Error during optimization: {str(e)}'
         })
-
-
 
 @app.route('/statistics')
 def statistics():
@@ -329,7 +518,8 @@ def get_statistics():
             config = {
                 'base_path': data_folder,
                 'races_completed': get_races_completed(data_folder),
-                'weighting_scheme': 'trend_based'
+                'weighting_scheme': 'trend_based',
+                'use_fp2_pace': False  # Disable FP2 for statistics calculation
             }
             
             # Calculate VFM
@@ -399,120 +589,6 @@ def process_driver_statistics(driver_race_df, driver_vfm_df, driver_affinity_df,
             'cost_value': float(re.sub(r'[^\d.]', '', str(driver_row['Cost']))),
             'vfm': float(driver_row['VFM']),
             'trend': str(driver_row.get('Performance_Trend', 'Unknown')),
-            'avg_points': float(np.mean(valid_points)) if valid_points else 0.0,
-            'total_points': float(np.sum(valid_points)) if valid_points else 0.0,
-            'races_completed': int(len(valid_points)),
-            'consistency': float(np.std(valid_points)) if len(valid_points) > 1 else 0.0,
-            'best_race': float(np.max(valid_points)) if valid_points else 0.0,
-            'worst_race': float(np.min(valid_points)) if valid_points else 0.0,
-        }
-        
-        # Recent form (last 3 races vs overall)
-        if len(valid_points) >= 3:
-            recent_avg = np.mean(valid_points[-3:])
-            stats['recent_form'] = float(recent_avg - stats['avg_points'])
-        else:
-            stats['recent_form'] = 0.0
-        
-        # Track characteristic affinities (for radar chart)
-        if driver_name in driver_char_affinity_df.index:
-            char_affinities = driver_char_affinity_df.loc[driver_name]
-            stats['char_affinities'] = {
-                'Corners': float(char_affinities.get('Corners', 0)),
-                'Length': float(char_affinities.get('Length (km)', 0)),
-                'Overtaking': float(char_affinities.get('Overtaking Opportunities_encoded', 0)),
-                'Speed': float(char_affinities.get('Track Speed_encoded', 0)),
-                'Temperature': float(char_affinities.get('Expected Temperatures_encoded', 0))
-            }
-        else:
-            stats['char_affinities'] = {
-                'Corners': 0.0, 'Length': 0.0, 'Overtaking': 0.0, 'Speed': 0.0, 'Temperature': 0.0
-            }
-        
-        # Track-specific performance
-        track_performance = []
-        for _, cal_row in calendar_df.iterrows():
-            race = cal_row['Race']
-            if race in race_columns:
-                race_idx = race_columns.index(race)
-                if race_idx < len(race_points) and not np.isnan(race_points[race_idx]):
-                    circuit = str(cal_row['Circuit'])
-                    affinity_col = f'{driver_name}_affinity'
-                    
-                    # Get affinity score for this circuit
-                    circuit_affinity = 0.0
-                    if affinity_col in driver_affinity_df.columns:
-                        circuit_row = driver_affinity_df[driver_affinity_df['Circuit'] == circuit]
-                        if not circuit_row.empty:
-                            circuit_affinity = float(circuit_row.iloc[0][affinity_col])
-                    
-                    track_performance.append({
-                        'circuit': circuit,
-                        'points': float(race_points[race_idx]),
-                        'affinity': circuit_affinity
-                    })
-        
-        # Sort by points to get best/worst tracks
-        track_performance.sort(key=lambda x: x['points'], reverse=True)
-        stats['best_tracks'] = track_performance[:3] if len(track_performance) >= 3 else track_performance
-        stats['worst_tracks'] = track_performance[-3:] if len(track_performance) >= 3 else []
-        
-        # Upcoming races affinity
-        upcoming_races = []
-        races_completed = len([r for r in race_columns if r in calendar_df['Race'].values])
-        for i in range(races_completed + 1, min(races_completed + 4, len(race_columns) + 1)):
-            race_name = f'Race{i}'
-            race_info = calendar_df[calendar_df['Race'] == race_name]
-            if not race_info.empty:
-                circuit = str(race_info.iloc[0]['Circuit'])
-                affinity_col = f'{driver_name}_affinity'
-                
-                circuit_affinity = 0.0
-                if affinity_col in driver_affinity_df.columns:
-                    circuit_row = driver_affinity_df[driver_affinity_df['Circuit'] == circuit]
-                    if not circuit_row.empty:
-                        circuit_affinity = float(circuit_row.iloc[0][affinity_col])
-                
-                upcoming_races.append({
-                    'race': race_name,
-                    'circuit': circuit,
-                    'affinity': circuit_affinity
-                })
-        
-        stats['upcoming_races'] = upcoming_races
-        driver_stats.append(stats)
-    
-    # Calculate cost efficiency rankings
-    driver_stats.sort(key=lambda x: x['vfm'], reverse=True)
-    for i, driver in enumerate(driver_stats):
-        driver['vfm_rank'] = i + 1
-    
-    return driver_stats
-
-def process_constructor_statistics(constructor_race_df, constructor_vfm_df, constructor_affinity_df,
-                                 constructor_char_affinity_df, calendar_df, tracks_df):
-    """Process comprehensive statistics for all constructors"""
-    constructor_stats = []
-    race_columns = [col for col in constructor_race_df.columns if col.startswith('Race')]
-    
-    for _, constructor_row in constructor_vfm_df.iterrows():
-        constructor_name = constructor_row['Constructor']
-        
-        # Get race data for this constructor
-        race_data = constructor_race_df[constructor_race_df['Constructor'] == constructor_name]
-        if race_data.empty:
-            continue
-            
-        race_points = race_data[race_columns].values[0]
-        valid_points = [float(p) for p in race_points if not np.isnan(p)]
-        
-        # Basic statistics
-        stats = {
-            'name': str(constructor_name),
-            'cost': str(constructor_row['Cost']),
-            'cost_value': float(re.sub(r'[^\d.]', '', str(constructor_row['Cost']))),
-            'vfm': float(constructor_row['VFM']),
-            'trend': str(constructor_row.get('Performance_Trend', 'Unknown')),
             'avg_points': float(np.mean(valid_points)) if valid_points else 0.0,
             'total_points': float(np.sum(valid_points)) if valid_points else 0.0,
             'races_completed': int(len(valid_points)),
@@ -666,4 +742,118 @@ def export_statistics():
         })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)d_points)) if valid_points else 0.0,
+            'races_completed': int(len(valid_points)),
+            'consistency': float(np.std(valid_points)) if len(valid_points) > 1 else 0.0,
+            'best_race': float(np.max(valid_points)) if valid_points else 0.0,
+            'worst_race': float(np.min(valid_points)) if valid_points else 0.0,
+        }
+        
+        # Recent form (last 3 races vs overall)
+        if len(valid_points) >= 3:
+            recent_avg = np.mean(valid_points[-3:])
+            stats['recent_form'] = float(recent_avg - stats['avg_points'])
+        else:
+            stats['recent_form'] = 0.0
+        
+        # Track characteristic affinities (for radar chart)
+        if driver_name in driver_char_affinity_df.index:
+            char_affinities = driver_char_affinity_df.loc[driver_name]
+            stats['char_affinities'] = {
+                'Corners': float(char_affinities.get('Corners', 0)),
+                'Length': float(char_affinities.get('Length (km)', 0)),
+                'Overtaking': float(char_affinities.get('Overtaking Opportunities_encoded', 0)),
+                'Speed': float(char_affinities.get('Track Speed_encoded', 0)),
+                'Temperature': float(char_affinities.get('Expected Temperatures_encoded', 0))
+            }
+        else:
+            stats['char_affinities'] = {
+                'Corners': 0.0, 'Length': 0.0, 'Overtaking': 0.0, 'Speed': 0.0, 'Temperature': 0.0
+            }
+        
+        # Track-specific performance
+        track_performance = []
+        for _, cal_row in calendar_df.iterrows():
+            race = cal_row['Race']
+            if race in race_columns:
+                race_idx = race_columns.index(race)
+                if race_idx < len(race_points) and not np.isnan(race_points[race_idx]):
+                    circuit = str(cal_row['Circuit'])
+                    affinity_col = f'{driver_name}_affinity'
+                    
+                    # Get affinity score for this circuit
+                    circuit_affinity = 0.0
+                    if affinity_col in driver_affinity_df.columns:
+                        circuit_row = driver_affinity_df[driver_affinity_df['Circuit'] == circuit]
+                        if not circuit_row.empty:
+                            circuit_affinity = float(circuit_row.iloc[0][affinity_col])
+                    
+                    track_performance.append({
+                        'circuit': circuit,
+                        'points': float(race_points[race_idx]),
+                        'affinity': circuit_affinity
+                    })
+        
+        # Sort by points to get best/worst tracks
+        track_performance.sort(key=lambda x: x['points'], reverse=True)
+        stats['best_tracks'] = track_performance[:3] if len(track_performance) >= 3 else track_performance
+        stats['worst_tracks'] = track_performance[-3:] if len(track_performance) >= 3 else []
+        
+        # Upcoming races affinity
+        upcoming_races = []
+        races_completed = len([r for r in race_columns if r in calendar_df['Race'].values])
+        for i in range(races_completed + 1, min(races_completed + 4, len(race_columns) + 1)):
+            race_name = f'Race{i}'
+            race_info = calendar_df[calendar_df['Race'] == race_name]
+            if not race_info.empty:
+                circuit = str(race_info.iloc[0]['Circuit'])
+                affinity_col = f'{driver_name}_affinity'
+                
+                circuit_affinity = 0.0
+                if affinity_col in driver_affinity_df.columns:
+                    circuit_row = driver_affinity_df[driver_affinity_df['Circuit'] == circuit]
+                    if not circuit_row.empty:
+                        circuit_affinity = float(circuit_row.iloc[0][affinity_col])
+                
+                upcoming_races.append({
+                    'race': race_name,
+                    'circuit': circuit,
+                    'affinity': circuit_affinity
+                })
+        
+        stats['upcoming_races'] = upcoming_races
+        driver_stats.append(stats)
+    
+    # Calculate cost efficiency rankings
+    driver_stats.sort(key=lambda x: x['vfm'], reverse=True)
+    for i, driver in enumerate(driver_stats):
+        driver['vfm_rank'] = i + 1
+    
+    return driver_stats
+
+def process_constructor_statistics(constructor_race_df, constructor_vfm_df, constructor_affinity_df,
+                                 constructor_char_affinity_df, calendar_df, tracks_df):
+    """Process comprehensive statistics for all constructors"""
+    constructor_stats = []
+    race_columns = [col for col in constructor_race_df.columns if col.startswith('Race')]
+    
+    for _, constructor_row in constructor_vfm_df.iterrows():
+        constructor_name = constructor_row['Constructor']
+        
+        # Get race data for this constructor
+        race_data = constructor_race_df[constructor_race_df['Constructor'] == constructor_name]
+        if race_data.empty:
+            continue
+            
+        race_points = race_data[race_columns].values[0]
+        valid_points = [float(p) for p in race_points if not np.isnan(p)]
+        
+        # Basic statistics
+        stats = {
+            'name': str(constructor_name),
+            'cost': str(constructor_row['Cost']),
+            'cost_value': float(re.sub(r'[^\d.]', '', str(constructor_row['Cost']))),
+            'vfm': float(constructor_row['VFM']),
+            'trend': str(constructor_row.get('Performance_Trend', 'Unknown')),
+            'avg_points': float(np.mean(valid_points)) if valid_points else 0.0,
+            'total_points': float(np.sum(vali
