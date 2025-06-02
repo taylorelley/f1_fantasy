@@ -742,7 +742,7 @@ def export_statistics():
         })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)d_points)) if valid_points else 0.0,
+    app.run(host='0.0.0.0', port=5000, debug=True)
             'races_completed': int(len(valid_points)),
             'consistency': float(np.std(valid_points)) if len(valid_points) > 1 else 0.0,
             'best_race': float(np.max(valid_points)) if valid_points else 0.0,
