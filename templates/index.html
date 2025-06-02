@@ -154,6 +154,15 @@
             background: #218838;
         }
         
+        .button-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .button-warning:hover {
+            background: #e0a800;
+        }
+        
         .progress {
             display: none;
             margin-top: 20px;
@@ -253,6 +262,14 @@
             margin: 15px 0;
         }
         
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        
         .default-data-status {
             margin-bottom: 20px;
             padding: 15px;
@@ -265,6 +282,7 @@
             display: flex;
             gap: 10px;
             margin-top: 20px;
+            flex-wrap: wrap;
         }
         
         .checkbox-group {
@@ -274,6 +292,64 @@
         .checkbox-group input[type="checkbox"] {
             width: auto;
             margin-right: 10px;
+        }
+        
+        /* FP2 specific styles */
+        .fp2-config {
+            border: 2px solid #17a2b8;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f8f9fa;
+        }
+        
+        .fp2-config h3 {
+            color: #17a2b8;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .fp2-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .test-result {
+            margin-top: 10px;
+        }
+        
+        .pace-adjustment {
+            background: #e9ecef;
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .pace-score {
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        small {
+            font-size: 0.875em;
+            color: #6c757d;
+            margin-top: 5px;
+            display: block;
+        }
+        
+        small a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        small a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -330,6 +406,29 @@
                 <button class="button" onclick="uploadFiles()">Upload New Files</button>
                 <button class="button button-success" id="use-default-btn" onclick="useDefaultData()" style="display: none;">Use Default Data</button>
             </div>
+        </div>
+        
+        <!-- Driver Mapping Section -->
+        <div class="section" id="driver-mapping-section" style="display: none;">
+            <h2>🏎️ Driver Mapping (Required for FP2 Integration)</h2>
+            <p>Upload a driver mapping file to enable FP2 pace integration. This maps driver numbers to names and teams.</p>
+            
+            <div class="form-group">
+                <label for="driver-mapping-file">Driver Mapping CSV</label>
+                <input type="file" id="driver-mapping-file" accept=".csv">
+                <small>
+                    Required columns: driver_number, driver_name, team_name<br>
+                    Example: 1,Max Verstappen,Red Bull Racing<br>
+                    <a href="https://api.openf1.org/v1/drivers" target="_blank">Get driver info from OpenF1 API</a>
+                </small>
+            </div>
+            
+            <div class="button-group">
+                <button class="button" onclick="uploadDriverMapping()">Upload Driver Mapping</button>
+                <button class="button button-secondary" onclick="checkDriverMapping()">Check Status</button>
+            </div>
+            
+            <div id="mapping-status"></div>
         </div>
         
         <!-- Configuration Section -->
@@ -398,6 +497,50 @@
                 </div>
             </div>
             
+            <!-- FP2 Race Pace Configuration -->
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" id="use-fp2-pace">
+                    🏁 Use FP2 Race Pace Data (Real-time performance enhancement)
+                </label>
+            </div>
+
+            <div class="fp2-config" id="fp2-config" style="display: none;">
+                <h3>🏁 FP2 Race Pace Configuration</h3>
+                
+                <div class="fp2-grid">
+                    <div class="form-group">
+                        <label for="fp2-session-key">FP2 Session Key</label>
+                        <input type="number" id="fp2-session-key" placeholder="e.g. 9158">
+                        <small>Get session key from <a href="https://api.openf1.org/v1/sessions" target="_blank">OpenF1 Sessions API</a></small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="pace-weight">Pace Weight</label>
+                        <select id="pace-weight">
+                            <option value="0.20">Conservative (20% current, 80% historical)</option>
+                            <option value="0.30" selected>Balanced (30% current, 70% historical)</option>
+                            <option value="0.40">Aggressive (40% current, 60% historical)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="pace-modifier-type">Pace Modifier Type</label>
+                        <select id="pace-modifier-type">
+                            <option value="conservative" selected>Conservative (0.8x to 1.2x range)</option>
+                            <option value="aggressive">Aggressive (0.6x to 1.4x range)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button class="button button-warning" onclick="testFP2Connection()">Test FP2 Connection</button>
+                    <button class="button button-secondary" onclick="showDriverMapping()">Manage Driver Mapping</button>
+                </div>
+                
+                <div id="fp2-test-result" class="test-result"></div>
+            </div>
+            
             <div class="button-group">
                 <button class="button" onclick="runOptimization()">Run Optimisation</button>
                 <button class="button button-secondary" onclick="showUploadSection()">Change Data Files</button>
@@ -429,6 +572,7 @@
         // Check for default data on page load
         window.onload = async function() {
             await checkDefaultData();
+            await checkDriverMapping();
             
             // If default data is available, go straight to configuration
             if (document.getElementById('use-default-btn').style.display !== 'none') {
@@ -443,9 +587,15 @@
                 
                 if (data.has_default) {
                     document.getElementById('default-data-status').style.display = 'block';
-                    document.getElementById('default-data-message').innerHTML = 
-                        `Using default data with ${data.data.races_completed} races completed. ` +
-                        `<a href="#" onclick="showUploadSection()">Click here to upload new files instead.</a>`;
+                    let message = `Using default data with ${data.data.races_completed} races completed.`;
+                    
+                    if (data.data.has_driver_mapping) {
+                        message += ' Driver mapping available for FP2 integration.';
+                    }
+                    
+                    message += ` <a href="#" onclick="showUploadSection()">Click here to upload new files instead.</a>`;
+                    
+                    document.getElementById('default-data-message').innerHTML = message;
                     document.getElementById('use-default-btn').style.display = 'inline-block';
                     return true;
                 }
@@ -456,9 +606,23 @@
             }
         }
         
-        async function loadLastConfig() {
-            // Load configuration from cookies instead of server
-            loadConfigFromCookie();
+        async function checkDriverMapping() {
+            try {
+                const response = await fetch('/check_driver_mapping');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('mapping-status');
+                if (data.exists) {
+                    statusDiv.innerHTML = '<div class="success">✅ Driver mapping file is available - FP2 integration ready!</div>';
+                } else {
+                    statusDiv.innerHTML = '<div class="warning">⚠️ No driver mapping file found. Upload one to enable FP2 integration.</div>';
+                }
+                
+                return data.exists;
+            } catch (error) {
+                console.error('Error checking driver mapping:', error);
+                return false;
+            }
         }
         
         function useDefaultData() {
@@ -478,6 +642,13 @@
                         
                         document.getElementById('config-section').style.display = 'block';
                         document.getElementById('upload-section').style.display = 'none';
+                        
+                        // Check FP2 capabilities
+                        if (data.data.has_driver_mapping) {
+                            document.getElementById('use-fp2-pace').disabled = false;
+                        } else {
+                            document.getElementById('use-fp2-pace').disabled = true;
+                        }
                     }
                 })
                 .catch(error => {
@@ -485,7 +656,104 @@
                 });
         }
         
-        // Cookie management functions
+        // FP2 Configuration Functions
+        document.addEventListener('DOMContentLoaded', function() {
+            const fp2Checkbox = document.getElementById('use-fp2-pace');
+            const fp2Config = document.getElementById('fp2-config');
+            
+            if (fp2Checkbox) {
+                fp2Checkbox.addEventListener('change', function() {
+                    fp2Config.style.display = this.checked ? 'block' : 'none';
+                    if (this.checked) {
+                        checkDriverMapping();
+                        showDriverMapping();
+                    } else {
+                        hideDriverMapping();
+                    }
+                });
+            }
+        });
+        
+        function showDriverMapping() {
+            document.getElementById('driver-mapping-section').style.display = 'block';
+        }
+        
+        function hideDriverMapping() {
+            document.getElementById('driver-mapping-section').style.display = 'none';
+        }
+        
+        async function uploadDriverMapping() {
+            const fileInput = document.getElementById('driver-mapping-file');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a driver mapping file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('driver_mapping', file);
+            
+            try {
+                const response = await fetch('/upload_driver_mapping', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                const statusDiv = document.getElementById('mapping-status');
+                
+                if (data.success) {
+                    statusDiv.innerHTML = `<div class="success">${data.message}</div>`;
+                    document.getElementById('use-fp2-pace').disabled = false;
+                } else {
+                    statusDiv.innerHTML = `<div class="error">${data.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('mapping-status').innerHTML = 
+                    `<div class="error">Error uploading file: ${error.message}</div>`;
+            }
+        }
+        
+        async function testFP2Connection() {
+            const sessionKey = document.getElementById('fp2-session-key').value;
+            
+            if (!sessionKey) {
+                alert('Please enter an FP2 session key');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('fp2-test-result');
+            resultDiv.innerHTML = '<div class="info">🔄 Testing FP2 connection...</div>';
+            
+            try {
+                const response = await fetch('/test_fp2_connection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ session_key: sessionKey })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ ${data.message}<br>
+                            Found data for ${data.driver_count} drivers<br>
+                            ${data.fastest_driver ? `Fastest driver: #${data.fastest_driver}` : ''}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error testing connection: ${error.message}</div>`;
+            }
+        }
+        
+        // Cookie management functions (updated for FP2)
         function setCookie(name, value, days = 30) {
             const expires = new Date();
             expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
@@ -530,7 +798,12 @@
                 step2_swaps: document.getElementById('step2-swaps').value,
                 weighting_scheme: document.getElementById('weighting-scheme').value,
                 risk_tolerance: document.getElementById('risk-tolerance').value,
-                multiplier: document.getElementById('multiplier').value
+                multiplier: document.getElementById('multiplier').value,
+                // FP2 settings
+                use_fp2_pace: document.getElementById('use-fp2-pace').checked,
+                fp2_session_key: document.getElementById('fp2-session-key').value,
+                pace_weight: document.getElementById('pace-weight').value,
+                pace_modifier_type: document.getElementById('pace-modifier-type').value
             };
             
             setCookie('f1_optimizer_config', config);
@@ -571,6 +844,18 @@
             if (config.weighting_scheme) document.getElementById('weighting-scheme').value = config.weighting_scheme;
             if (config.risk_tolerance) document.getElementById('risk-tolerance').value = config.risk_tolerance;
             if (config.multiplier) document.getElementById('multiplier').value = config.multiplier;
+            
+            // Load FP2 settings
+            if (config.use_fp2_pace !== undefined) {
+                document.getElementById('use-fp2-pace').checked = config.use_fp2_pace;
+                document.getElementById('fp2-config').style.display = config.use_fp2_pace ? 'block' : 'none';
+                if (config.use_fp2_pace) {
+                    showDriverMapping();
+                }
+            }
+            if (config.fp2_session_key) document.getElementById('fp2-session-key').value = config.fp2_session_key;
+            if (config.pace_weight) document.getElementById('pace-weight').value = config.pace_weight;
+            if (config.pace_modifier_type) document.getElementById('pace-modifier-type').value = config.pace_modifier_type;
         }
         
         async function uploadFiles() {
@@ -623,6 +908,7 @@
                     if (data.updated_default) {
                         alert('Files uploaded and saved as default data successfully!');
                         await checkDefaultData(); // Refresh default data status
+                        await checkDriverMapping(); // Check driver mapping status
                     } else {
                         alert('Files uploaded successfully!');
                     }
@@ -645,6 +931,7 @@
             document.getElementById('upload-section').style.display = 'block';
             document.getElementById('results-section').style.display = 'none';
             document.getElementById('default-data-status').style.display = 'none';
+            document.getElementById('driver-mapping-section').style.display = 'none';
             
             // Clear file inputs
             document.getElementById('driver-data').value = '';
@@ -709,6 +996,25 @@
                 return;
             }
             
+            // Validate FP2 configuration if enabled
+            const useFP2 = document.getElementById('use-fp2-pace').checked;
+            if (useFP2) {
+                const sessionKey = document.getElementById('fp2-session-key').value;
+                if (!sessionKey) {
+                    alert('Please enter an FP2 session key when using pace data');
+                    return;
+                }
+                
+                // Check if driver mapping exists
+                const mappingCheck = await fetch('/check_driver_mapping');
+                const mappingData = await mappingCheck.json();
+                if (!mappingData.exists) {
+                    alert('Driver mapping file is required for FP2 integration. Please upload it first.');
+                    showDriverMapping();
+                    return;
+                }
+            }
+            
             // Get configuration
             const config = {
                 session_id: sessionId,
@@ -719,7 +1025,12 @@
                 step2_swaps: document.getElementById('step2-swaps').value,
                 weighting_scheme: document.getElementById('weighting-scheme').value,
                 risk_tolerance: document.getElementById('risk-tolerance').value,
-                multiplier: document.getElementById('multiplier').value
+                multiplier: document.getElementById('multiplier').value,
+                // FP2 configuration
+                use_fp2_pace: useFP2,
+                fp2_session_key: useFP2 ? document.getElementById('fp2-session-key').value : null,
+                pace_weight: parseFloat(document.getElementById('pace-weight').value),
+                pace_modifier_type: document.getElementById('pace-modifier-type').value
             };
             
             // Save configuration to cookies
@@ -756,7 +1067,36 @@
             const resultsContent = document.getElementById('results-content');
             const opt = data.optimization;
             
+            // FP2 information card
+            let fp2InfoHtml = '';
+            if (opt.fp2_info && opt.fp2_info.applied) {
+                fp2InfoHtml = `
+                    <div class="result-card" style="border-left-color: #17a2b8;">
+                        <h3>🏁 FP2 Pace Integration</h3>
+                        <p><strong>Session Key:</strong> ${opt.fp2_info.session_key}</p>
+                        <p><strong>Pace Weight:</strong> ${(opt.fp2_info.pace_weight * 100).toFixed(0)}% current form, ${(100 - opt.fp2_info.pace_weight * 100).toFixed(0)}% historical</p>
+                        <p><strong>Modifier Type:</strong> ${opt.fp2_info.modifier_type}</p>
+                        <p style="color: #28a745; font-weight: bold;">✅ Real-time pace data successfully integrated</p>
+                        
+                        ${opt.fp2_info.pace_adjustments && opt.fp2_info.pace_adjustments.length > 0 ? `
+                            <h4>Pace Adjustments for Current Team:</h4>
+                            ${opt.fp2_info.pace_adjustments.map(adj => `
+                                <div class="pace-adjustment">
+                                    <span>${adj.driver}</span>
+                                    <span class="pace-score">
+                                        Score: ${adj.pace_score} | 
+                                        Modifier: ${adj.pace_modifier}x | 
+                                        VFM: ${adj.vfm_original} → ${adj.vfm_adjusted}
+                                    </span>
+                                </div>
+                            `).join('')}
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
             let html = `
+                ${fp2InfoHtml}
                 <div class="result-card">
                     <h3>Step 1: ${opt.step1.race} at ${opt.step1.circuit}</h3>
                     ${opt.step1.swaps.length > 0 ? `
@@ -806,10 +1146,17 @@
                     <p><strong>Total Improvement:</strong> <span class="improvement">+${opt.summary.total_improvement.toFixed(1)} points</span></p>
                     <p><strong>Patterns Evaluated:</strong> ${opt.summary.patterns_evaluated.toLocaleString()}</p>
                     <p><strong>Optimization Time:</strong> ${opt.summary.optimization_time.toFixed(1)}s</p>
+                    ${opt.fp2_info && opt.fp2_info.applied ? 
+                        '<p style="color: #17a2b8;"><strong>Enhancement:</strong> FP2 real-time pace data integrated</p>' : 
+                        '<p style="color: #6c757d;"><strong>Analysis:</strong> Historical data only</p>'
+                    }
                 </div>
                 
                 <div class="button-group">
                     <button class="button button-secondary" onclick="runAnotherOptimization()">Run Another Optimization</button>
+                    ${opt.fp2_info && opt.fp2_info.applied ? 
+                        '<button class="button button-warning" onclick="showFP2Details()">View FP2 Details</button>' : ''
+                    }
                 </div>
             `;
             
@@ -817,7 +1164,10 @@
             document.getElementById('results-section').style.display = 'block';
         }
         
-
+        function showFP2Details() {
+            // This could expand to show more detailed FP2 analysis
+            alert('FP2 pace data was successfully integrated into the optimization. Check the FP2 integration card above for details on how current weekend performance influenced the recommendations.');
+        }
         
         function runAnotherOptimization() {
             document.getElementById('results-section').style.display = 'none';
