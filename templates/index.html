@@ -641,15 +641,21 @@
         
         // Check for default data on page load
         window.onload = async function() {
-            await checkDefaultData();
-            await checkDriverMapping();
-            
-            // Initialize FP2 events after DOM is loaded
-            initializeFP2Events();
-            
-            // If default data is available, go straight to configuration
-            if (document.getElementById('use-default-btn').style.display !== 'none') {
-                useDefaultData();
+            try {
+                await checkDefaultData();
+                await checkDriverMapping();
+                
+                // Initialize FP2 events after DOM is loaded
+                initializeFP2Events();
+                
+                // If default data is available, go straight to configuration
+                const useDefaultBtn = document.getElementById('use-default-btn');
+                if (useDefaultBtn && useDefaultBtn.style.display !== 'none') {
+                    useDefaultData();
+                }
+            } catch (error) {
+                console.error('Error during page initialization:', error);
+                // Continue loading the page even if there are errors
             }
         };
         
@@ -697,17 +703,30 @@
                 const data = await response.json();
                 
                 if (data.has_default) {
-                    document.getElementById('default-data-status').style.display = 'block';
-                    let message = `Using default data with ${data.data.races_completed} races completed.`;
+                    const defaultDataStatus = document.getElementById('default-data-status');
+                    const defaultDataMessage = document.getElementById('default-data-message');
+                    const useDefaultBtn = document.getElementById('use-default-btn');
                     
-                    if (data.data.has_driver_mapping) {
-                        message += ' Driver mapping available for FP2 integration.';
+                    if (defaultDataStatus) {
+                        defaultDataStatus.style.display = 'block';
                     }
                     
-                    message += ` <a href="#" onclick="showUploadSection()">Click here to upload new files instead.</a>`;
+                    if (defaultDataMessage) {
+                        let message = `Using default data with ${data.data.races_completed} races completed.`;
+                        
+                        if (data.data.has_driver_mapping) {
+                            message += ' Driver mapping available for FP2 integration.';
+                        }
+                        
+                        message += ` <a href="#" onclick="showUploadSection()">Click here to upload new files instead.</a>`;
+                        
+                        defaultDataMessage.innerHTML = message;
+                    }
                     
-                    document.getElementById('default-data-message').innerHTML = message;
-                    document.getElementById('use-default-btn').style.display = 'inline-block';
+                    if (useDefaultBtn) {
+                        useDefaultBtn.style.display = 'inline-block';
+                    }
+                    
                     return true;
                 }
                 return false;
