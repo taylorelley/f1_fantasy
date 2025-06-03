@@ -1,827 +1,1143 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F1 Fantasy Team Optimiser</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-            line-height: 1.6;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        header {
-            background: #e10600;
-            color: white;
-            padding: 20px 0;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        h1 {
-            font-size: 2.5em;
-            font-weight: 300;
-        }
-        
-        .nav-links {
-            display: flex;
-            gap: 20px;
-        }
-        
-        .nav-links a {
-            color: white;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            transition: background 0.3s;
-        }
-        
-        .nav-links a:hover {
-            background: rgba(255,255,255,0.2);
-        }
-        
-        .nav-links a.active {
-            background: rgba(255,255,255,0.2);
-        }
-        
-        .section {
-            background: white;
-            padding: 30px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        h2 {
-            color: #e10600;
-            margin-bottom: 20px;
-            font-weight: 400;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-        }
-        
-        input[type="file"],
-        input[type="number"],
-        input[type="text"],
-        select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-        
-        .file-upload {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-        }
-        
-        .team-selection {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        
-        .driver-select, .constructor-select {
-            margin-bottom: 10px;
-        }
-        
-        .button {
-            background: #e10600;
-            color: white;
-            padding: 12px 30px;
-            border: none;
-            border-radius: 4px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        
-        .button:hover {
-            background: #b30500;
-        }
-        
-        .button:disabled {
-            background: #999;
-            cursor: not-allowed;
-        }
-        
-        .button-secondary {
-            background: #6c757d;
-        }
-        
-        .button-secondary:hover {
-            background: #5a6268;
-        }
-        
-        .button-success {
-            background: #28a745;
-        }
-        
-        .button-success:hover {
-            background: #218838;
-        }
-        
-        .progress {
-            display: none;
-            margin-top: 20px;
-            padding: 20px;
-            background: #f0f0f0;
-            border-radius: 4px;
-        }
-        
-        .progress-item {
-            margin: 5px 0;
-            color: #666;
-        }
-        
-        .results {
-            display: none;
-        }
-        
-        .result-card {
-            background: #f9f9f9;
-            padding: 20px;
-            margin: 15px 0;
-            border-radius: 4px;
-            border-left: 4px solid #e10600;
-        }
-        
-        .swap-item {
-            background: #fff;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .improvement {
-            color: #28a745;
-            font-weight: bold;
-        }
-        
-        .team-display {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
-        }
-        
-        .team-member {
-            background: #fff;
-            padding: 10px;
-            border-radius: 4px;
-            text-align: center;
-            border: 1px solid #e0e0e0;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-        }
-        
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #e10600;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 15px 0;
-        }
-        
-        .success {
-            background: #d4edda;
-            color: #155724;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 15px 0;
-        }
-        
-        .info {
-            background: #d1ecf1;
-            color: #0c5460;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 15px 0;
-        }
-        
-        .default-data-status {
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #e8f4f8;
-            border-radius: 4px;
-            border: 1px solid #bee5eb;
-        }
-        
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        
-        .checkbox-group {
-            margin: 20px 0;
-        }
-        
-        .checkbox-group input[type="checkbox"] {
-            width: auto;
-            margin-right: 10px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>F1 Fantasy Team Optimiser</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      background: #e10600;
+      color: white;
+      padding: 20px 0;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      font-weight: 300;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 20px;
+    }
+
+    .nav-links a {
+      color: white;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      transition: background 0.3s;
+    }
+
+    .nav-links a:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .nav-links a.active {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .section {
+      background: white;
+      padding: 30px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #e10600;
+      margin-bottom: 20px;
+      font-weight: 400;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    input[type="file"],
+    input[type="number"],
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+
+    .file-upload {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+    }
+
+    .team-selection {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .driver-select, .constructor-select {
+      margin-bottom: 10px;
+    }
+
+    .button {
+      background: #e10600;
+      color: white;
+      padding: 12px 30px;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .button:hover {
+      background: #b30500;
+    }
+
+    .button:disabled {
+      background: #999;
+      cursor: not-allowed;
+    }
+
+    .button-secondary {
+      background: #6c757d;
+    }
+
+    .button-secondary:hover {
+      background: #5a6268;
+    }
+
+    .button-success {
+      background: #28a745;
+    }
+
+    .button-success:hover {
+      background: #218838;
+    }
+
+    .button-warning {
+      background: #ffc107;
+      color: #212529;
+    }
+
+    .button-warning:hover {
+      background: #e0a800;
+    }
+
+    .progress {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+
+    .progress-item {
+      margin: 5px 0;
+      color: #666;
+    }
+
+    .results {
+      display: none;
+    }
+
+    .result-card {
+      background: #f9f9f9;
+      padding: 20px;
+      margin: 15px 0;
+      border-radius: 4px;
+      border-left: 4px solid #e10600;
+    }
+
+    .swap-item {
+      background: #fff;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .improvement {
+      color: #28a745;
+      font-weight: bold;
+    }
+
+    .team-display {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .team-member {
+      background: #fff;
+      padding: 10px;
+      border-radius: 4px;
+      text-align: center;
+      border: 1px solid #e0e0e0;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #e10600;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 15px 0;
+    }
+
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 15px 0;
+    }
+
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 15px 0;
+    }
+
+    .warning {
+      background: #fff3cd;
+      color: #856404;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 15px 0;
+    }
+
+    .default-data-status {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #e8f4f8;
+      border-radius: 4px;
+      border: 1px solid #bee5eb;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .checkbox-group {
+      margin: 20px 0;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: auto;
+      margin-right: 10px;
+    }
+
+    .fp2-config {
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      /* keep padding/margin if you still want spacing */
+    }
+
+    .fp2-config h3 {
+      color: #333;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+    }
+
+    .fp2-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+    }
+
+    .test-result {
+      margin-top: 10px;
+    }
+
+    .pace-adjustment {
+      background: #e9ecef;
+      padding: 8px 12px;
+      margin: 5px 0;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .pace-score {
+      font-weight: bold;
+      color: #495057;
+    }
+
+    small {
+      font-size: 0.875em;
+      color: #6c757d;
+      margin-top: 5px;
+      display: block;
+    }
+
+    small a {
+      color: #007bff;
+      text-decoration: none;
+    }
+
+    small a:hover {
+      text-decoration: underline;
+    }
+  </style>
 </head>
 <body>
-    <header>
-        <div class="header-content">
-            <h1>F1 Fantasy Team Optimiser</h1>
-            <nav class="nav-links">
-                <a href="/" class="active">Optimiser</a>
-                <a href="/statistics">Statistics</a>
-            </nav>
-        </div>
-    </header>
-    
-    <div class="container">
-        <!-- Default Data Status -->
-        <div class="section default-data-status" id="default-data-status" style="display: none;">
-            <h3>📁 Default Data</h3>
-            <p id="default-data-message"></p>
-        </div>
-        
-        <!-- File Upload Section -->
-        <div class="section" id="upload-section">
-            <h2>Load Data Files</h2>
-            <p style="margin-bottom: 20px;">Upload new data files or use existing default data if available.</p>
-            
-            <div class="file-upload">
-                <div class="form-group">
-                    <label for="driver-data">Driver Race Data (CSV)</label>
-                    <input type="file" id="driver-data" accept=".csv">
-                </div>
-                <div class="form-group">
-                    <label for="constructor-data">Constructor Race Data (CSV)</label>
-                    <input type="file" id="constructor-data" accept=".csv">
-                </div>
-                <div class="form-group">
-                    <label for="calendar-data">Race Calendar (CSV)</label>
-                    <input type="file" id="calendar-data" accept=".csv">
-                </div>
-                <div class="form-group">
-                    <label for="tracks-data">Track Characteristics (CSV)</label>
-                    <input type="file" id="tracks-data" accept=".csv">
-                </div>
-            </div>
-            
-            <div class="checkbox-group">
-                <label>
-                    <input type="checkbox" id="update-default-checkbox">
-                    Save these files as default data (will replace existing default data)
-                </label>
-            </div>
-            
-            <div class="button-group">
-                <button class="button" onclick="uploadFiles()">Upload New Files</button>
-                <button class="button button-success" id="use-default-btn" onclick="useDefaultData()" style="display: none;">Use Default Data</button>
-            </div>
-        </div>
-        
-        <!-- Configuration Section -->
-        <div class="section" id="config-section" style="display: none;">
-            <h2>Configure Optimisation</h2>
-            
-            <div class="form-group">
-                <label>Races Completed: <span id="races-completed">-</span></label>
-            </div>
-            
-            <h3 style="margin: 20px 0 10px;">Current Team</h3>
-            <div class="team-selection">
-                <div>
-                    <label>Drivers (Select 5)</label>
-                    <div id="driver-selects">
-                        <!-- Driver dropdowns will be added here -->
-                    </div>
-                </div>
-                <div>
-                    <label>Constructors (Select 2)</label>
-                    <div id="constructor-selects">
-                        <!-- Constructor dropdowns will be added here -->
-                    </div>
-                </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 30px;">
-                <div class="form-group">
-                    <label for="remaining-budget">Remaining Budget (M)</label>
-                    <input type="number" id="remaining-budget" value="1.0" step="0.1" min="0">
-                </div>
-                
-                <div class="form-group">
-                    <label for="step1-swaps">Step 1 Max Swaps</label>
-                    <input type="number" id="step1-swaps" value="2" min="0" max="7">
-                </div>
-                
-                <div class="form-group">
-                    <label for="step2-swaps">Step 2 Max Swaps</label>
-                    <input type="number" id="step2-swaps" value="2" min="0" max="7">
-                </div>
-                
-                <div class="form-group">
-                    <label for="weighting-scheme">VFM Weighting Scheme</label>
-                    <select id="weighting-scheme">
-                        <option value="trend_based">Trend-based (Adaptive)</option>
-                        <option value="equal">Equal weights</option>
-                        <option value="linear_decay">Linear decay</option>
-                        <option value="exp_decay">Exponential decay</option>
-                        <option value="moderate_decay">Moderate decay</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="risk-tolerance">Risk Tolerance</label>
-                    <select id="risk-tolerance">
-                        <option value="low">Low (Consistent performers)</option>
-                        <option value="medium" selected>Medium (Balanced)</option>
-                        <option value="high">High (Track-specific)</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="multiplier">Multiplier</label>
-                    <input type="number" id="multiplier" value="2" min="1" max="5">
-                </div>
-            </div>
-            
-            <div class="button-group">
-                <button class="button" onclick="runOptimization()">Run Optimisation</button>
-                <button class="button button-secondary" onclick="showUploadSection()">Change Data Files</button>
-            </div>
-        </div>
-        
-        <!-- Progress Section -->
-        <div class="section progress" id="progress-section">
-            <h2>Optimisation Progress</h2>
-            <div class="loading">
-                <div class="spinner"></div>
-                <p>Running optimisation...</p>
-            </div>
-            <div id="progress-messages"></div>
-        </div>
-        
-        <!-- Results Section -->
-        <div class="section results" id="results-section">
-            <h2>Optimisation Results</h2>
-            <div id="results-content"></div>
-        </div>
+  <header>
+    <div class="header-content">
+      <h1>F1 Fantasy Team Optimiser</h1>
+      <nav class="nav-links">
+        <a href="/" class="active">Optimiser</a>
+        <a href="/statistics">Statistics</a>
+      </nav>
     </div>
-    
-    <script>
-        let sessionId = null;
-        let sessionData = null;
-        let usingDefaultData = false;
-        
-        // Check for default data on page load
-        window.onload = async function() {
-            await checkDefaultData();
-            
-            // If default data is available, go straight to configuration
-            if (document.getElementById('use-default-btn').style.display !== 'none') {
-                useDefaultData();
-            }
-        };
-        
-        async function checkDefaultData() {
-            try {
-                const response = await fetch('/check_default_data');
-                const data = await response.json();
-                
-                if (data.has_default) {
-                    document.getElementById('default-data-status').style.display = 'block';
-                    document.getElementById('default-data-message').innerHTML = 
-                        `Using default data with ${data.data.races_completed} races completed. ` +
-                        `<a href="#" onclick="showUploadSection()">Click here to upload new files instead.</a>`;
-                    document.getElementById('use-default-btn').style.display = 'inline-block';
-                    return true;
-                }
-                return false;
-            } catch (error) {
-                console.error('Error checking default data:', error);
-                return false;
-            }
-        }
-        
-        async function loadLastConfig() {
-            // Load configuration from cookies instead of server
-            loadConfigFromCookie();
-        }
-        
-        function useDefaultData() {
-            fetch('/check_default_data')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.has_default) {
-                        sessionId = 'default';
-                        sessionData = data.data;
-                        usingDefaultData = true;
-                        
-                        document.getElementById('races-completed').textContent = data.data.races_completed;
-                        populateTeamSelects(data.data.drivers, data.data.constructors);
-                        
-                        // Load last config if available
-                        loadConfigFromCookie();
-                        
-                        document.getElementById('config-section').style.display = 'block';
-                        document.getElementById('upload-section').style.display = 'none';
-                    }
-                })
-                .catch(error => {
-                    alert('Error loading default data: ' + error.message);
-                });
-        }
-        
-        // Cookie management functions
-        function setCookie(name, value, days = 30) {
-            const expires = new Date();
-            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-            document.cookie = `${name}=${JSON.stringify(value)};expires=${expires.toUTCString()};path=/`;
-        }
-        
-        function getCookie(name) {
-            const nameEQ = name + "=";
-            const ca = document.cookie.split(';');
-            for (let i = 0; i < ca.length; i++) {
-                let c = ca[i];
-                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-                if (c.indexOf(nameEQ) === 0) {
-                    try {
-                        return JSON.parse(c.substring(nameEQ.length, c.length));
-                    } catch (e) {
-                        return null;
-                    }
-                }
-            }
-            return null;
-        }
-        
-        function saveConfigToCookie() {
-            // Get selected drivers
-            const drivers = [];
-            document.querySelectorAll('.driver-select').forEach(select => {
-                if (select.value) drivers.push(select.value);
-            });
-            
-            // Get selected constructors
-            const constructors = [];
-            document.querySelectorAll('.constructor-select').forEach(select => {
-                if (select.value) constructors.push(select.value);
-            });
-            
-            const config = {
-                current_drivers: drivers,
-                current_constructors: constructors,
-                remaining_budget: document.getElementById('remaining-budget').value,
-                step1_swaps: document.getElementById('step1-swaps').value,
-                step2_swaps: document.getElementById('step2-swaps').value,
-                weighting_scheme: document.getElementById('weighting-scheme').value,
-                risk_tolerance: document.getElementById('risk-tolerance').value,
-                multiplier: document.getElementById('multiplier').value
-            };
-            
-            setCookie('f1_optimizer_config', config);
-        }
-        
-        function loadConfigFromCookie() {
-            const config = getCookie('f1_optimizer_config');
-            if (config) {
-                applyConfig(config);
-            }
-        }
-        
-        function applyConfig(config) {
-            // Set drivers
-            const driverSelects = document.querySelectorAll('.driver-select');
-            if (config.current_drivers) {
-                config.current_drivers.forEach((driver, index) => {
-                    if (driverSelects[index]) {
-                        driverSelects[index].value = driver;
-                    }
-                });
-            }
-            
-            // Set constructors
-            const constructorSelects = document.querySelectorAll('.constructor-select');
-            if (config.current_constructors) {
-                config.current_constructors.forEach((constructor, index) => {
-                    if (constructorSelects[index]) {
-                        constructorSelects[index].value = constructor;
-                    }
-                });
-            }
-            
-            // Set other values
-            if (config.remaining_budget) document.getElementById('remaining-budget').value = config.remaining_budget;
-            if (config.step1_swaps) document.getElementById('step1-swaps').value = config.step1_swaps;
-            if (config.step2_swaps) document.getElementById('step2-swaps').value = config.step2_swaps;
-            if (config.weighting_scheme) document.getElementById('weighting-scheme').value = config.weighting_scheme;
-            if (config.risk_tolerance) document.getElementById('risk-tolerance').value = config.risk_tolerance;
-            if (config.multiplier) document.getElementById('multiplier').value = config.multiplier;
-        }
-        
-        async function uploadFiles() {
-            const files = {
-                'driver_race_data.csv': document.getElementById('driver-data').files[0],
-                'constructor_race_data.csv': document.getElementById('constructor-data').files[0],
-                'calendar.csv': document.getElementById('calendar-data').files[0],
-                'tracks.csv': document.getElementById('tracks-data').files[0]
-            };
-            
-            // Check all files are selected
-            let allFilesSelected = true;
-            for (const [name, file] of Object.entries(files)) {
-                if (!file) {
-                    allFilesSelected = false;
-                    break;
-                }
-            }
-            
-            if (!allFilesSelected) {
-                alert('Please select all 4 CSV files');
-                return;
-            }
-            
-            const formData = new FormData();
-            for (const [name, file] of Object.entries(files)) {
-                formData.append(name, file, name);
-            }
-            
-            // Check if we should update default data
-            const updateDefault = document.getElementById('update-default-checkbox').checked;
-            formData.append('update_default', updateDefault);
-            
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    sessionId = data.session_id;
-                    sessionData = data;
-                    usingDefaultData = false;
-                    
-                    document.getElementById('races-completed').textContent = data.races_completed;
-                    populateTeamSelects(data.drivers, data.constructors);
-                    
-                    if (data.updated_default) {
-                        alert('Files uploaded and saved as default data successfully!');
-                        await checkDefaultData(); // Refresh default data status
-                    } else {
-                        alert('Files uploaded successfully!');
-                    }
-                    
-                    // Load last config if available
-                    loadConfigFromCookie();
-                    
-                    document.getElementById('config-section').style.display = 'block';
-                    document.getElementById('upload-section').style.display = 'none';
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            } catch (error) {
-                alert('Error uploading files: ' + error.message);
-            }
-        }
-        
-        function showUploadSection() {
-            document.getElementById('config-section').style.display = 'none';
-            document.getElementById('upload-section').style.display = 'block';
-            document.getElementById('results-section').style.display = 'none';
-            document.getElementById('default-data-status').style.display = 'none';
-            
-            // Clear file inputs
-            document.getElementById('driver-data').value = '';
-            document.getElementById('constructor-data').value = '';
-            document.getElementById('calendar-data').value = '';
-            document.getElementById('tracks-data').value = '';
-            document.getElementById('update-default-checkbox').checked = false;
-        }
-        
-        function resetToUpload() {
-            showUploadSection();
-        }
-        
-        function populateTeamSelects(drivers, constructors) {
-            // Create driver selects
-            const driverContainer = document.getElementById('driver-selects');
-            driverContainer.innerHTML = '';
-            for (let i = 0; i < 5; i++) {
-                const select = document.createElement('select');
-                select.className = 'driver-select';
-                select.innerHTML = '<option value="">Select driver...</option>';
-                drivers.forEach(driver => {
-                    select.innerHTML += `<option value="${driver}">${driver}</option>`;
-                });
-                driverContainer.appendChild(select);
-            }
-            
-            // Create constructor selects
-            const constructorContainer = document.getElementById('constructor-selects');
-            constructorContainer.innerHTML = '';
-            for (let i = 0; i < 2; i++) {
-                const select = document.createElement('select');
-                select.className = 'constructor-select';
-                select.innerHTML = '<option value="">Select constructor...</option>';
-                constructors.forEach(constructor => {
-                    select.innerHTML += `<option value="${constructor}">${constructor}</option>`;
-                });
-                constructorContainer.appendChild(select);
-            }
-        }
-        
-        async function runOptimization() {
-            // Get selected drivers
-            const drivers = [];
-            document.querySelectorAll('.driver-select').forEach(select => {
-                if (select.value) drivers.push(select.value);
-            });
-            
-            if (drivers.length !== 5) {
-                alert('Please select exactly 5 drivers');
-                return;
-            }
-            
-            // Get selected constructors
-            const constructors = [];
-            document.querySelectorAll('.constructor-select').forEach(select => {
-                if (select.value) constructors.push(select.value);
-            });
-            
-            if (constructors.length !== 2) {
-                alert('Please select exactly 2 constructors');
-                return;
-            }
-            
-            // Get configuration
-            const config = {
-                session_id: sessionId,
-                current_drivers: drivers,
-                current_constructors: constructors,
-                remaining_budget: document.getElementById('remaining-budget').value,
-                step1_swaps: document.getElementById('step1-swaps').value,
-                step2_swaps: document.getElementById('step2-swaps').value,
-                weighting_scheme: document.getElementById('weighting-scheme').value,
-                risk_tolerance: document.getElementById('risk-tolerance').value,
-                multiplier: document.getElementById('multiplier').value
-            };
-            
-            // Save configuration to cookies
-            saveConfigToCookie();
-            
-            // Show progress
-            document.getElementById('progress-section').style.display = 'block';
-            document.getElementById('results-section').style.display = 'none';
-            
-            try {
-                const response = await fetch('/optimize', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(config)
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    displayResults(data);
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            } catch (error) {
-                alert('Error running optimization: ' + error.message);
-            } finally {
-                document.getElementById('progress-section').style.display = 'none';
-            }
-        }
-        
-        function displayResults(data) {
-            const resultsContent = document.getElementById('results-content');
-            const opt = data.optimization;
-            
-            let html = `
-                <div class="result-card">
-                    <h3>Step 1: ${opt.step1.race} at ${opt.step1.circuit}</h3>
-                    ${opt.step1.swaps.length > 0 ? `
-                        <h4>Recommended Swaps:</h4>
-                        ${opt.step1.swaps.map(swap => `
-                            <div class="swap-item">
-                                <span>${swap[0]}: ${swap[1]} → ${swap[2]}</span>
-                            </div>
-                        `).join('')}
-                    ` : '<p>No swaps recommended</p>'}
-                    <p><strong>Expected Points:</strong> ${opt.step1.expected_points.toFixed(1)} 
-                       <span class="improvement">(+${opt.step1.improvement.toFixed(1)})</span></p>
-                    <p><strong>Boost Driver:</strong> ${opt.step1.boost_driver}</p>
-                </div>
-                
-                <div class="result-card">
-                    <h3>Step 2: ${opt.step2.race} at ${opt.step2.circuit}</h3>
-                    ${opt.step2.swaps.length > 0 ? `
-                        <h4>Additional Swaps:</h4>
-                        ${opt.step2.swaps.map(swap => `
-                            <div class="swap-item">
-                                <span>${swap[0]}: ${swap[1]} → ${swap[2]}</span>
-                            </div>
-                        `).join('')}
-                    ` : '<p>No additional swaps</p>'}
-                    <p><strong>Expected Points:</strong> ${opt.step2.expected_points.toFixed(1)} 
-                       <span class="improvement">(+${opt.step2.improvement.toFixed(1)})</span></p>
-                    <p><strong>Boost Driver:</strong> ${opt.step2.boost_driver}</p>
-                    <p><strong>Budget:</strong> ${opt.step2.budget_used.toFixed(1)}M used, 
-                       ${opt.step2.budget_remaining.toFixed(1)}M remaining</p>
-                </div>
-                
-                <div class="result-card">
-                    <h3>Final Team</h3>
-                    <h4>Drivers:</h4>
-                    <div class="team-display">
-                        ${opt.step2.team.drivers.map(d => `<div class="team-member">${d}</div>`).join('')}
-                    </div>
-                    <h4>Constructors:</h4>
-                    <div class="team-display">
-                        ${opt.step2.team.constructors.map(c => `<div class="team-member">${c}</div>`).join('')}
-                    </div>
-                </div>
-                
-                <div class="result-card">
-                    <h3>Summary</h3>
-                    <p><strong>Total Improvement:</strong> <span class="improvement">+${opt.summary.total_improvement.toFixed(1)} points</span></p>
-                    <p><strong>Patterns Evaluated:</strong> ${opt.summary.patterns_evaluated.toLocaleString()}</p>
-                    <p><strong>Optimization Time:</strong> ${opt.summary.optimization_time.toFixed(1)}s</p>
-                </div>
-                
-                <div class="button-group">
-                    <button class="button button-secondary" onclick="runAnotherOptimization()">Run Another Optimization</button>
-                </div>
-            `;
-            
-            resultsContent.innerHTML = html;
-            document.getElementById('results-section').style.display = 'block';
-        }
-        
+  </header>
 
-        
-        function runAnotherOptimization() {
-            document.getElementById('results-section').style.display = 'none';
-            document.getElementById('config-section').style.display = 'block';
+  <div class="container">
+    <!-- Default Data Status -->
+    <div class="section default-data-status" id="default-data-status" style="display: none;">
+      <h3>📁 Default Data</h3>
+      <p id="default-data-message"></p>
+    </div>
+
+    <!-- File Upload Section -->
+    <div class="section" id="upload-section">
+      <h2>Load Data Files</h2>
+      <p style="margin-bottom: 20px;">
+        Upload new data files or use existing default data if available.
+      </p>
+
+      <div class="file-upload">
+        <div class="form-group">
+          <label for="driver-data">Driver Race Data</label>
+          <input type="file" id="driver-data" accept=".csv">
+        </div>
+        <div class="form-group">
+          <label for="constructor-data">Constructor Race Data</label>
+          <input type="file" id="constructor-data" accept=".csv">
+        </div>
+        <div class="form-group">
+          <label for="calendar-data">Race Calendar</label>
+          <input type="file" id="calendar-data" accept=".csv">
+        </div>
+        <div class="form-group">
+          <label for="tracks-data">Track Characteristics</label>
+          <input type="file" id="tracks-data" accept=".csv">
+        </div>
+        <div id="driver-mapping-section">
+          <div class="form-group">
+            <label for="driver-mapping-file">Driver Number Mapping</label>
+            <input type="file" id="driver-mapping-file" accept=".csv">
+            <small>
+              Optional, only required for Race Pace Estimations
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <div class="checkbox-group">
+        <label>
+          <input type="checkbox" id="update-default-checkbox">
+          Save these files as default data (will replace existing default data)
+        </label>
+      </div>
+
+      <div class="button-group">
+        <button class="button" onclick="uploadFiles()">Upload New Files</button>
+        <button class="button button-success"
+                id="use-default-btn"
+                onclick="useDefaultData()"
+                style="display: none;">
+          Use Default Data
+        </button>
+      </div>
+
+      <div id="mapping-status"></div>
+    </div>
+
+    <!-- Configuration Section -->
+    <div class="section" id="config-section" style="display: none;">
+      <h2>Configure Optimisation</h2>
+
+      <div class="form-group">
+        <label>Races Completed: <span id="races-completed">-</span></label>
+      </div>
+
+      <h3 style="margin: 20px 0 10px;">Current Team</h3>
+      <div class="team-selection">
+        <div>
+          <label>Drivers (Select 5)</label>
+          <div id="driver-selects">
+            <!-- Driver dropdowns will be added here -->
+          </div>
+        </div>
+        <div>
+          <label>Constructors (Select 2)</label>
+          <div id="constructor-selects">
+            <!-- Constructor dropdowns will be added here -->
+          </div>
+        </div>
+      </div>
+
+      <div style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;">
+        <div class="form-group">
+          <label for="remaining-budget">Remaining Budget (M)</label>
+          <input type="number" id="remaining-budget" value="1.0" step="0.1" min="0">
+        </div>
+
+        <div class="form-group">
+          <label for="step1-swaps">Next Race Max Swaps</label>
+          <input type="number" id="step1-swaps" value="2" min="0" max="7">
+        </div>
+
+        <div class="form-group">
+          <label for="step2-swaps">Following Race Max Swaps</label>
+          <input type="number" id="step2-swaps" value="2" min="0" max="7">
+        </div>
+
+        <div class="form-group">
+          <label for="weighting-scheme">Past Performance Weighting</label>
+          <select id="weighting-scheme">
+            <option value="trend_based">Trend-based (Adaptive)</option>
+            <option value="equal">Equal weights</option>
+            <option value="linear_decay">Linear decay</option>
+            <option value="moderate_decay">Moderate decay</option>
+            <option value="exp_decay" selected>Exponential decay</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="risk-tolerance">Risk Tolerance</label>
+          <select id="risk-tolerance">
+            <option value="low">Low (Consistent performers)</option>
+            <option value="medium" selected>Medium (Balanced)</option>
+            <option value="high">High (Track-specific)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="multiplier">Multiplier</label>
+          <input type="number" id="multiplier" value="2" min="2" max="3">
+        </div>
+      </div>
+
+      <!-- FP2 Race Pace Configuration -->
+      <div class="checkbox-group">
+        <label>
+          <input type="checkbox" id="use-fp2-pace">
+          Include Race Pace Estimation using FP2 Lap Data
+        </label>
+      </div>
+
+      <div class="fp2-config" id="fp2-config" style="display: none;">
+
+        <div class="fp2-grid">
+          <div class="form-group">
+            <label for="fp2-session-key">FP2 Session Key</label>
+            <input type="number" id="fp2-session-key" placeholder="e.g. 9158">
+          </div>
+
+          <div class="form-group">
+            <label for="pace-weight">Pace Weight</label>
+            <select id="pace-weight">
+              <option value="0.20">Conservative (20% current, 80% historical)</option>
+              <option value="0.30" selected>Balanced (30% current, 70% historical)</option>
+              <option value="0.40">Aggressive (40% current, 60% historical)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="pace-modifier-type">Pace Modifier Type</label>
+            <select id="pace-modifier-type">
+              <option value="conservative" selected>Conservative (0.8× to 1.2× range)</option>
+              <option value="aggressive">Aggressive (0.6× to 1.4× range)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <button class="button button-warning" onclick="testFP2Connection()">
+            Test API Connection
+          </button>
+        </div>
+
+        <div id="fp2-test-result" class="test-result"></div>
+      </div>
+
+      <div class="button-group">
+        <button class="button" onclick="runOptimization()">Run Optimisation</button>
+        <button class="button button-secondary" onclick="showUploadSection()">
+          Change Data Files
+        </button>
+      </div>
+    </div>
+
+    <!-- Progress Section -->
+    <div class="section progress" id="progress-section">
+      <h2>Optimisation Progress</h2>
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Running optimisation…</p>
+      </div>
+      <div id="progress-messages"></div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="section results" id="results-section">
+      <h2>Optimisation Results</h2>
+      <div id="results-content"></div>
+    </div>
+  </div>
+
+  <script>
+    let sessionId = null;
+    let sessionData = null;
+    let usingDefaultData = false;
+
+    // Once the DOM is ready, do all setup here
+    window.addEventListener('DOMContentLoaded', async function() {
+      try {
+        await checkDefaultData();
+        await checkDriverMapping();
+
+        // FP2 checkbox listener
+        const fp2Checkbox = document.getElementById('use-fp2-pace');
+        const fp2Config = document.getElementById('fp2-config');
+        if (fp2Checkbox) {
+          fp2Checkbox.addEventListener('change', function() {
+            if (fp2Config) {
+              fp2Config.style.display = this.checked ? 'block' : 'none';
+            }
+            if (this.checked) {
+              checkDriverMapping();
+              // keep mapping visible
+            }
+            // unchecking does not hide mapping anymore
+          });
         }
-    </script>
+
+        // If default data is present, immediately switch to config
+        const useDefaultBtn = document.getElementById('use-default-btn');
+        if (useDefaultBtn && useDefaultBtn.style.display !== 'none') {
+          useDefaultData();
+        }
+      } catch (error) {
+        console.error('Error during page initialization:', error);
+      }
+    });
+
+    async function checkDefaultData() {
+      try {
+        const response = await fetch('/check_default_data');
+        const data = await response.json();
+
+        if (data.has_default) {
+          const defaultDataStatus  = document.getElementById('default-data-status');
+          const defaultDataMessage = document.getElementById('default-data-message');
+          const useDefaultBtn      = document.getElementById('use-default-btn');
+          if (defaultDataStatus) {
+            defaultDataStatus.style.display = 'block';
+          }
+          if (defaultDataMessage) {
+            let message = `Using default data with ${data.data.races_completed} races completed.`;
+            if (data.data.has_driver_mapping) {
+              message += ' Driver mapping available for FP2 integration.';
+            }
+            message += ` <a href="#" onclick="showUploadSection()">Click here to upload new files instead.</a>`;
+            defaultDataMessage.innerHTML = message;
+          }
+          if (useDefaultBtn) {
+            useDefaultBtn.style.display = 'inline-block';
+          }
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Error checking default data:', error);
+        return false;
+      }
+    }
+
+    async function checkDriverMapping() {
+      try {
+        const response = await fetch('/check_driver_mapping');
+        const data = await response.json();
+        const statusDiv = document.getElementById('mapping-status');
+        if (statusDiv) {
+          if (data.exists) {
+            statusDiv.innerHTML = '<div class="success">✅ Driver mapping file is available – Race Pace Estimation ready!</div>';
+          } else {
+            statusDiv.innerHTML = '<div class="warning">⚠️ No driver mapping file found. Upload one to enable Race Pace Estimation.</div>';
+          }
+        }
+        return data.exists;
+      } catch (error) {
+        console.error('Error checking driver mapping:', error);
+        return false;
+      }
+    }
+
+    function showDriverMapping() {
+      const section = document.getElementById('driver-mapping-section');
+      if (section) {
+        section.style.display = 'block';
+      }
+    }
+
+    // Overwrite hideDriverMapping to do nothing, so mapping stays visible
+    function hideDriverMapping() {
+      // Intentionally empty
+    }
+
+    async function useDefaultData() {
+      fetch('/check_default_data')
+        .then(response => response.json())
+        .then(data => {
+          if (!data.has_default) return;
+
+          sessionId      = 'default';
+          sessionData    = data.data;
+          usingDefaultData = true;
+
+          // Show races completed
+          const racesCompletedEl = document.getElementById('races-completed');
+          if (racesCompletedEl) {
+            racesCompletedEl.textContent = data.data.races_completed;
+          }
+
+          populateTeamSelects(data.data.drivers, data.data.constructors);
+
+          // Load saved config, if any
+          loadConfigFromCookie();
+
+          // Switch UI sections
+          const configSection = document.getElementById('config-section');
+          const uploadSection = document.getElementById('upload-section');
+          if (configSection) {
+            configSection.style.display = 'block';
+          }
+          if (uploadSection) {
+            uploadSection.style.display = 'none';
+          }
+
+          // Enable FP2 checkbox
+          const fp2Checkbox = document.getElementById('use-fp2-pace');
+          if (fp2Checkbox) {
+            fp2Checkbox.disabled = false;
+          }
+
+          // Refresh mapping status
+          checkDriverMapping();
+        })
+        .catch(error => {
+          alert('Error loading default data: ' + error.message);
+        });
+    }
+
+    // Populate driver/constructor dropdowns
+    function populateTeamSelects(drivers, constructors) {
+      const driverContainer = document.getElementById('driver-selects');
+      if (driverContainer) {
+        driverContainer.innerHTML = '';
+        for (let i = 0; i < 5; i++) {
+          const select = document.createElement('select');
+          select.className = 'driver-select';
+          select.innerHTML = '<option value="">Select driver…</option>';
+          drivers.forEach(driver => {
+            select.innerHTML += `<option value="${driver}">${driver}</option>`;
+          });
+          driverContainer.appendChild(select);
+        }
+      }
+
+      const constructorContainer = document.getElementById('constructor-selects');
+      if (constructorContainer) {
+        constructorContainer.innerHTML = '';
+        for (let i = 0; i < 2; i++) {
+          const select = document.createElement('select');
+          select.className = 'constructor-select';
+          select.innerHTML = '<option value="">Select constructor…</option>';
+          constructors.forEach(cons => {
+            select.innerHTML += `<option value="${cons}">${cons}</option>`;
+          });
+          constructorContainer.appendChild(select);
+        }
+      }
+    }
+
+    // Test FP2 API connection
+    async function testFP2Connection() {
+      const sessionKey = document.getElementById('fp2-session-key')?.value;
+      if (!sessionKey) {
+        alert('Please enter an FP2 session key');
+        return;
+      }
+      const resultDiv = document.getElementById('fp2-test-result');
+      if (resultDiv) {
+        resultDiv.innerHTML = '<div class="info">🔄 Testing FP2 connection…</div>';
+      }
+      try {
+        const response = await fetch('/test_fp2_connection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_key: sessionKey })
+        });
+        const data = await response.json();
+        if (data.success) {
+          resultDiv.innerHTML = `
+            <div class="success">
+              ✅ ${data.message}<br>
+              Found data for ${data.driver_count} drivers<br>
+              ${data.fastest_driver ? `Fastest driver: #${data.fastest_driver}` : ''}
+            </div>
+          `;
+        } else {
+          resultDiv.innerHTML = `<div class="error">❌ ${data.message}</div>`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="error">❌ Error testing connection: ${error.message}</div>`;
+      }
+    }
+
+    // Cookie helpers
+    function setCookie(name, value, days = 30) {
+      const expires = new Date();
+      expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+      document.cookie = `${name}=${JSON.stringify(value)};expires=${expires.toUTCString()};path=/`;
+    }
+
+    function getCookie(name) {
+      const nameEQ = name + '=';
+      const ca = document.cookie.split(';');
+      for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) === ' ') c = c.substring(1);
+        if (c.indexOf(nameEQ) === 0) {
+          try {
+            return JSON.parse(c.substring(nameEQ.length));
+          } catch {
+            return null;
+          }
+        }
+      }
+      return null;
+    }
+
+    function saveConfigToCookie() {
+      const drivers = [];
+      document.querySelectorAll('.driver-select').forEach(sel => {
+        if (sel.value) drivers.push(sel.value);
+      });
+      const constructors = [];
+      document.querySelectorAll('.constructor-select').forEach(sel => {
+        if (sel.value) constructors.push(sel.value);
+      });
+      const config = {
+        current_drivers:     drivers,
+        current_constructors: constructors,
+        remaining_budget:    document.getElementById('remaining-budget')?.value,
+        step1_swaps:         document.getElementById('step1-swaps')?.value,
+        step2_swaps:         document.getElementById('step2-swaps')?.value,
+        weighting_scheme:    document.getElementById('weighting-scheme')?.value,
+        risk_tolerance:      document.getElementById('risk-tolerance')?.value,
+        multiplier:          document.getElementById('multiplier')?.value,
+        use_fp2_pace:        document.getElementById('use-fp2-pace')?.checked,
+        fp2_session_key:     document.getElementById('fp2-session-key')?.value,
+        pace_weight:         document.getElementById('pace-weight')?.value,
+        pace_modifier_type:  document.getElementById('pace-modifier-type')?.value
+      };
+      setCookie('f1_optimizer_config', config);
+    }
+
+    function loadConfigFromCookie() {
+      const config = getCookie('f1_optimizer_config');
+      if (config) applyConfig(config);
+    }
+
+    function applyConfig(config) {
+      // Drivers
+      const driverSelects = document.querySelectorAll('.driver-select');
+      if (config.current_drivers) {
+        config.current_drivers.forEach((driver, idx) => {
+          if (driverSelects[idx]) driverSelects[idx].value = driver;
+        });
+      }
+      // Constructors
+      const constructorSelects = document.querySelectorAll('.constructor-select');
+      if (config.current_constructors) {
+        config.current_constructors.forEach((cons, idx) => {
+          if (constructorSelects[idx]) constructorSelects[idx].value = cons;
+        });
+      }
+      // Other values
+      if (config.remaining_budget) document.getElementById('remaining-budget').value = config.remaining_budget;
+      if (config.step1_swaps)       document.getElementById('step1-swaps').value       = config.step1_swaps;
+      if (config.step2_swaps)       document.getElementById('step2-swaps').value       = config.step2_swaps;
+      if (config.weighting_scheme)  document.getElementById('weighting-scheme').value  = config.weighting_scheme;
+      if (config.risk_tolerance)    document.getElementById('risk-tolerance').value    = config.risk_tolerance;
+      if (config.multiplier)        document.getElementById('multiplier').value        = config.multiplier;
+
+      // FP2 settings
+      if (config.use_fp2_pace !== undefined) {
+        const fp2Checkbox = document.getElementById('use-fp2-pace');
+        const fp2ConfigEl  = document.getElementById('fp2-config');
+        if (fp2Checkbox) {
+          fp2Checkbox.checked = config.use_fp2_pace;
+          if (fp2ConfigEl) {
+            fp2ConfigEl.style.display = config.use_fp2_pace ? 'block' : 'none';
+          }
+          if (config.use_fp2_pace) showDriverMapping();
+        }
+      }
+      if (config.fp2_session_key)    document.getElementById('fp2-session-key').value   = config.fp2_session_key;
+      if (config.pace_weight)        document.getElementById('pace-weight').value       = config.pace_weight;
+      if (config.pace_modifier_type) document.getElementById('pace-modifier-type').value = config.pace_modifier_type;
+    }
+
+    async function uploadFiles() {
+      const files = {
+        'driver_race_data.csv':      document.getElementById('driver-data')?.files[0],
+        'constructor_race_data.csv': document.getElementById('constructor-data')?.files[0],
+        'calendar.csv':              document.getElementById('calendar-data')?.files[0],
+        'tracks.csv':                document.getElementById('tracks-data')?.files[0]
+      };
+
+      let allFilesSelected = true;
+      for (const file of Object.values(files)) {
+        if (!file) {
+          allFilesSelected = false;
+          break;
+        }
+      }
+      if (!allFilesSelected) {
+        alert('Please select all 4 required CSV files');
+        return;
+      }
+
+      const formData = new FormData();
+      for (const [name, file] of Object.entries(files)) {
+        formData.append(name, file, name);
+      }
+      const updateDefault = document.getElementById('update-default-checkbox')?.checked;
+      formData.append('update_default', updateDefault);
+
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body:   formData
+        });
+        const data = await response.json();
+        if (!data.success) {
+          alert('Error: ' + data.message);
+          return;
+        }
+
+        sessionId   = data.session_id;
+        sessionData = data;
+        usingDefaultData = false;
+
+        // Show how many races completed
+        document.getElementById('races-completed').textContent = data.races_completed;
+        populateTeamSelects(data.drivers, data.constructors);
+
+        const driverMappingFile = document.getElementById('driver-mapping-file')?.files[0];
+        if (driverMappingFile) {
+          await uploadDriverMappingFile(driverMappingFile);
+        }
+
+        if (data.updated_default) {
+          alert('Files uploaded and saved as default data successfully!');
+          await checkDefaultData();
+          await checkDriverMapping();
+        } else {
+          alert('Files uploaded successfully!');
+        }
+
+        loadConfigFromCookie();
+        document.getElementById('config-section').style.display = 'block';
+        document.getElementById('upload-section').style.display = 'none';
+      } catch (error) {
+        alert('Error uploading files: ' + error.message);
+      }
+    }
+
+    async function uploadDriverMappingFile(file) {
+      const formData = new FormData();
+      formData.append('driver_mapping', file);
+      try {
+        const response = await fetch('/upload_driver_mapping', {
+          method: 'POST',
+          body:   formData
+        });
+        const data = await response.json();
+        const statusDiv = document.getElementById('mapping-status');
+        if (data.success) {
+          statusDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
+          document.getElementById('use-fp2-pace').disabled = false;
+        } else {
+          statusDiv.innerHTML = `<div class="error">❌ ${data.message}</div>`;
+        }
+      } catch (error) {
+        document.getElementById('mapping-status').innerHTML =
+          `<div class="error">❌ Error uploading driver mapping: ${error.message}</div>`;
+      }
+    }
+
+    function showUploadSection() {
+      document.getElementById('config-section').style.display    = 'none';
+      document.getElementById('upload-section').style.display    = 'block';
+      document.getElementById('results-section').style.display   = 'none';
+      document.getElementById('default-data-status').style.display = 'none';
+      // mapping stays visible
+
+      document.getElementById('driver-data').value = '';
+      document.getElementById('constructor-data').value = '';
+      document.getElementById('calendar-data').value = '';
+      document.getElementById('tracks-data').value = '';
+      document.getElementById('update-default-checkbox').checked = false;
+    }
+
+    function runAnotherOptimization() {
+      document.getElementById('results-section').style.display = 'none';
+      document.getElementById('config-section').style.display  = 'block';
+    }
+
+    async function runOptimization() {
+      const drivers = [];
+      document.querySelectorAll('.driver-select').forEach(sel => {
+        if (sel.value) drivers.push(sel.value);
+      });
+      if (drivers.length !== 5) {
+        alert('Please select exactly 5 drivers');
+        return;
+      }
+
+      const constructors = [];
+      document.querySelectorAll('.constructor-select').forEach(sel => {
+        if (sel.value) constructors.push(sel.value);
+      });
+      if (constructors.length !== 2) {
+        alert('Please select exactly 2 constructors');
+        return;
+      }
+
+      const useFP2 = document.getElementById('use-fp2-pace')?.checked;
+      if (useFP2) {
+        const sessionKey = document.getElementById('fp2-session-key')?.value;
+        if (!sessionKey) {
+          alert('Please enter an FP2 session key when using pace data');
+          return;
+        }
+        const mappingCheck = await fetch('/check_driver_mapping');
+        const mappingData  = await mappingCheck.json();
+        if (!mappingData.exists) {
+          alert('Driver mapping file is required for Race Pace Estimation. Please upload it first.');
+          // mapping remains visible
+          return;
+        }
+      }
+
+      const config = {
+        session_id:        sessionId,
+        current_drivers:   drivers,
+        current_constructors: constructors,
+        remaining_budget:  document.getElementById('remaining-budget')?.value,
+        step1_swaps:       document.getElementById('step1-swaps')?.value,
+        step2_swaps:       document.getElementById('step2-swaps')?.value,
+        weighting_scheme:  document.getElementById('weighting-scheme')?.value,
+        risk_tolerance:    document.getElementById('risk-tolerance')?.value,
+        multiplier:        document.getElementById('multiplier')?.value,
+        use_fp2_pace:      useFP2,
+        fp2_session_key:   useFP2 ? document.getElementById('fp2-session-key')?.value : null,
+        pace_weight:       useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
+        pace_modifier_type: useFP2 ? document.getElementById('pace-modifier-type')?.value : null
+      };
+
+      saveConfigToCookie();
+
+      document.getElementById('progress-section').style.display = 'block';
+      document.getElementById('results-section').style.display  = 'none';
+
+      try {
+        const response = await fetch('/optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        });
+        const data = await response.json();
+        if (data.success) {
+          displayResults(data);
+        } else {
+          alert('Error: ' + data.message);
+        }
+      } catch (error) {
+        alert('Error running optimization: ' + error.message);
+      } finally {
+        document.getElementById('progress-section').style.display = 'none';
+      }
+    }
+
+    function displayResults(data) {
+      const resultsContent = document.getElementById('results-content');
+      const opt = data.optimization;
+      let fp2InfoHtml = '';
+      if (opt.fp2_info && opt.fp2_info.applied) {
+        fp2InfoHtml = `
+          <div class="result-card" style="border-left-color: #17a2b8;">
+            <h3>Race Pace Estimation</h3>
+            <p><strong>Session Key:</strong> ${opt.fp2_info.session_key}</p>
+            <p><strong>Pace Weight:</strong> ${(opt.fp2_info.pace_weight * 100).toFixed(0)}% current form, ${(100 - opt.fp2_info.pace_weight * 100).toFixed(0)}% historical</p>
+            <p><strong>Modifier Type:</strong> ${opt.fp2_info.modifier_type}</p>
+            <p style="color: #28a745; font-weight: bold;">✅ FP2 Lap data successfully integrated</p>
+            ${opt.fp2_info.pace_adjustments && opt.fp2_info.pace_adjustments.length > 0 ? `
+              <h4>Pace Adjustments for Current Team:</h4>
+              ${opt.fp2_info.pace_adjustments.map(adj => `
+                <div class="pace-adjustment">
+                  <span>${adj.driver}</span>
+                  <span class="pace-score">
+                    Score: ${adj.pace_score} | 
+                    Modifier: ${adj.pace_modifier}× | 
+                    VFM: ${adj.vfm_original} → ${adj.vfm_adjusted}
+                  </span>
+                </div>
+              `).join('')}
+            ` : ''}
+          </div>
+        `;
+      }
+
+      const html = `
+        ${fp2InfoHtml}
+        <div class="result-card">
+          <h3>Next Race: ${opt.step1.circuit}</h3>
+          ${opt.step1.swaps.length > 0 ? `
+            <h4>Recommended Swaps:</h4>
+            ${opt.step1.swaps.map(swap => `
+              <div class="swap-item">
+                <span>${swap[0]}: ${swap[1]} → ${swap[2]}</span>
+              </div>
+            `).join('')}
+          ` : '<p>No swaps recommended</p>'}
+          <p><strong>Expected Points:</strong> ${opt.step1.expected_points.toFixed(1)} 
+             <span class="improvement">(+${opt.step1.improvement.toFixed(1)})</span></p>
+          <p><strong>Boost Driver:</strong> ${opt.step1.boost_driver}</p>
+        </div>
+
+        <div class="result-card">
+          <h3>Following Race: ${opt.step2.circuit}</h3>
+          ${opt.step2.swaps.length > 0 ? `
+            <h4>Additional Swaps:</h4>
+            ${opt.step2.swaps.map(swap => `
+              <div class="swap-item">
+                <span>${swap[0]}: ${swap[1]} → ${swap[2]}</span>
+              </div>
+            `).join('')}
+          ` : '<p>No additional swaps</p>'}
+          <p><strong>Expected Points:</strong> ${opt.step2.expected_points.toFixed(1)} 
+             <span class="improvement">(+${opt.step2.improvement.toFixed(1)})</span></p>
+          <p><strong>Boost Driver:</strong> ${opt.step2.boost_driver}</p>
+          <p><strong>Budget:</strong> ${opt.step2.budget_used.toFixed(1)}M used,
+             ${opt.step2.budget_remaining.toFixed(1)}M remaining</p>
+        </div>
+
+        <div class="result-card">
+          <h3>Final Team</h3>
+          <h4>Drivers:</h4>
+          <div class="team-display">
+            ${opt.step2.team.drivers.map(d => `<div class="team-member">${d}</div>`).join('')}
+          </div>
+          <h4>Constructors:</h4>
+          <div class="team-display">
+            ${opt.step2.team.constructors.map(c => `<div class="team-member">${c}</div>`).join('')}
+          </div>
+        </div>
+
+        <div class="result-card">
+          <h3>Summary</h3>
+          <p><strong>Total Improvement:</strong> <span class="improvement">+${opt.summary.total_improvement.toFixed(1)} points</span></p>
+          <p><strong>Patterns Evaluated:</strong> ${opt.summary.patterns_evaluated.toLocaleString()}</p>
+          <p><strong>Optimization Time:</strong> ${opt.summary.optimization_time.toFixed(1)}s</p>
+          ${opt.fp2_info && opt.fp2_info.applied ?
+            '<p style="color: #17a2b8;"><strong>Enhancement:</strong> FP2 derived race pace estimations</p>' :
+            '<p style="color: #6c757d;"><strong>Analysis:</strong> Historical data only</p>'
+          }
+        </div>
+      `;
+      resultsContent.innerHTML = html;
+      document.getElementById('results-section').style.display = 'block';
+    }
+  </script>
 </body>
+</html>
