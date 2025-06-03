@@ -377,30 +377,27 @@
 
       <div class="file-upload">
         <div class="form-group">
-          <label for="driver-data">Driver Race Data (CSV)</label>
+          <label for="driver-data">Driver Race Data</label>
           <input type="file" id="driver-data" accept=".csv">
         </div>
         <div class="form-group">
-          <label for="constructor-data">Constructor Race Data (CSV)</label>
+          <label for="constructor-data">Constructor Race Data</label>
           <input type="file" id="constructor-data" accept=".csv">
         </div>
         <div class="form-group">
-          <label for="calendar-data">Race Calendar (CSV)</label>
+          <label for="calendar-data">Race Calendar</label>
           <input type="file" id="calendar-data" accept=".csv">
         </div>
         <div class="form-group">
-          <label for="tracks-data">Track Characteristics (CSV)</label>
+          <label for="tracks-data">Track Characteristics</label>
           <input type="file" id="tracks-data" accept=".csv">
         </div>
-
-        <!-- DRIVER MAPPING SECTION: always visible -->
         <div id="driver-mapping-section">
           <div class="form-group">
-            <label for="driver-mapping-file">Driver Mapping (CSV) - Optional</label>
+            <label for="driver-mapping-file">Driver Number Mapping</label>
             <input type="file" id="driver-mapping-file" accept=".csv">
             <small>
-              Required for FP2 integration. Format: driver_number, driver_name, team_name<br>
-              Example: 1,Max Verstappen,Red Bull Racing
+              Optional, only required for Race Pace Estimations
             </small>
           </div>
         </div>
