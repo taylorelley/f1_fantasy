@@ -52,19 +52,58 @@ def get_expected_race_pace(session_key):
     if df.empty:
         raise Exception("No lap data found for the given session_key.")
     
-    # Filter out in-laps, out-laps, and laps with missing lap_time
-    df = df[(df['lap_type'] == 'FLYING') & (df['lap_time'].notnull())]
+    # Filter out laps with missing lap_time and invalid times
+    # Remove laps that are None, null, or unusually slow (> 200 seconds)
+    df = df[df['lap_time'].notnull()]
+    df = df[df['lap_time'] > 0]  # Remove zero or negative times
+    df = df[df['lap_time'] < 200]  # Remove unusually slow laps (likely out/in laps)
+    
     if df.empty:
-        raise Exception("No valid flying laps found for the given session_key.")
+        raise Exception("No valid lap times found for the given session_key.")
     
-    # Calculate average lap time per driver
-    avg_lap_times = df.groupby('driver_number')['lap_time'].mean().reset_index()
-    avg_lap_times.rename(columns={'lap_time': 'average_lap_time'}, inplace=True)
+    # Group by driver and calculate statistics to filter outliers
+    driver_stats = df.groupby('driver_number')['lap_time'].agg(['mean', 'std', 'count']).reset_index()
     
-    # Sort by average lap time
-    avg_lap_times.sort_values(by='average_lap_time', inplace=True)
+    # Only include drivers with at least 3 laps
+    driver_stats = driver_stats[driver_stats['count'] >= 3]
     
-    return avg_lap_times
+    if driver_stats.empty:
+        raise Exception("No drivers with sufficient lap data (minimum 3 laps required).")
+    
+    # For each driver, remove outlier laps (more than 2 standard deviations from their mean)
+    filtered_laps = []
+    for _, driver_stat in driver_stats.iterrows():
+        driver_num = driver_stat['driver_number']
+        driver_mean = driver_stat['mean']
+        driver_std = driver_stat['std']
+        
+        # Get all laps for this driver
+        driver_laps = df[df['driver_number'] == driver_num]['lap_time']
+        
+        # Filter outliers (keep laps within 2 standard deviations)
+        if driver_std > 0:
+            lower_bound = driver_mean - 2 * driver_std
+            upper_bound = driver_mean + 2 * driver_std
+            valid_laps = driver_laps[(driver_laps >= lower_bound) & (driver_laps <= upper_bound)]
+        else:
+            valid_laps = driver_laps
+        
+        if len(valid_laps) > 0:
+            filtered_laps.append({
+                'driver_number': driver_num,
+                'average_lap_time': valid_laps.mean()
+            })
+    
+    if not filtered_laps:
+        raise Exception("No valid lap data remaining after filtering.")
+    
+    # Create result DataFrame
+    result_df = pd.DataFrame(filtered_laps)
+    
+    # Sort by average lap time (fastest first)
+    result_df = result_df.sort_values(by='average_lap_time')
+    
+    return result_df
 
 
 def get_user_configuration():
