@@ -1,13 +1,14 @@
 import os
 import json
 import traceback
-from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 import numpy as np
 import re
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 import shutil
+
 from f1_optimizer import (
     F1VFMCalculator,
     F1TrackAffinityCalculator,
@@ -17,7 +18,7 @@ from f1_optimizer import (
 )
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max
 app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["RESULTS_FOLDER"] = "results"
 app.config["DEFAULT_DATA_FOLDER"] = "default_data"
@@ -223,37 +224,6 @@ def upload_driver_mapping():
         return jsonify({"success": False, "message": f"Error uploading driver mapping: {e}"})
 
 
-@app.route("/test_fp2_connection", methods=["POST"])
-def test_fp2_connection():
-    try:
-        payload = request.get_json() or {}
-        session_key = payload.get("session_key")
-        if session_key is None:
-            return jsonify({"success": False, "message": "Session key is required"})
-
-        try:
-            session_key = int(session_key)
-        except (ValueError, TypeError):
-            return jsonify({"success": False, "message": "Session key must be a number"})
-
-        pace_df = get_expected_race_pace(session_key)
-        if pace_df.empty:
-            return jsonify({"success": False, "message": f"No lap data for session {session_key}"})
-
-        fastest = int(pace_df.iloc[0]["driver_number"])
-        return jsonify(
-            {
-                "success": True,
-                "message": f"Connected to FP2 session {session_key}",
-                "driver_count": len(pace_df),
-                "fastest_driver_number": fastest,
-                "session_key": session_key,
-            }
-        )
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error connecting to FP2 API: {e}"})
-
-
 @app.route("/optimize", methods=["POST"])
 def optimize():
     try:
@@ -273,7 +243,6 @@ def optimize():
             races_completed = sessions[session_id]["races_completed"]
 
         use_fp2 = bool(data.get("use_fp2_pace", False))
-        # pace_weight defaults to 0.25 if not provided
         raw_pw = data.get("pace_weight", None)
         try:
             pace_weight = float(raw_pw) if raw_pw is not None else 0.25
@@ -282,41 +251,42 @@ def optimize():
 
         pace_modifier_type = data.get("pace_modifier_type") or "conservative"
 
-        if use_fp2:
-            if not has_driver_mapping():
-                return jsonify(
-                    {
-                        "success": False,
-                        "message": "driver_mapping.csv is required for FP2 integration; upload it first.",
-                    }
-                )
-
-        # Automatically fetch next race’s meeting_key and year
-        cal_df = pd.read_csv(os.path.join(data_folder, "calendar.csv"), skipinitialspace=True)
+        # Read calendar.csv, find next race row
+        cal_path = os.path.join(data_folder, "calendar.csv")
+        cal_df = pd.read_csv(cal_path, skipinitialspace=True)
         next_race = f"Race{races_completed + 1}"
         row = cal_df[cal_df["Race"] == next_race]
-        if row.empty and use_fp2:
-            return jsonify({"success": False, "message": f"'{next_race}' not found in calendar.csv."})
-        meeting_key = int(row.iloc[0]["meeting_key"]) if use_fp2 else None
-        race_year = int(row.iloc[0]["year"]) if use_fp2 else None
+
+        # If user asked for FP2 but meeting_key is missing or invalid, disable FP2
+        if use_fp2:
+            if row.empty or "meeting_key" not in cal_df.columns or pd.isna(row.iloc[0]["meeting_key"]):
+                use_fp2 = False
+                meeting_key = None
+                race_year = None
+            else:
+                meeting_key = int(row.iloc[0]["meeting_key"])
+                race_year = int(row.iloc[0]["year"])
+        else:
+            meeting_key = None
+            race_year = None
 
         config = {
-            "base_path": data_folder,
-            "races_completed": races_completed,
-            "current_drivers": data.get("current_drivers", []),
-            "current_constructors": data.get("current_constructors", []),
-            "remaining_budget": float(data.get("remaining_budget", 0.0)),
-            "step1_swaps": int(data.get("step1_swaps", 0)),
-            "step2_swaps": int(data.get("step2_swaps", 0)),
-            "weighting_scheme": data.get("weighting_scheme", "trend_based"),
-            "risk_tolerance": data.get("risk_tolerance", "medium"),
-            "multiplier": int(data.get("multiplier", 1)),
-            "use_parallel": False,
-            "use_fp2_pace": use_fp2,
-            "pace_weight": pace_weight,
-            "pace_modifier_type": pace_modifier_type,
-            "next_meeting_key": meeting_key,
-            "next_race_year": race_year,
+            "base_path":              data_folder,
+            "races_completed":        races_completed,
+            "current_drivers":        data.get("current_drivers", []),
+            "current_constructors":   data.get("current_constructors", []),
+            "remaining_budget":       float(data.get("remaining_budget", 0.0)),
+            "step1_swaps":            int(data.get("step1_swaps", 0)),
+            "step2_swaps":            int(data.get("step2_swaps", 0)),
+            "weighting_scheme":       data.get("weighting_scheme", "trend_based"),
+            "risk_tolerance":         data.get("risk_tolerance", "medium"),
+            "multiplier":             int(data.get("multiplier", 1)),
+            "use_parallel":           False,
+            "use_fp2_pace":           use_fp2,
+            "pace_weight":            pace_weight,
+            "pace_modifier_type":     pace_modifier_type,
+            "next_meeting_key":       meeting_key,
+            "next_race_year":         race_year,
         }
 
         results = {"status": "running", "progress": []}
@@ -347,29 +317,29 @@ def optimize():
             "success": True,
             "optimization": {
                 "step1": {
-                    "race": optimizer.step1_race,
-                    "circuit": optimizer.step1_circuit,
-                    "swaps": step1["swaps"] if step1 else [],
+                    "race":          optimizer.step1_race,
+                    "circuit":       optimizer.step1_circuit,
+                    "swaps":         step1["swaps"] if step1 else [],
                     "expected_points": step1["points"] if step1 else base_s1[0],
-                    "improvement": (step1["points"] - base_s1[0]) if step1 else 0.0,
-                    "boost_driver": step1["boost_driver"] if step1 else base_s1[3],
+                    "improvement":   (step1["points"] - base_s1[0]) if step1 else 0.0,
+                    "boost_driver":  step1["boost_driver"] if step1 else base_s1[3],
                     "team": {
-                        "drivers": step1["drivers"] if step1 else config["current_drivers"],
+                        "drivers":      step1["drivers"] if step1 else config["current_drivers"],
                         "constructors": step1["constructors"] if step1 else config["current_constructors"],
                     },
                 },
                 "step2": {
-                    "race": optimizer.step2_race,
-                    "circuit": optimizer.step2_circuit,
-                    "swaps": step2["swaps"] if step2 else [],
+                    "race":            optimizer.step2_race,
+                    "circuit":         optimizer.step2_circuit,
+                    "swaps":           step2["swaps"] if step2 else [],
                     "expected_points": step2["points"] if step2 else base_s2[0],
-                    "improvement": (step2["points"] - base_s2[0]) if step2 else 0.0,
-                    "boost_driver": step2["boost_driver"] if step2 else base_s2[3],
+                    "improvement":     (step2["points"] - base_s2[0]) if step2 else 0.0,
+                    "boost_driver":    step2["boost_driver"] if step2 else base_s2[3],
                     "team": {
-                        "drivers": step2["drivers"] if step2 else config["current_drivers"],
+                        "drivers":      step2["drivers"] if step2 else config["current_drivers"],
                         "constructors": step2["constructors"] if step2 else config["current_constructors"],
                     },
-                    "budget_used": step2["cost"] if step2 else base_s2[2],
+                    "budget_used":     step2["cost"] if step2 else base_s2[2],
                     "budget_remaining": round(
                         optimizer.max_budget - (step2["cost"] if step2 else base_s2[2]), 2
                     ),
@@ -385,11 +355,11 @@ def optimize():
 
         if config["use_fp2_pace"]:
             pace_info = {
-                "meeting_key": meeting_key,
-                "year": race_year,
-                "pace_weight": config["pace_weight"],
-                "modifier_type": config["pace_modifier_type"],
-                "applied": True,
+                "meeting_key":     meeting_key,
+                "year":            race_year,
+                "pace_weight":     config["pace_weight"],
+                "modifier_type":   config["pace_modifier_type"],
+                "applied":         True,
                 "pace_adjustments": [],
             }
             for drv in config["current_drivers"]:
@@ -402,11 +372,11 @@ def optimize():
                     if ps > 0:
                         pace_info["pace_adjustments"].append(
                             {
-                                "driver": drv,
-                                "pace_score": round(ps, 1),
+                                "driver":        drv,
+                                "pace_score":    round(ps, 1),
                                 "pace_modifier": round(pm, 3),
-                                "vfm_original": round(vfm_pre, 2),
-                                "vfm_adjusted": round(vfm_post, 2),
+                                "vfm_original":  round(vfm_pre, 2),
+                                "vfm_adjusted":  round(vfm_post, 2),
                             }
                         )
             resp["optimization"]["fp2_info"] = pace_info
@@ -442,10 +412,10 @@ def get_statistics():
 
         if not all(os.path.exists(p) for p in [driver_aff_path, constructor_aff_path, driver_char_aff, constructor_char_aff]):
             cfg = {
-                "base_path": data_folder,
-                "races_completed": get_races_completed(data_folder),
-                "weighting_scheme": "trend_based",
-                "use_fp2_pace": False,
+                "base_path":         data_folder,
+                "races_completed":   get_races_completed(data_folder),
+                "weighting_scheme":  "trend_based",
+                "use_fp2_pace":      False,
             }
             vfm_calc = F1VFMCalculator(cfg)
             vfm_calc.run()
@@ -500,18 +470,18 @@ def process_driver_statistics(
         valid_pts = [float(p) for p in points_arr if not np.isnan(p)]
 
         s = {
-            "name": name,
-            "team": str(drv_row.get("Team", "Unknown")),
-            "cost": str(drv_row["Cost"]),
-            "cost_value": float(re.sub(r"[^\d.]", "", str(drv_row["Cost"]))),
-            "vfm": float(drv_row["VFM"]),
-            "trend": str(drv_row.get("Performance_Trend", "Unknown")),
-            "avg_points": float(np.mean(valid_pts)) if valid_pts else 0.0,
-            "total_points": float(np.sum(valid_pts)) if valid_pts else 0.0,
+            "name":            name,
+            "team":            str(drv_row.get("Team", "Unknown")),
+            "cost":            str(drv_row["Cost"]),
+            "cost_value":      float(re.sub(r"[^\d.]", "", str(drv_row["Cost"]))),
+            "vfm":             float(drv_row["VFM"]),
+            "trend":           str(drv_row.get("Performance_Trend", "Unknown")),
+            "avg_points":      float(np.mean(valid_pts)) if valid_pts else 0.0,
+            "total_points":    float(np.sum(valid_pts)) if valid_pts else 0.0,
             "races_completed": len(valid_pts),
-            "consistency": float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
-            "best_race": float(np.max(valid_pts)) if valid_pts else 0.0,
-            "worst_race": float(np.min(valid_pts)) if valid_pts else 0.0,
+            "consistency":     float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
+            "best_race":       float(np.max(valid_pts)) if valid_pts else 0.0,
+            "worst_race":      float(np.min(valid_pts)) if valid_pts else 0.0,
         }
 
         if len(valid_pts) >= 3:
@@ -523,14 +493,20 @@ def process_driver_statistics(
         if name in driver_char_df.index:
             char_vals = driver_char_df.loc[name]
             s["char_affinities"] = {
-                "Corners": float(char_vals.get("Corners", 0.0)),
-                "Length": float(char_vals.get("Length (km)", 0.0)),
-                "Overtaking": float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
-                "Speed": float(char_vals.get("Track Speed_encoded", 0.0)),
-                "Temperature": float(char_vals.get("Expected Temperatures_encoded", 0.0)),
+                "Corners":                    float(char_vals.get("Corners", 0.0)),
+                "Length":                     float(char_vals.get("Length (km)", 0.0)),
+                "Overtaking":                 float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
+                "Speed":                      float(char_vals.get("Track Speed_encoded", 0.0)),
+                "Temperature":                float(char_vals.get("Expected Temperatures_encoded", 0.0)),
             }
         else:
-            s["char_affinities"] = {"Corners": 0.0, "Length": 0.0, "Overtaking": 0.0, "Speed": 0.0, "Temperature": 0.0}
+            s["char_affinities"] = {
+                "Corners":      0.0,
+                "Length":       0.0,
+                "Overtaking":   0.0,
+                "Speed":        0.0,
+                "Temperature":  0.0,
+            }
 
         perf_list = []
         for _, cal_row in calendar_df.iterrows():
@@ -597,17 +573,17 @@ def process_constructor_statistics(
         valid_pts = [float(p) for p in points_arr if not np.isnan(p)]
 
         s = {
-            "name": name,
-            "cost": str(const_row["Cost"]),
-            "cost_value": float(re.sub(r"[^\d.]", "", str(const_row["Cost"]))),
-            "vfm": float(const_row["VFM"]),
-            "trend": str(const_row.get("Performance_Trend", "Unknown")),
-            "avg_points": float(np.mean(valid_pts)) if valid_pts else 0.0,
-            "total_points": float(np.sum(valid_pts)) if valid_pts else 0.0,
+            "name":            name,
+            "cost":            str(const_row["Cost"]),
+            "cost_value":      float(re.sub(r"[^\d.]", "", str(const_row["Cost"]))),
+            "vfm":             float(const_row["VFM"]),
+            "trend":           str(const_row.get("Performance_Trend", "Unknown")),
+            "avg_points":      float(np.mean(valid_pts)) if valid_pts else 0.0,
+            "total_points":    float(np.sum(valid_pts)) if valid_pts else 0.0,
             "races_completed": len(valid_pts),
-            "consistency": float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
-            "best_race": float(np.max(valid_pts)) if valid_pts else 0.0,
-            "worst_race": float(np.min(valid_pts)) if valid_pts else 0.0,
+            "consistency":     float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
+            "best_race":       float(np.max(valid_pts)) if valid_pts else 0.0,
+            "worst_race":      float(np.min(valid_pts)) if valid_pts else 0.0,
         }
 
         if len(valid_pts) >= 3:
@@ -619,14 +595,20 @@ def process_constructor_statistics(
         if name in constructor_char_df.index:
             char_vals = constructor_char_df.loc[name]
             s["char_affinities"] = {
-                "Corners": float(char_vals.get("Corners", 0.0)),
-                "Length": float(char_vals.get("Length (km)", 0.0)),
-                "Overtaking": float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
-                "Speed": float(char_vals.get("Track Speed_encoded", 0.0)),
-                "Temperature": float(char_vals.get("Expected Temperatures_encoded", 0.0)),
+                "Corners":                    float(char_vals.get("Corners", 0.0)),
+                "Length":                     float(char_vals.get("Length (km)", 0.0)),
+                "Overtaking":                 float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
+                "Speed":                      float(char_vals.get("Track Speed_encoded", 0.0)),
+                "Temperature":                float(char_vals.get("Expected Temperatures_encoded", 0.0)),
             }
         else:
-            s["char_affinities"] = {"Corners": 0.0, "Length": 0.0, "Overtaking": 0.0, "Speed": 0.0, "Temperature": 0.0}
+            s["char_affinities"] = {
+                "Corners":      0.0,
+                "Length":       0.0,
+                "Overtaking":   0.0,
+                "Speed":        0.0,
+                "Temperature":  0.0,
+            }
 
         perf_list = []
         for _, cal_row in calendar_df.iterrows():
@@ -684,16 +666,16 @@ def export_statistics():
         for drv in stats_data["drivers"]:
             driver_rows.append(
                 {
-                    "Driver": drv["name"],
-                    "Team": drv["team"],
-                    "Cost": drv["cost"],
-                    "VFM": drv["vfm"],
-                    "VFM_Rank": drv["vfm_rank"],
-                    "Avg_Points": round(drv["avg_points"], 2),
-                    "Total_Points": drv["total_points"],
+                    "Driver":      drv["name"],
+                    "Team":        drv["team"],
+                    "Cost":        drv["cost"],
+                    "VFM":         drv["vfm"],
+                    "VFM_Rank":    drv["vfm_rank"],
+                    "Avg_Points":  round(drv["avg_points"], 2),
+                    "Total_Points":drv["total_points"],
                     "Consistency": round(drv["consistency"], 2),
                     "Recent_Form": round(drv["recent_form"], 2),
-                    "Trend": drv["trend"],
+                    "Trend":       drv["trend"],
                 }
             )
         df_drv = pd.DataFrame(driver_rows)
@@ -703,14 +685,14 @@ def export_statistics():
             const_rows.append(
                 {
                     "Constructor": const["name"],
-                    "Cost": const["cost"],
-                    "VFM": const["vfm"],
-                    "VFM_Rank": const["vfm_rank"],
-                    "Avg_Points": round(const["avg_points"], 2),
-                    "Total_Points": const["total_points"],
+                    "Cost":        const["cost"],
+                    "VFM":         const["vfm"],
+                    "VFM_Rank":    const["vfm_rank"],
+                    "Avg_Points":  round(const["avg_points"], 2),
+                    "Total_Points":const["total_points"],
                     "Consistency": round(const["consistency"], 2),
                     "Recent_Form": round(const["recent_form"], 2),
-                    "Trend": const["trend"],
+                    "Trend":       const["trend"],
                 }
             )
         df_const = pd.DataFrame(const_rows)
