@@ -1,3 +1,5 @@
+# app.py
+
 import os
 import json
 import traceback
@@ -297,6 +299,12 @@ def optimize():
         driver_vfm_df, constructor_vfm_df = vfm_calc.run()
         results["progress"].append("VFM calculation complete")
 
+        # Check whether any Pace_Score column was actually set
+        actual_fp2_applied = False
+        if config["use_fp2_pace"] and "Pace_Score" in driver_vfm_df.columns:
+            if driver_vfm_df["Pace_Score"].sum() > 0:
+                actual_fp2_applied = True
+
         results["progress"].append("Calculating track affinities...")
         affinity_calc = F1TrackAffinityCalculator(config)
         driver_aff_df, constructor_aff_df = affinity_calc.run()
@@ -311,7 +319,6 @@ def optimize():
         step1 = best_dict.get("step1_result")
         step2 = best_dict.get("step2_result")
 
-        # Build JSON response
         resp = {
             "status": "complete",
             "success": True,
@@ -353,8 +360,8 @@ def optimize():
             "progress": results["progress"],
         }
 
-        # Only include pace block if FP2 was actually used
-        if config["use_fp2_pace"]:
+        # Only include pace block if FP2 was actually applied
+        if actual_fp2_applied:
             pace_info = {
                 "meeting_key":       meeting_key,
                 "year":              race_year,
