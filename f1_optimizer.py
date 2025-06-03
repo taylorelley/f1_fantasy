@@ -4,7 +4,6 @@ F1 Fantasy Optimizer Suite
 Complete pipeline for VFM calculation, track affinity analysis, and team optimization
 Enhanced with improved affinity calculations and FP2 pace integration
 """
-
 import pandas as pd
 import numpy as np
 import re
@@ -328,10 +327,27 @@ class F1VFMCalculator:
         self.config = config
         self.base_path = config["base_path"]
         self.scheme = config["weighting_scheme"]
-        self.use_fp2_pace = config.get("use_fp2_pace", False)
-        self.fp2_session_key = config.get("fp2_session_key", None)
-        self.pace_weight = config.get("pace_weight", 0.25)
-        self.pace_modifier_type = config.get("pace_modifier_type", "conservative")
+
+        # Always treat use_fp2_pace as a boolean
+        self.use_fp2_pace = bool(config.get("use_fp2_pace", False))
+
+        # Only pull fp2_session_key if FP2 is enabled
+        self.fp2_session_key = config.get("fp2_session_key") if self.use_fp2_pace else None
+
+        # If FP2 is enabled, cast pace_weight to float. Otherwise default to 0.0
+        if self.use_fp2_pace:
+            # config.get("pace_weight") might be None or missing → float(None) would crash
+            raw_pw = config.get("pace_weight")
+            self.pace_weight = float(raw_pw) if (raw_pw is not None) else 0.25
+        else:
+            self.pace_weight = 0.0
+
+        # Likewise, only pull pace_modifier_type if FP2 is enabled
+        if self.use_fp2_pace:
+            self.pace_modifier_type = config.get("pace_modifier_type", "conservative")
+        else:
+            self.pace_modifier_type = "conservative"
+    #### CHANGED ####
 
     def calculate_vfm(self, race_data_file, vfm_data_file, entity_type="driver", weights=None):
         """Calculate VFM scores with outlier removal and optional FP2 pace integration"""
@@ -339,7 +355,7 @@ class F1VFMCalculator:
         race_df = self._calculate_base_vfm(race_data_file, entity_type, weights)
 
         # Apply FP2 pace modifier if enabled
-        if self.use_fp2_pace and self.fp2_session_key:
+        if self.use_fp2_pace and self.fp2_session_key is not None:
             try:
                 pace_data = get_expected_race_pace(self.fp2_session_key)
                 race_df = self._apply_pace_modifiers(race_df, pace_data, entity_type)
@@ -445,9 +461,9 @@ class F1VFMCalculator:
     def _calculate_pace_modifier(self, pace_score):
         """Convert pace score to VFM modifier"""
         if self.pace_modifier_type == "aggressive":
-            base_mod = 0.6 + (pace_score / 100) * 0.8  # range 0.6x–1.4x
+            base_mod = 0.6 + (pace_score / 100) * 0.8  # range 0.6×–1.4×
         else:
-            base_mod = 0.8 + (pace_score / 100) * 0.4  # range 0.8x–1.2x
+            base_mod = 0.8 + (pace_score / 100) * 0.4  # range 0.8×–1.2×
 
         risk = self.config.get("risk_tolerance", "medium")
         if risk == "low":
@@ -912,7 +928,6 @@ class F1TrackAffinityCalculator:
             "Expected Temperatures_encoded"
         ]
         interaction_cols = [c for c in char_affinity_df.columns if "_x_" in c]
-        all_cols = base_cols + interaction_cols
         affinities = {}
 
         for ent in char_affinity_df.index:
@@ -1388,13 +1403,17 @@ class F1TeamOptimizer:
         print(f"Cache hits: {self.performance_stats['cache_hits']:,}")
         print(f"Time taken: {self.performance_stats['optimization_time']:.1f}s")
 
+        # Only print FP2 info if it was enabled
         if self.config.get("use_fp2_pace", False):
             print("\n" + "-"*80)
             print("FP2 PACE INTEGRATION")
             print("-"*80)
             print(f"Session key: {self.config.get('fp2_session_key', 'N/A')}")
-            print(f"Pace weight: {self.config.get('pace_weight', 0.25)}")
-            print(f"Modifier type: {self.config.get('pace_modifier_type', 'conservative')}")
+            # config.get("pace_weight") might be None—guard against that
+            pw = self.config.get("pace_weight", 0.25)
+            pt = self.config.get("pace_modifier_type", "conservative")
+            print(f"Pace weight: {pw}")
+            print(f"Modifier type: {pt}")
 
             print("\nPace adjustments for current team:")
             for d in self.config["current_drivers"]:
