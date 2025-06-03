@@ -52,17 +52,52 @@ def get_expected_race_pace(session_key):
     if df.empty:
         raise Exception("No lap data found for the given session_key.")
     
-    # Filter out laps with missing lap_time and invalid times
-    # Remove laps that are None, null, or unusually slow (> 200 seconds)
-    df = df[df['lap_time'].notnull()]
-    df = df[df['lap_time'] > 0]  # Remove zero or negative times
-    df = df[df['lap_time'] < 200]  # Remove unusually slow laps (likely out/in laps)
+    # Debug: Check what columns are available
+    print(f"Available columns: {df.columns.tolist()}")
+    if len(df) > 0:
+        print(f"Sample row: {df.iloc[0].to_dict()}")
+    
+    # Check for possible lap time column names
+    time_columns = [col for col in df.columns if 'time' in col.lower() or 'duration' in col.lower()]
+    print(f"Time-related columns: {time_columns}")
+    
+    # Try to find the correct lap time column
+    lap_time_col = None
+    possible_names = ['lap_time', 'duration_sector_1', 'duration_sector_2', 'duration_sector_3', 'lap_duration']
+    
+    for col_name in possible_names:
+        if col_name in df.columns:
+            lap_time_col = col_name
+            break
+    
+    # If we have sector times, calculate total lap time
+    if lap_time_col is None and all(col in df.columns for col in ['duration_sector_1', 'duration_sector_2', 'duration_sector_3']):
+        # Calculate total lap time from sectors
+        df['calculated_lap_time'] = df['duration_sector_1'] + df['duration_sector_2'] + df['duration_sector_3']
+        lap_time_col = 'calculated_lap_time'
+        print("Calculated lap time from sector durations")
+    
+    if lap_time_col is None:
+        raise Exception(f"Could not find lap time data. Available columns: {df.columns.tolist()}")
+    
+    print(f"Using lap time column: {lap_time_col}")
+    
+    # Filter out laps with missing or invalid lap times
+    df = df[df[lap_time_col].notnull()]
+    df = df[df[lap_time_col] > 0]  # Remove zero or negative times
+    
+    # Convert to numeric if it's not already
+    df[lap_time_col] = pd.to_numeric(df[lap_time_col], errors='coerce')
+    df = df[df[lap_time_col].notnull()]
+    
+    # Remove unusually slow laps (> 200 seconds) - likely out/in laps
+    df = df[df[lap_time_col] < 200]
     
     if df.empty:
-        raise Exception("No valid lap times found for the given session_key.")
+        raise Exception("No valid lap times found after filtering.")
     
     # Group by driver and calculate statistics to filter outliers
-    driver_stats = df.groupby('driver_number')['lap_time'].agg(['mean', 'std', 'count']).reset_index()
+    driver_stats = df.groupby('driver_number')[lap_time_col].agg(['mean', 'std', 'count']).reset_index()
     
     # Only include drivers with at least 3 laps
     driver_stats = driver_stats[driver_stats['count'] >= 3]
@@ -78,7 +113,7 @@ def get_expected_race_pace(session_key):
         driver_std = driver_stat['std']
         
         # Get all laps for this driver
-        driver_laps = df[df['driver_number'] == driver_num]['lap_time']
+        driver_laps = df[df['driver_number'] == driver_num][lap_time_col]
         
         # Filter outliers (keep laps within 2 standard deviations)
         if driver_std > 0:
@@ -102,6 +137,8 @@ def get_expected_race_pace(session_key):
     
     # Sort by average lap time (fastest first)
     result_df = result_df.sort_values(by='average_lap_time')
+    
+    print(f"Successfully processed data for {len(result_df)} drivers")
     
     return result_df
 
