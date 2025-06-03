@@ -956,6 +956,8 @@
       const resultsContent = document.getElementById('results-content');
       const opt = data.optimization;
       let fp2InfoHtml = '';
+
+      // Only show FP2 block if “applied” is true
       if (opt.fp2_info && opt.fp2_info.applied) {
         fp2InfoHtml = `
           <div class="result-card" style="border-left-color: #17a2b8;">
