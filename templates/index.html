@@ -723,10 +723,12 @@
                 const data = await response.json();
                 
                 const statusDiv = document.getElementById('mapping-status');
-                if (data.exists) {
-                    statusDiv.innerHTML = '<div class="success">✅ Driver mapping file is available - FP2 integration ready!</div>';
-                } else {
-                    statusDiv.innerHTML = '<div class="warning">⚠️ No driver mapping file found. Upload one to enable FP2 integration.</div>';
+                if (statusDiv) {
+                    if (data.exists) {
+                        statusDiv.innerHTML = '<div class="success">✅ Driver mapping file is available - FP2 integration ready!</div>';
+                    } else {
+                        statusDiv.innerHTML = '<div class="warning">⚠️ No driver mapping file found. Upload one to enable FP2 integration.</div>';
+                    }
                 }
                 
                 return data.exists;
@@ -755,7 +757,13 @@
                         document.getElementById('upload-section').style.display = 'none';
                         
                         // Always enable FP2 checkbox - user will get warning if no mapping
-                        document.getElementById('use-fp2-pace').disabled = false;
+                        const fp2Checkbox = document.getElementById('use-fp2-pace');
+                        if (fp2Checkbox) {
+                            fp2Checkbox.disabled = false;
+                        }
+                        
+                        // Check driver mapping status and update display
+                        checkDriverMapping();
                     }
                 })
                 .catch(error => {
