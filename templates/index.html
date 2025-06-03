@@ -393,8 +393,8 @@
           <input type="file" id="tracks-data" accept=".csv">
         </div>
 
-        <!-- DRIVER MAPPING SECTION WRAPPER ADDED HERE -->
-        <div id="driver-mapping-section" style="display: none;">
+        <!-- DRIVER MAPPING SECTION: always visible -->
+        <div id="driver-mapping-section">
           <div class="form-group">
             <label for="driver-mapping-file">Driver Mapping (CSV) - Optional</label>
             <input type="file" id="driver-mapping-file" accept=".csv">
@@ -585,10 +585,9 @@
             }
             if (this.checked) {
               checkDriverMapping();
-              showDriverMapping();
-            } else {
-              hideDriverMapping();
+              // keep mapping visible
             }
+            // unchecking does not hide mapping anymore
           });
         }
 
@@ -660,11 +659,9 @@
       }
     }
 
+    // Overwrite hideDriverMapping to do nothing, so mapping stays visible
     function hideDriverMapping() {
-      const section = document.getElementById('driver-mapping-section');
-      if (section) {
-        section.style.display = 'none';
-      }
+      // Intentionally empty
     }
 
     async function useDefaultData() {
@@ -966,7 +963,7 @@
       document.getElementById('upload-section').style.display    = 'block';
       document.getElementById('results-section').style.display   = 'none';
       document.getElementById('default-data-status').style.display = 'none';
-      hideDriverMapping();
+      // mapping stays visible
 
       document.getElementById('driver-data').value = '';
       document.getElementById('constructor-data').value = '';
@@ -1010,7 +1007,7 @@
         const mappingData  = await mappingCheck.json();
         if (!mappingData.exists) {
           alert('Driver mapping file is required for Race Pace Estimation. Please upload it first.');
-          showDriverMapping();
+          // mapping remains visible
           return;
         }
       }
@@ -1144,7 +1141,6 @@
       resultsContent.innerHTML = html;
       document.getElementById('results-section').style.display = 'block';
     }
-
   </script>
 </body>
 </html>
