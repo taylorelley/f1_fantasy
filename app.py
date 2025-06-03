@@ -7,7 +7,6 @@ import re
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
-import shutil
 
 from f1_optimizer import (
     F1VFMCalculator,
@@ -251,7 +250,7 @@ def optimize():
 
         pace_modifier_type = data.get("pace_modifier_type") or "conservative"
 
-        # Read calendar.csv, find next race row
+        # Read calendar.csv and find the next race
         cal_path = os.path.join(data_folder, "calendar.csv")
         cal_df = pd.read_csv(cal_path, skipinitialspace=True)
         next_race = f"Race{races_completed + 1}"
@@ -271,22 +270,22 @@ def optimize():
             race_year = None
 
         config = {
-            "base_path":              data_folder,
-            "races_completed":        races_completed,
-            "current_drivers":        data.get("current_drivers", []),
-            "current_constructors":   data.get("current_constructors", []),
-            "remaining_budget":       float(data.get("remaining_budget", 0.0)),
-            "step1_swaps":            int(data.get("step1_swaps", 0)),
-            "step2_swaps":            int(data.get("step2_swaps", 0)),
-            "weighting_scheme":       data.get("weighting_scheme", "trend_based"),
-            "risk_tolerance":         data.get("risk_tolerance", "medium"),
-            "multiplier":             int(data.get("multiplier", 1)),
-            "use_parallel":           False,
-            "use_fp2_pace":           use_fp2,
-            "pace_weight":            pace_weight,
-            "pace_modifier_type":     pace_modifier_type,
-            "next_meeting_key":       meeting_key,
-            "next_race_year":         race_year,
+            "base_path":            data_folder,
+            "races_completed":      races_completed,
+            "current_drivers":      data.get("current_drivers", []),
+            "current_constructors": data.get("current_constructors", []),
+            "remaining_budget":     float(data.get("remaining_budget", 0.0)),
+            "step1_swaps":          int(data.get("step1_swaps", 0)),
+            "step2_swaps":          int(data.get("step2_swaps", 0)),
+            "weighting_scheme":     data.get("weighting_scheme", "trend_based"),
+            "risk_tolerance":       data.get("risk_tolerance", "medium"),
+            "multiplier":           int(data.get("multiplier", 1)),
+            "use_parallel":         False,
+            "use_fp2_pace":         use_fp2,
+            "pace_weight":          pace_weight,
+            "pace_modifier_type":   pace_modifier_type,
+            "next_meeting_key":     meeting_key,
+            "next_race_year":       race_year,
         }
 
         results = {"status": "running", "progress": []}
@@ -312,55 +311,57 @@ def optimize():
         step1 = best_dict.get("step1_result")
         step2 = best_dict.get("step2_result")
 
+        # Build JSON response
         resp = {
             "status": "complete",
             "success": True,
             "optimization": {
                 "step1": {
-                    "race":          optimizer.step1_race,
-                    "circuit":       optimizer.step1_circuit,
-                    "swaps":         step1["swaps"] if step1 else [],
-                    "expected_points": step1["points"] if step1 else base_s1[0],
-                    "improvement":   (step1["points"] - base_s1[0]) if step1 else 0.0,
-                    "boost_driver":  step1["boost_driver"] if step1 else base_s1[3],
+                    "race":             optimizer.step1_race,
+                    "circuit":          optimizer.step1_circuit,
+                    "swaps":            step1["swaps"] if step1 else [],
+                    "expected_points":  step1["points"] if step1 else base_s1[0],
+                    "improvement":      (step1["points"] - base_s1[0]) if step1 else 0.0,
+                    "boost_driver":     step1["boost_driver"] if step1 else base_s1[3],
                     "team": {
                         "drivers":      step1["drivers"] if step1 else config["current_drivers"],
                         "constructors": step1["constructors"] if step1 else config["current_constructors"],
                     },
                 },
                 "step2": {
-                    "race":            optimizer.step2_race,
-                    "circuit":         optimizer.step2_circuit,
-                    "swaps":           step2["swaps"] if step2 else [],
-                    "expected_points": step2["points"] if step2 else base_s2[0],
-                    "improvement":     (step2["points"] - base_s2[0]) if step2 else 0.0,
-                    "boost_driver":    step2["boost_driver"] if step2 else base_s2[3],
+                    "race":             optimizer.step2_race,
+                    "circuit":          optimizer.step2_circuit,
+                    "swaps":            step2["swaps"] if step2 else [],
+                    "expected_points":  step2["points"] if step2 else base_s2[0],
+                    "improvement":      (step2["points"] - base_s2[0]) if step2 else 0.0,
+                    "boost_driver":     step2["boost_driver"] if step2 else base_s2[3],
                     "team": {
                         "drivers":      step2["drivers"] if step2 else config["current_drivers"],
                         "constructors": step2["constructors"] if step2 else config["current_constructors"],
                     },
-                    "budget_used":     step2["cost"] if step2 else base_s2[2],
+                    "budget_used":      step2["cost"] if step2 else base_s2[2],
                     "budget_remaining": round(
                         optimizer.max_budget - (step2["cost"] if step2 else base_s2[2]), 2
                     ),
                 },
                 "summary": {
-                    "total_improvement": round(best_dict["final_points"] - base_s2[0], 2),
+                    "total_improvement":  round(best_dict["final_points"] - base_s2[0], 2),
                     "patterns_evaluated": optimizer.performance_stats["patterns_evaluated"],
-                    "optimization_time": round(optimizer.performance_stats["optimization_time"], 2),
+                    "optimization_time":  round(optimizer.performance_stats["optimization_time"], 2),
                 },
             },
             "progress": results["progress"],
         }
 
+        # Only include pace block if FP2 was actually used
         if config["use_fp2_pace"]:
             pace_info = {
-                "meeting_key":     meeting_key,
-                "year":            race_year,
-                "pace_weight":     config["pace_weight"],
-                "modifier_type":   config["pace_modifier_type"],
-                "applied":         True,
-                "pace_adjustments": [],
+                "meeting_key":       meeting_key,
+                "year":              race_year,
+                "pace_weight":       config["pace_weight"],
+                "modifier_type":     config["pace_modifier_type"],
+                "applied":           True,
+                "pace_adjustments":  [],
             }
             for drv in config["current_drivers"]:
                 row = optimizer.drivers_df[optimizer.drivers_df["Driver"] == drv]
@@ -493,11 +494,11 @@ def process_driver_statistics(
         if name in driver_char_df.index:
             char_vals = driver_char_df.loc[name]
             s["char_affinities"] = {
-                "Corners":                    float(char_vals.get("Corners", 0.0)),
-                "Length":                     float(char_vals.get("Length (km)", 0.0)),
-                "Overtaking":                 float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
-                "Speed":                      float(char_vals.get("Track Speed_encoded", 0.0)),
-                "Temperature":                float(char_vals.get("Expected Temperatures_encoded", 0.0)),
+                "Corners":      float(char_vals.get("Corners", 0.0)),
+                "Length":       float(char_vals.get("Length (km)", 0.0)),
+                "Overtaking":   float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
+                "Speed":        float(char_vals.get("Track Speed_encoded", 0.0)),
+                "Temperature":  float(char_vals.get("Expected Temperatures_encoded", 0.0)),
             }
         else:
             s["char_affinities"] = {
@@ -595,11 +596,11 @@ def process_constructor_statistics(
         if name in constructor_char_df.index:
             char_vals = constructor_char_df.loc[name]
             s["char_affinities"] = {
-                "Corners":                    float(char_vals.get("Corners", 0.0)),
-                "Length":                     float(char_vals.get("Length (km)", 0.0)),
-                "Overtaking":                 float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
-                "Speed":                      float(char_vals.get("Track Speed_encoded", 0.0)),
-                "Temperature":                float(char_vals.get("Expected Temperatures_encoded", 0.0)),
+                "Corners":      float(char_vals.get("Corners", 0.0)),
+                "Length":       float(char_vals.get("Length (km)", 0.0)),
+                "Overtaking":   float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
+                "Speed":        float(char_vals.get("Track Speed_encoded", 0.0)),
+                "Temperature":  float(char_vals.get("Expected Temperatures_encoded", 0.0)),
             }
         else:
             s["char_affinities"] = {
