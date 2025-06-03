@@ -328,17 +328,29 @@ class F1VFMCalculator:
         self.base_path = config["base_path"]
         self.scheme = config["weighting_scheme"]
     
-        # FP2 flag (True/False)
-        self.use_fp2_pace = config.get("use_fp2_pace", False)
+        # FP2 toggle (True/False)
+        self.use_fp2_pace = bool(config.get("use_fp2_pace", False))
     
-        # FP2 session key (may be None)
-        self.fp2_session_key = config.get("fp2_session_key")
+        # Defaults if FP2 is off
+        self.fp2_session_key = None
+        self.pace_weight = 0.0
+        self.pace_modifier_type = "conservative"
     
-        # Pace weight: if missing or None, default to 0.0
-        self.pace_weight = config.get("pace_weight") or 0.0
+        if self.use_fp2_pace:
+            # Must have a session key when FP2 is on
+            key = config.get("fp2_session_key")
+            if key is None:
+                raise ValueError("FP2 is enabled but 'fp2_session_key' is missing.")
+            self.fp2_session_key = int(key)
     
-        # Pace modifier type: if missing or None, default to "conservative"
-        self.pace_modifier_type = config.get("pace_modifier_type") or "conservative"
+            # pace_weight → float or default to 0.0
+            pw = config.get("pace_weight")
+            self.pace_weight = float(pw) if pw is not None else 0.0
+    
+            # pace_modifier_type → string or default
+            pm = config.get("pace_modifier_type")
+            self.pace_modifier_type = pm if pm is not None else "conservative"
+
 
 
     #### CHANGED ####
