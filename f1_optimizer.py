@@ -327,33 +327,29 @@ class F1VFMCalculator:
         self.config = config
         self.base_path = config["base_path"]
         self.scheme = config["weighting_scheme"]
-    
+
         # FP2 toggle (True/False)
         self.use_fp2_pace = bool(config.get("use_fp2_pace", False))
-    
+
         # Defaults if FP2 is off
         self.fp2_session_key = None
         self.pace_weight = 0.0
         self.pace_modifier_type = "conservative"
-    
+
         if self.use_fp2_pace:
             # Must have a session key when FP2 is on
             key = config.get("fp2_session_key")
             if key is None:
                 raise ValueError("FP2 is enabled but 'fp2_session_key' is missing.")
             self.fp2_session_key = int(key)
-    
+
             # pace_weight → float or default to 0.0
             pw = config.get("pace_weight")
             self.pace_weight = float(pw) if pw is not None else 0.0
-    
+
             # pace_modifier_type → string or default
             pm = config.get("pace_modifier_type")
             self.pace_modifier_type = pm if pm is not None else "conservative"
-
-
-
-    #### CHANGED ####
 
     def calculate_vfm(self, race_data_file, vfm_data_file, entity_type="driver", weights=None):
         """Calculate VFM scores with outlier removal and optional FP2 pace integration"""
@@ -1415,7 +1411,6 @@ class F1TeamOptimizer:
             print("FP2 PACE INTEGRATION")
             print("-"*80)
             print(f"Session key: {self.config.get('fp2_session_key', 'N/A')}")
-            # config.get("pace_weight") might be None—guard against that
             pw = self.config.get("pace_weight", 0.25)
             pt = self.config.get("pace_modifier_type", "conservative")
             print(f"Pace weight: {pw}")
