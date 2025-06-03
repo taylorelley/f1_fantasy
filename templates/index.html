@@ -393,6 +393,14 @@
                     <label for="tracks-data">Track Characteristics (CSV)</label>
                     <input type="file" id="tracks-data" accept=".csv">
                 </div>
+                <div class="form-group">
+                    <label for="driver-mapping-file">Driver Mapping (CSV) - Optional</label>
+                    <input type="file" id="driver-mapping-file" accept=".csv">
+                    <small>
+                        Required for FP2 integration. Format: driver_number, driver_name, team_name<br>
+                        Example: 1,Max Verstappen,Red Bull Racing
+                    </small>
+                </div>
             </div>
             
             <div class="checkbox-group">
@@ -405,27 +413,6 @@
             <div class="button-group">
                 <button class="button" onclick="uploadFiles()">Upload New Files</button>
                 <button class="button button-success" id="use-default-btn" onclick="useDefaultData()" style="display: none;">Use Default Data</button>
-            </div>
-        </div>
-        
-        <!-- Driver Mapping Section -->
-        <div class="section" id="driver-mapping-section" style="display: none;">
-            <h2>🏎️ Driver Mapping (Required for FP2 Integration)</h2>
-            <p>Upload a driver mapping file to enable FP2 pace integration. This maps driver numbers to names and teams.</p>
-            
-            <div class="form-group">
-                <label for="driver-mapping-file">Driver Mapping CSV</label>
-                <input type="file" id="driver-mapping-file" accept=".csv">
-                <small>
-                    Required columns: driver_number, driver_name, team_name<br>
-                    Example: 1,Max Verstappen,Red Bull Racing<br>
-                    <a href="https://api.openf1.org/v1/drivers" target="_blank">Get driver info from OpenF1 API</a>
-                </small>
-            </div>
-            
-            <div class="button-group">
-                <button class="button" onclick="uploadDriverMapping()">Upload Driver Mapping</button>
-                <button class="button button-secondary" onclick="checkDriverMapping()">Check Status</button>
             </div>
             
             <div id="mapping-status"></div>
@@ -535,7 +522,6 @@
                 
                 <div class="button-group">
                     <button class="button button-warning" onclick="testFP2Connection()">Test FP2 Connection</button>
-                    <button class="button button-secondary" onclick="showDriverMapping()">Manage Driver Mapping</button>
                 </div>
                 
                 <div id="fp2-test-result" class="test-result"></div>
@@ -620,6 +606,52 @@
                     `<div class="error">Error uploading file: ${error.message}</div>`;
             }
         }
+        
+        function resetToUpload() {
+            showUploadSection();
+        }
+        
+        function populateTeamSelects(drivers, constructors) {
+            // Create driver selects
+            const driverContainer = document.getElementById('driver-selects');
+            driverContainer.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                const select = document.createElement('select');
+                select.className = 'driver-select';
+                select.innerHTML = '<option value="">Select driver...</option>';
+                drivers.forEach(driver => {
+                    select.innerHTML += `<option value="${driver}">${driver}</option>`;
+                });
+                driverContainer.appendChild(select);
+            }
+            
+            // Create constructor selects
+            const constructorContainer = document.getElementById('constructor-selects');
+            constructorContainer.innerHTML = '';
+            for (let i = 0; i < 2; i++) {
+                const select = document.createElement('select');
+                select.className = 'constructor-select';
+                select.innerHTML = '<option value="">Select constructor...</option>';
+                constructors.forEach(constructor => {
+                    select.innerHTML += `<option value="${constructor}">${constructor}</option>`;
+                });
+                constructorContainer.appendChild(select);
+            }
+        }
+        
+        // Check for default data on page load
+        window.onload = async function() {
+            await checkDefaultData();
+            await checkDriverMapping();
+            
+            // Initialize FP2 events after DOM is loaded
+            initializeFP2Events();
+            
+            // If default data is available, go straight to configuration
+            if (document.getElementById('use-default-btn').style.display !== 'none') {
+                useDefaultData();
+            }
+        };
         
         async function testFP2Connection() {
             const sessionKey = document.getElementById('fp2-session-key').value;
@@ -941,7 +973,7 @@
                 'tracks.csv': document.getElementById('tracks-data').files[0]
             };
             
-            // Check all files are selected
+            // Check all required files are selected
             let allFilesSelected = true;
             for (const [name, file] of Object.entries(files)) {
                 if (!file) {
@@ -951,7 +983,7 @@
             }
             
             if (!allFilesSelected) {
-                alert('Please select all 4 CSV files');
+                alert('Please select all 4 required CSV files');
                 return;
             }
             
@@ -965,6 +997,7 @@
             formData.append('update_default', updateDefault);
             
             try {
+                // Upload main files first
                 const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
@@ -979,6 +1012,12 @@
                     
                     document.getElementById('races-completed').textContent = data.races_completed;
                     populateTeamSelects(data.drivers, data.constructors);
+                    
+                    // Check if driver mapping file was also selected
+                    const driverMappingFile = document.getElementById('driver-mapping-file').files[0];
+                    if (driverMappingFile) {
+                        await uploadDriverMappingFile(driverMappingFile);
+                    }
                     
                     if (data.updated_default) {
                         alert('Files uploaded and saved as default data successfully!');
@@ -998,6 +1037,31 @@
                 }
             } catch (error) {
                 alert('Error uploading files: ' + error.message);
+            }
+        }
+        
+        async function uploadDriverMappingFile(file) {
+            const formData = new FormData();
+            formData.append('driver_mapping', file);
+            
+            try {
+                const response = await fetch('/upload_driver_mapping', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                const statusDiv = document.getElementById('mapping-status');
+                
+                if (data.success) {
+                    statusDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
+                    document.getElementById('use-fp2-pace').disabled = false;
+                } else {
+                    statusDiv.innerHTML = `<div class="error">❌ ${data.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('mapping-status').innerHTML = 
+                    `<div class="error">❌ Error uploading driver mapping: ${error.message}</div>`;
             }
         }
         
