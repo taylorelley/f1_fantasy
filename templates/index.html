@@ -461,12 +461,12 @@
         </div>
 
         <div class="form-group">
-          <label for="step1-swaps">Step 1 Max Swaps</label>
+          <label for="step1-swaps">Next Race Max Swaps</label>
           <input type="number" id="step1-swaps" value="2" min="0" max="7">
         </div>
 
         <div class="form-group">
-          <label for="step2-swaps">Step 2 Max Swaps</label>
+          <label for="step2-swaps">Following Race Max Swaps</label>
           <input type="number" id="step2-swaps" value="2" min="0" max="7">
         </div>
 
@@ -510,12 +510,6 @@
           <div class="form-group">
             <label for="fp2-session-key">FP2 Session Key</label>
             <input type="number" id="fp2-session-key" placeholder="e.g. 9158">
-            <small>
-              Get session key from
-              <a href="https://api.openf1.org/v1/sessions" target="_blank">
-                OpenF1 Sessions API
-              </a>
-            </small>
           </div>
 
           <div class="form-group">
@@ -1093,7 +1087,7 @@
       const html = `
         ${fp2InfoHtml}
         <div class="result-card">
-          <h3>Step 1: ${opt.step1.race} at ${opt.step1.circuit}</h3>
+          <h3>Next Race: ${opt.step1.circuit}</h3>
           ${opt.step1.swaps.length > 0 ? `
             <h4>Recommended Swaps:</h4>
             ${opt.step1.swaps.map(swap => `
@@ -1108,7 +1102,7 @@
         </div>
 
         <div class="result-card">
-          <h3>Step 2: ${opt.step2.race} at ${opt.step2.circuit}</h3>
+          <h3>Following Race: ${opt.step2.circuit}</h3>
           ${opt.step2.swaps.length > 0 ? `
             <h4>Additional Swaps:</h4>
             ${opt.step2.swaps.map(swap => `
