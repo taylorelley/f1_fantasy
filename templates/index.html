@@ -471,13 +471,13 @@
         </div>
 
         <div class="form-group">
-          <label for="weighting-scheme">VFM Weighting Scheme</label>
+          <label for="weighting-scheme">Past Performance Weighting</label>
           <select id="weighting-scheme">
             <option value="trend_based">Trend-based (Adaptive)</option>
             <option value="equal">Equal weights</option>
             <option value="linear_decay">Linear decay</option>
-            <option value="exp_decay" selected>Exponential decay</option>
             <option value="moderate_decay">Moderate decay</option>
+            <option value="exp_decay" selected>Exponential decay</option>
           </select>
         </div>
 
@@ -492,7 +492,7 @@
 
         <div class="form-group">
           <label for="multiplier">Multiplier</label>
-          <input type="number" id="multiplier" value="2" min="1" max="5">
+          <input type="number" id="multiplier" value="2" min="2" max="3">
         </div>
       </div>
 
