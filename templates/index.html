@@ -503,12 +503,12 @@
       <div class="checkbox-group">
         <label>
           <input type="checkbox" id="use-fp2-pace">
-          🏁 Use FP2 Race Pace Data (Real-time performance enhancement)
+          Include Race Pace Estimation using FP2 Lap Data
         </label>
       </div>
 
       <div class="fp2-config" id="fp2-config" style="display: none;">
-        <h3>🏁 FP2 Race Pace Configuration</h3>
+        <h3>Race Pace Configuration</h3>
 
         <div class="fp2-grid">
           <div class="form-group">
@@ -651,9 +651,9 @@
         const statusDiv = document.getElementById('mapping-status');
         if (statusDiv) {
           if (data.exists) {
-            statusDiv.innerHTML = '<div class="success">✅ Driver mapping file is available – FP2 integration ready!</div>';
+            statusDiv.innerHTML = '<div class="success">✅ Driver mapping file is available – Race Pace Estimation ready!</div>';
           } else {
-            statusDiv.innerHTML = '<div class="warning">⚠️ No driver mapping file found. Upload one to enable FP2 integration.</div>';
+            statusDiv.innerHTML = '<div class="warning">⚠️ No driver mapping file found. Upload one to enable Race Pace Estimation.</div>';
           }
         }
         return data.exists;
@@ -1019,7 +1019,7 @@
         const mappingCheck = await fetch('/check_driver_mapping');
         const mappingData  = await mappingCheck.json();
         if (!mappingData.exists) {
-          alert('Driver mapping file is required for FP2 integration. Please upload it first.');
+          alert('Driver mapping file is required for Race Pace Estimation. Please upload it first.');
           showDriverMapping();
           return;
         }
@@ -1072,11 +1072,11 @@
       if (opt.fp2_info && opt.fp2_info.applied) {
         fp2InfoHtml = `
           <div class="result-card" style="border-left-color: #17a2b8;">
-            <h3>🏁 FP2 Pace Integration</h3>
+            <h3>Race Pace Estimation</h3>
             <p><strong>Session Key:</strong> ${opt.fp2_info.session_key}</p>
             <p><strong>Pace Weight:</strong> ${(opt.fp2_info.pace_weight * 100).toFixed(0)}% current form, ${(100 - opt.fp2_info.pace_weight * 100).toFixed(0)}% historical</p>
             <p><strong>Modifier Type:</strong> ${opt.fp2_info.modifier_type}</p>
-            <p style="color: #28a745; font-weight: bold;">✅ Real-time pace data successfully integrated</p>
+            <p style="color: #28a745; font-weight: bold;">✅ FP2 Lap data successfully integrated</p>
             ${opt.fp2_info.pace_adjustments && opt.fp2_info.pace_adjustments.length > 0 ? `
               <h4>Pace Adjustments for Current Team:</h4>
               ${opt.fp2_info.pace_adjustments.map(adj => `
@@ -1146,15 +1146,8 @@
           <p><strong>Patterns Evaluated:</strong> ${opt.summary.patterns_evaluated.toLocaleString()}</p>
           <p><strong>Optimization Time:</strong> ${opt.summary.optimization_time.toFixed(1)}s</p>
           ${opt.fp2_info && opt.fp2_info.applied ?
-            '<p style="color: #17a2b8;"><strong>Enhancement:</strong> FP2 real-time pace data integrated</p>' :
+            '<p style="color: #17a2b8;"><strong>Enhancement:</strong> FP2 derived race pace estimations</p>' :
             '<p style="color: #6c757d;"><strong>Analysis:</strong> Historical data only</p>'
-          }
-        </div>
-
-        <div class="button-group">
-          <button class="button button-secondary" onclick="runAnotherOptimization()">Run Another Optimization</button>
-          ${opt.fp2_info && opt.fp2_info.applied ?
-            '<button class="button button-warning" onclick="showFP2Details()">View FP2 Details</button>' : ''
           }
         </div>
       `;
@@ -1162,9 +1155,6 @@
       document.getElementById('results-section').style.display = 'block';
     }
 
-    function showFP2Details() {
-      alert('FP2 pace data was successfully integrated into the optimization. Check the FP2 integration card above for details.');
-    }
   </script>
 </body>
 </html>
