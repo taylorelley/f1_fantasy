@@ -592,10 +592,10 @@
           }
           if (defaultDataMessage) {
             let message = `Using default data with ${data.data.races_completed} races completed.`;
-            // if (data.data.has_driver_mapping) {
-            //   message += ' Driver mapping is available for FP2 integration.';
-            // }
-            // message += ` <a href="#" onclick="showUploadSection()">Click here to upload new files instead.</a>`;
+            if (data.data.has_driver_mapping) {
+              message += '';
+            }
+            message += ``;
             defaultDataMessage.innerHTML = message;
           }
           if (useDefaultBtn) {
