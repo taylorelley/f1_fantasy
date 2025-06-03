@@ -327,26 +327,19 @@ class F1VFMCalculator:
         self.config = config
         self.base_path = config["base_path"]
         self.scheme = config["weighting_scheme"]
-
+    
         # Always treat use_fp2_pace as a boolean
         self.use_fp2_pace = bool(config.get("use_fp2_pace", False))
+    
+        # FP2 session key (could be None)
+        self.fp2_session_key = config.get("fp2_session_key", None)
+    
+        # If pace_weight missing, default to 0.0
+        self.pace_weight = float(config.get("pace_weight", 0.0))
+    
+        # If pace_modifier_type missing, default to "conservative"
+        self.pace_modifier_type = config.get("pace_modifier_type", "conservative")
 
-        # Only pull fp2_session_key if FP2 is enabled
-        self.fp2_session_key = config.get("fp2_session_key") if self.use_fp2_pace else None
-
-        # If FP2 is enabled, cast pace_weight to float. Otherwise default to 0.0
-        if self.use_fp2_pace:
-            # config.get("pace_weight") might be None or missing → float(None) would crash
-            raw_pw = config.get("pace_weight")
-            self.pace_weight = float(raw_pw) if (raw_pw is not None) else 0.25
-        else:
-            self.pace_weight = 0.0
-
-        # Likewise, only pull pace_modifier_type if FP2 is enabled
-        if self.use_fp2_pace:
-            self.pace_modifier_type = config.get("pace_modifier_type", "conservative")
-        else:
-            self.pace_modifier_type = "conservative"
     #### CHANGED ####
 
     def calculate_vfm(self, race_data_file, vfm_data_file, entity_type="driver", weights=None):
