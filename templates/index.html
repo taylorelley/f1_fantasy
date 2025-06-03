@@ -722,12 +722,8 @@
                         document.getElementById('config-section').style.display = 'block';
                         document.getElementById('upload-section').style.display = 'none';
                         
-                        // Check FP2 capabilities
-                        if (data.data.has_driver_mapping) {
-                            document.getElementById('use-fp2-pace').disabled = false;
-                        } else {
-                            document.getElementById('use-fp2-pace').disabled = true;
-                        }
+                        // Always enable FP2 checkbox - user will get warning if no mapping
+                        document.getElementById('use-fp2-pace').disabled = false;
                     }
                 })
                 .catch(error => {
