@@ -307,8 +307,14 @@ def optimize():
         # FP2 configuration
         use_fp2 = bool(data.get("use_fp2_pace", False))
         fp2_key = data.get("fp2_session_key")
-        pace_weight = data.get("pace_weight", 0.25)
-        pace_modifier_type = data.get("pace_modifier_type", "conservative")
+        # If payload does not include pace_weight (or explicitly null), default to 0.25
+        raw_pw = data.get("pace_weight", None)
+        try:
+            pace_weight = float(raw_pw) if raw_pw is not None else 0.25
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "message": "pace_weight must be a number if provided"})
+
+        pace_modifier_type = data.get("pace_modifier_type") or "conservative"
 
         if use_fp2:
             if fp2_key is None:
@@ -340,7 +346,7 @@ def optimize():
             "use_parallel": False,  # disable parallel in web context
             "use_fp2_pace": use_fp2,
             "fp2_session_key": fp2_key,
-            "pace_weight": float(pace_weight),
+            "pace_weight": pace_weight,
             "pace_modifier_type": pace_modifier_type,
         }
 
@@ -399,7 +405,9 @@ def optimize():
                         "constructors": step2["constructors"] if step2 else config["current_constructors"],
                     },
                     "budget_used": step2["cost"] if step2 else base_s2[2],
-                    "budget_remaining": round(optimizer.max_budget - (step2["cost"] if step2 else base_s2[2]), 2),
+                    "budget_remaining": round(
+                        optimizer.max_budget - (step2["cost"] if step2 else base_s2[2]), 2
+                    ),
                 },
                 "summary": {
                     "total_improvement": round(best_dict["final_points"] - base_s2[0], 2),
