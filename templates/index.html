@@ -501,12 +501,12 @@
             <div class="checkbox-group">
                 <label>
                     <input type="checkbox" id="use-fp2-pace">
-                    Use FP2 Data for Race Pace Estimation
+                    🏁 Use FP2 Race Pace Data (Real-time performance enhancement)
                 </label>
             </div>
 
             <div class="fp2-config" id="fp2-config" style="display: none;">
-                <h3>FP2 Race Pace Configuration</h3>
+                <h3>🏁 FP2 Race Pace Configuration</h3>
                 
                 <div class="fp2-grid">
                     <div class="form-group">
@@ -579,6 +579,85 @@
                 useDefaultData();
             }
         };
+        
+        function showDriverMapping() {
+            document.getElementById('driver-mapping-section').style.display = 'block';
+        }
+        
+        function hideDriverMapping() {
+            document.getElementById('driver-mapping-section').style.display = 'none';
+        }
+        
+        async function uploadDriverMapping() {
+            const fileInput = document.getElementById('driver-mapping-file');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a driver mapping file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('driver_mapping', file);
+            
+            try {
+                const response = await fetch('/upload_driver_mapping', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                const statusDiv = document.getElementById('mapping-status');
+                
+                if (data.success) {
+                    statusDiv.innerHTML = `<div class="success">${data.message}</div>`;
+                    document.getElementById('use-fp2-pace').disabled = false;
+                } else {
+                    statusDiv.innerHTML = `<div class="error">${data.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('mapping-status').innerHTML = 
+                    `<div class="error">Error uploading file: ${error.message}</div>`;
+            }
+        }
+        
+        async function testFP2Connection() {
+            const sessionKey = document.getElementById('fp2-session-key').value;
+            
+            if (!sessionKey) {
+                alert('Please enter an FP2 session key');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('fp2-test-result');
+            resultDiv.innerHTML = '<div class="info">🔄 Testing FP2 connection...</div>';
+            
+            try {
+                const response = await fetch('/test_fp2_connection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ session_key: sessionKey })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ ${data.message}<br>
+                            Found data for ${data.driver_count} drivers<br>
+                            ${data.fastest_driver ? `Fastest driver: #${data.fastest_driver}` : ''}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error testing connection: ${error.message}</div>`;
+            }
+        }
         
         async function checkDefaultData() {
             try {
