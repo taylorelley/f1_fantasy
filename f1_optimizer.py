@@ -1043,6 +1043,16 @@ class F1TeamOptimizer:
         self.drivers_df["VFM_Original"] = self.drivers_df["VFM"].copy()
         self.constructors_df["VFM_Original"] = self.constructors_df["VFM"].copy()
 
+        # Initialize step-specific columns to sensible defaults so that any
+        # driver/constructor without an explicit affinity entry still retains
+        # usable VFM values. Missing columns previously caused NaNs which
+        # propagated through the optimization logic.
+        for step in (1, 2):
+            self.drivers_df[f"Step {step}_Affinity"] = 0.0
+            self.drivers_df[f"Step {step}_VFM"] = self.drivers_df["VFM_Original"]
+            self.constructors_df[f"Step {step}_Affinity"] = 0.0
+            self.constructors_df[f"Step {step}_VFM"] = self.constructors_df["VFM_Original"]
+
         driver_affinity_cols = [
             col for col in self.track_affinity_df.columns if col.endswith("_affinity")
         ]
