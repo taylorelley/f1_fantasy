@@ -1,13 +1,15 @@
+# app.py
+
 import os
 import json
 import traceback
-from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 import numpy as np
 import re
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
-import shutil
+
 from f1_optimizer import (
     F1VFMCalculator,
     F1TrackAffinityCalculator,
@@ -17,26 +19,20 @@ from f1_optimizer import (
 )
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max
 app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["RESULTS_FOLDER"] = "results"
 app.config["DEFAULT_DATA_FOLDER"] = "default_data"
-app.secret_key = "your-secret-key-here"  # Change this to a random secret key
+app.secret_key = "your-secret-key-here"
 
-# Ensure directories exist
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 os.makedirs(app.config["RESULTS_FOLDER"], exist_ok=True)
 os.makedirs(app.config["DEFAULT_DATA_FOLDER"], exist_ok=True)
 
-# In-memory session store (for demonstration only)
 sessions = {}
 
 
 def get_data_folder(session_id=None):
-    """
-    Return the data folder path (with trailing slash) for a given session_id.
-    If session_id maps to an upload, return that folder. Otherwise, if default data exists, return DEFAULT_DATA_FOLDER.
-    """
     if session_id and session_id in sessions:
         folder = sessions[session_id]["folder"]
         return folder if folder.endswith("/") else folder + "/"
@@ -47,7 +43,6 @@ def get_data_folder(session_id=None):
 
 
 def has_default_data():
-    """Check if all required default data files exist in DEFAULT_DATA_FOLDER."""
     required_files = [
         "driver_race_data.csv",
         "constructor_race_data.csv",
@@ -62,16 +57,11 @@ def has_default_data():
 
 
 def has_driver_mapping():
-    """Check if driver_mapping.csv exists in DEFAULT_DATA_FOLDER."""
     mapping_path = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "driver_mapping.csv")
     return os.path.exists(mapping_path)
 
 
 def load_default_data():
-    """
-    Load default data from DEFAULT_DATA_FOLDER. Return a dict with races_completed,
-    sorted lists of drivers and constructors, and a flag for driver mapping.
-    """
     if not has_default_data():
         return None
 
@@ -97,26 +87,22 @@ def load_default_data():
 
 @app.route("/")
 def index():
-    """Render main page."""
     return render_template("index.html")
 
 
 @app.route("/check_default_data")
 def check_default_data():
-    """Return JSON indicating whether default data is available and its details."""
     default_info = load_default_data()
     return jsonify({"has_default": default_info is not None, "data": default_info})
 
 
 @app.route("/check_driver_mapping")
 def check_driver_mapping():
-    """Return JSON indicating whether driver_mapping.csv exists."""
     return jsonify({"exists": has_driver_mapping()})
 
 
 @app.route("/upload", methods=["POST"])
 def upload_files():
-    """Handle CSV file uploads (driver, constructor, calendar, tracks)."""
     try:
         update_default = request.form.get("update_default", "false") == "true"
         session_id = request.form.get("session_id")
@@ -141,14 +127,12 @@ def upload_files():
             if not file or not file.filename:
                 continue
 
-            # Determine target filename based on required list
             filename = None
             for expected in required_files:
                 if expected in field_name:
                     filename = expected
                     break
             if filename is None:
-                # If key doesn't match any required CSV, use a safe name
                 filename = secure_filename(file.filename)
 
             dest_path = os.path.join(target_folder, filename)
@@ -164,11 +148,9 @@ def upload_files():
                 }
             )
 
-        # Recalculate races_completed from whichever folder we used
         folder_with_slash = target_folder if target_folder.endswith("/") else target_folder + "/"
         races_completed = get_races_completed(folder_with_slash)
 
-        # Read driver and constructor lists
         driver_df = pd.read_csv(os.path.join(folder_with_slash, "driver_race_data.csv"))
         constructor_df = pd.read_csv(os.path.join(folder_with_slash, "constructor_race_data.csv"))
         drivers_list = sorted(driver_df["Driver"].astype(str).unique().tolist())
@@ -200,7 +182,6 @@ def upload_files():
 
 @app.route("/upload_driver_mapping", methods=["POST"])
 def upload_driver_mapping():
-    """Handle upload of driver_mapping.csv to DEFAULT_DATA_FOLDER."""
     try:
         if "driver_mapping" not in request.files:
             return jsonify({"success": False, "message": "No driver mapping file provided"})
@@ -212,7 +193,6 @@ def upload_driver_mapping():
         dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "driver_mapping.csv")
         file.save(dest)
 
-        # Validate CSV structure
         mapping_df = pd.read_csv(dest)
         required_cols = ["driver_number", "driver_name", "team_name"]
         if not all(col in mapping_df.columns for col in required_cols):
@@ -239,59 +219,18 @@ def upload_driver_mapping():
         )
 
     except Exception as e:
-        # Clean up on error
         dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "driver_mapping.csv")
         if os.path.exists(dest):
             os.remove(dest)
         return jsonify({"success": False, "message": f"Error uploading driver mapping: {e}"})
 
 
-@app.route("/test_fp2_connection", methods=["POST"])
-def test_fp2_connection():
-    """Verify that the provided FP2 session key returns valid lap data."""
-    try:
-        payload = request.get_json() or {}
-        session_key = payload.get("session_key")
-        if session_key is None:
-            return jsonify({"success": False, "message": "Session key is required"})
-
-        try:
-            session_key = int(session_key)
-        except (ValueError, TypeError):
-            return jsonify({"success": False, "message": "Session key must be a number"})
-
-        pace_df = get_expected_race_pace(session_key)
-        if pace_df.empty:
-            return jsonify({"success": False, "message": f"No lap data for session {session_key}"})
-
-        fastest = int(pace_df.iloc[0]["driver_number"])
-        return jsonify(
-            {
-                "success": True,
-                "message": f"Connected to FP2 session {session_key}",
-                "driver_count": len(pace_df),
-                "fastest_driver_number": fastest,
-                "session_key": session_key,
-            }
-        )
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error connecting to FP2 API: {e}"})
-
-
 @app.route("/optimize", methods=["POST"])
 def optimize():
-    """
-    Run the full optimization pipeline:
-    1. Calculate VFM (with optional FP2).
-    2. Calculate track affinities.
-    3. Optimize team for next two races.
-    Returns a JSON summary.
-    """
     try:
         data = request.get_json() or {}
         session_id = data.get("session_id", "default")
 
-        # Determine data folder and races_completed
         if session_id == "default":
             if not has_default_data():
                 return jsonify({"success": False, "message": "No default data; upload files first."})
@@ -304,10 +243,7 @@ def optimize():
             data_folder = get_data_folder(session_id)
             races_completed = sessions[session_id]["races_completed"]
 
-        # FP2 configuration
         use_fp2 = bool(data.get("use_fp2_pace", False))
-        fp2_key = data.get("fp2_session_key")
-        # If payload does not include pace_weight (or explicitly null), default to 0.25
         raw_pw = data.get("pace_weight", None)
         try:
             pace_weight = float(raw_pw) if raw_pw is not None else 0.25
@@ -316,64 +252,70 @@ def optimize():
 
         pace_modifier_type = data.get("pace_modifier_type") or "conservative"
 
-        if use_fp2:
-            if fp2_key is None:
-                return jsonify({"success": False, "message": "FP2 session key required for pace integration"})
-            try:
-                fp2_key = int(fp2_key)
-            except (ValueError, TypeError):
-                return jsonify({"success": False, "message": "FP2 session key must be a number"})
-            if not has_driver_mapping():
-                return jsonify(
-                    {
-                        "success": False,
-                        "message": "driver_mapping.csv is required for FP2 integration; upload it first.",
-                    }
-                )
+        # Read calendar.csv and find the next race
+        cal_path = os.path.join(data_folder, "calendar.csv")
+        cal_df = pd.read_csv(cal_path, skipinitialspace=True)
+        next_race = f"Race{races_completed + 1}"
+        row = cal_df[cal_df["Race"] == next_race]
 
-        # Build common config
+        # If user asked for FP2 but meeting_key is missing or invalid, disable FP2
+        if use_fp2:
+            if row.empty or "meeting_key" not in cal_df.columns or pd.isna(row.iloc[0]["meeting_key"]):
+                use_fp2 = False
+                meeting_key = None
+                race_year = None
+            else:
+                meeting_key = int(row.iloc[0]["meeting_key"])
+                race_year = int(row.iloc[0]["year"])
+        else:
+            meeting_key = None
+            race_year = None
+
         config = {
-            "base_path": data_folder,
-            "races_completed": races_completed,
-            "current_drivers": data.get("current_drivers", []),
+            "base_path":            data_folder,
+            "races_completed":      races_completed,
+            "current_drivers":      data.get("current_drivers", []),
             "current_constructors": data.get("current_constructors", []),
-            "remaining_budget": float(data.get("remaining_budget", 0.0)),
-            "step1_swaps": int(data.get("step1_swaps", 0)),
-            "step2_swaps": int(data.get("step2_swaps", 0)),
-            "weighting_scheme": data.get("weighting_scheme", "trend_based"),
-            "risk_tolerance": data.get("risk_tolerance", "medium"),
-            "multiplier": int(data.get("multiplier", 1)),
-            "use_parallel": False,  # disable parallel in web context
-            "use_fp2_pace": use_fp2,
-            "fp2_session_key": fp2_key,
-            "pace_weight": pace_weight,
-            "pace_modifier_type": pace_modifier_type,
+            "remaining_budget":     float(data.get("remaining_budget", 0.0)),
+            "step1_swaps":          int(data.get("step1_swaps", 0)),
+            "step2_swaps":          int(data.get("step2_swaps", 0)),
+            "weighting_scheme":     data.get("weighting_scheme", "trend_based"),
+            "risk_tolerance":       data.get("risk_tolerance", "medium"),
+            "multiplier":           int(data.get("multiplier", 1)),
+            "use_parallel":         False,
+            "use_fp2_pace":         use_fp2,
+            "pace_weight":          pace_weight,
+            "pace_modifier_type":   pace_modifier_type,
+            "next_meeting_key":     meeting_key,
+            "next_race_year":       race_year,
         }
 
         results = {"status": "running", "progress": []}
 
-        # Step 1: VFM (with optional FP2)
         if config["use_fp2_pace"]:
-            results["progress"].append(f"Fetching FP2 pace data (session {config['fp2_session_key']})...")
+            results["progress"].append(f"Fetching FP2 pace data for meeting_key {meeting_key}...")
         results["progress"].append("Calculating VFM scores...")
         vfm_calc = F1VFMCalculator(config)
         driver_vfm_df, constructor_vfm_df = vfm_calc.run()
         results["progress"].append("VFM calculation complete")
 
-        # Step 2: Track affinities
+        # Check whether any Pace_Score column was actually set
+        actual_fp2_applied = False
+        if config["use_fp2_pace"] and "Pace_Score" in driver_vfm_df.columns:
+            if driver_vfm_df["Pace_Score"].sum() > 0:
+                actual_fp2_applied = True
+
         results["progress"].append("Calculating track affinities...")
         affinity_calc = F1TrackAffinityCalculator(config)
         driver_aff_df, constructor_aff_df = affinity_calc.run()
         results["progress"].append("Track affinity calculation complete")
 
-        # Step 3: Team optimization
         results["progress"].append("Optimizing team selection...")
         optimizer = F1TeamOptimizer(config)
         if not optimizer.load_data():
             return jsonify({"success": False, "message": "Error loading data for optimization"})
         best_dict, base_s1, base_s2 = optimizer.run_dual_step_optimization()
 
-        # Assemble response
         step1 = best_dict.get("step1_result")
         step2 = best_dict.get("step2_result")
 
@@ -382,50 +324,51 @@ def optimize():
             "success": True,
             "optimization": {
                 "step1": {
-                    "race": optimizer.step1_race,
-                    "circuit": optimizer.step1_circuit,
-                    "swaps": step1["swaps"] if step1 else [],
-                    "expected_points": step1["points"] if step1 else base_s1[0],
-                    "improvement": (step1["points"] - base_s1[0]) if step1 else 0.0,
-                    "boost_driver": step1["boost_driver"] if step1 else base_s1[3],
+                    "race":             optimizer.step1_race,
+                    "circuit":          optimizer.step1_circuit,
+                    "swaps":            step1["swaps"] if step1 else [],
+                    "expected_points":  step1["points"] if step1 else base_s1[0],
+                    "improvement":      (step1["points"] - base_s1[0]) if step1 else 0.0,
+                    "boost_driver":     step1["boost_driver"] if step1 else base_s1[3],
                     "team": {
-                        "drivers": step1["drivers"] if step1 else config["current_drivers"],
+                        "drivers":      step1["drivers"] if step1 else config["current_drivers"],
                         "constructors": step1["constructors"] if step1 else config["current_constructors"],
                     },
                 },
                 "step2": {
-                    "race": optimizer.step2_race,
-                    "circuit": optimizer.step2_circuit,
-                    "swaps": step2["swaps"] if step2 else [],
-                    "expected_points": step2["points"] if step2 else base_s2[0],
-                    "improvement": (step2["points"] - base_s2[0]) if step2 else 0.0,
-                    "boost_driver": step2["boost_driver"] if step2 else base_s2[3],
+                    "race":             optimizer.step2_race,
+                    "circuit":          optimizer.step2_circuit,
+                    "swaps":            step2["swaps"] if step2 else [],
+                    "expected_points":  step2["points"] if step2 else base_s2[0],
+                    "improvement":      (step2["points"] - base_s2[0]) if step2 else 0.0,
+                    "boost_driver":     step2["boost_driver"] if step2 else base_s2[3],
                     "team": {
-                        "drivers": step2["drivers"] if step2 else config["current_drivers"],
+                        "drivers":      step2["drivers"] if step2 else config["current_drivers"],
                         "constructors": step2["constructors"] if step2 else config["current_constructors"],
                     },
-                    "budget_used": step2["cost"] if step2 else base_s2[2],
+                    "budget_used":      step2["cost"] if step2 else base_s2[2],
                     "budget_remaining": round(
                         optimizer.max_budget - (step2["cost"] if step2 else base_s2[2]), 2
                     ),
                 },
                 "summary": {
-                    "total_improvement": round(best_dict["final_points"] - base_s2[0], 2),
+                    "total_improvement":  round(best_dict["final_points"] - base_s2[0], 2),
                     "patterns_evaluated": optimizer.performance_stats["patterns_evaluated"],
-                    "optimization_time": round(optimizer.performance_stats["optimization_time"], 2),
+                    "optimization_time":  round(optimizer.performance_stats["optimization_time"], 2),
                 },
             },
             "progress": results["progress"],
         }
 
-        if config["use_fp2_pace"]:
-            # Include FP2 details and pace adjustments
+        # Only include pace block if FP2 was actually applied
+        if actual_fp2_applied:
             pace_info = {
-                "session_key": config["fp2_session_key"],
-                "pace_weight": config["pace_weight"],
-                "modifier_type": config["pace_modifier_type"],
-                "applied": True,
-                "pace_adjustments": [],
+                "meeting_key":       meeting_key,
+                "year":              race_year,
+                "pace_weight":       config["pace_weight"],
+                "modifier_type":     config["pace_modifier_type"],
+                "applied":           True,
+                "pace_adjustments":  [],
             }
             for drv in config["current_drivers"]:
                 row = optimizer.drivers_df[optimizer.drivers_df["Driver"] == drv]
@@ -437,11 +380,11 @@ def optimize():
                     if ps > 0:
                         pace_info["pace_adjustments"].append(
                             {
-                                "driver": drv,
-                                "pace_score": round(ps, 1),
+                                "driver":        drv,
+                                "pace_score":    round(ps, 1),
                                 "pace_modifier": round(pm, 3),
-                                "vfm_original": round(vfm_pre, 2),
-                                "vfm_adjusted": round(vfm_post, 2),
+                                "vfm_original":  round(vfm_pre, 2),
+                                "vfm_adjusted":  round(vfm_post, 2),
                             }
                         )
             resp["optimization"]["fp2_info"] = pace_info
@@ -455,48 +398,38 @@ def optimize():
 
 @app.route("/statistics")
 def statistics():
-    """Render the statistics page."""
     return render_template("statistics.html")
 
 
 @app.route("/api/statistics")
 def get_statistics():
-    """
-    Compute and return comprehensive statistics for drivers and constructors.
-    If affinity files are missing, run the necessary calculations.
-    """
     try:
         data_folder = get_data_folder("default")
         if not data_folder:
             return jsonify({"success": False, "message": "No data; upload files first."})
 
-        # Load raw race data and calendar/tracks
         driver_race_df = pd.read_csv(os.path.join(data_folder, "driver_race_data.csv"))
         constructor_race_df = pd.read_csv(os.path.join(data_folder, "constructor_race_data.csv"))
         calendar_df = pd.read_csv(os.path.join(data_folder, "calendar.csv"))
         tracks_df = pd.read_csv(os.path.join(data_folder, "tracks.csv"))
 
-        # Affinity file paths
         driver_aff_path = os.path.join(data_folder, "driver_affinity.csv")
         constructor_aff_path = os.path.join(data_folder, "constructor_affinity.csv")
         driver_char_aff = os.path.join(data_folder, "driver_characteristic_affinities.csv")
         constructor_char_aff = os.path.join(data_folder, "constructor_characteristic_affinities.csv")
 
-        # If any affinity CSV is missing, re-run calculations
         if not all(os.path.exists(p) for p in [driver_aff_path, constructor_aff_path, driver_char_aff, constructor_char_aff]):
             cfg = {
-                "base_path": data_folder,
-                "races_completed": get_races_completed(data_folder),
-                "weighting_scheme": "trend_based",
-                "use_fp2_pace": False,
+                "base_path":         data_folder,
+                "races_completed":   get_races_completed(data_folder),
+                "weighting_scheme":  "trend_based",
+                "use_fp2_pace":      False,
             }
-            # Recompute VFM and affinities
             vfm_calc = F1VFMCalculator(cfg)
             vfm_calc.run()
             aff_calc = F1TrackAffinityCalculator(cfg)
             aff_calc.run()
 
-        # Load computed VFM and affinity data
         driver_vfm_df = pd.read_csv(os.path.join(data_folder, "driver_vfm.csv"))
         constructor_vfm_df = pd.read_csv(os.path.join(data_folder, "constructor_vfm.csv"))
         driver_aff_df = pd.read_csv(driver_aff_path)
@@ -532,7 +465,6 @@ def process_driver_statistics(
     calendar_df,
     tracks_df,
 ):
-    """Build a detailed stats dictionary for each driver."""
     stats_list = []
     race_cols = [c for c in driver_race_df.columns if c.startswith("Race")]
 
@@ -546,41 +478,44 @@ def process_driver_statistics(
         valid_pts = [float(p) for p in points_arr if not np.isnan(p)]
 
         s = {
-            "name": name,
-            "team": str(drv_row.get("Team", "Unknown")),
-            "cost": str(drv_row["Cost"]),
-            "cost_value": float(re.sub(r"[^\d.]", "", str(drv_row["Cost"]))),
-            "vfm": float(drv_row["VFM"]),
-            "trend": str(drv_row.get("Performance_Trend", "Unknown")),
-            "avg_points": float(np.mean(valid_pts)) if valid_pts else 0.0,
-            "total_points": float(np.sum(valid_pts)) if valid_pts else 0.0,
+            "name":            name,
+            "team":            str(drv_row.get("Team", "Unknown")),
+            "cost":            str(drv_row["Cost"]),
+            "cost_value":      float(re.sub(r"[^\d.]", "", str(drv_row["Cost"]))),
+            "vfm":             float(drv_row["VFM"]),
+            "trend":           str(drv_row.get("Performance_Trend", "Unknown")),
+            "avg_points":      float(np.mean(valid_pts)) if valid_pts else 0.0,
+            "total_points":    float(np.sum(valid_pts)) if valid_pts else 0.0,
             "races_completed": len(valid_pts),
-            "consistency": float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
-            "best_race": float(np.max(valid_pts)) if valid_pts else 0.0,
-            "worst_race": float(np.min(valid_pts)) if valid_pts else 0.0,
+            "consistency":     float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
+            "best_race":       float(np.max(valid_pts)) if valid_pts else 0.0,
+            "worst_race":      float(np.min(valid_pts)) if valid_pts else 0.0,
         }
 
-        # Recent form = average of last 3 minus overall average
         if len(valid_pts) >= 3:
             last3 = valid_pts[-3:]
             s["recent_form"] = float(np.mean(last3) - s["avg_points"])
         else:
             s["recent_form"] = 0.0
 
-        # Characteristic affinities
         if name in driver_char_df.index:
             char_vals = driver_char_df.loc[name]
             s["char_affinities"] = {
-                "Corners": float(char_vals.get("Corners", 0.0)),
-                "Length": float(char_vals.get("Length (km)", 0.0)),
-                "Overtaking": float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
-                "Speed": float(char_vals.get("Track Speed_encoded", 0.0)),
-                "Temperature": float(char_vals.get("Expected Temperatures_encoded", 0.0)),
+                "Corners":      float(char_vals.get("Corners", 0.0)),
+                "Length":       float(char_vals.get("Length (km)", 0.0)),
+                "Overtaking":   float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
+                "Speed":        float(char_vals.get("Track Speed_encoded", 0.0)),
+                "Temperature":  float(char_vals.get("Expected Temperatures_encoded", 0.0)),
             }
         else:
-            s["char_affinities"] = {"Corners": 0.0, "Length": 0.0, "Overtaking": 0.0, "Speed": 0.0, "Temperature": 0.0}
+            s["char_affinities"] = {
+                "Corners":      0.0,
+                "Length":       0.0,
+                "Overtaking":   0.0,
+                "Speed":        0.0,
+                "Temperature":  0.0,
+            }
 
-        # Track-specific performance (past races)
         perf_list = []
         for _, cal_row in calendar_df.iterrows():
             race_name = cal_row["Race"]
@@ -600,7 +535,6 @@ def process_driver_statistics(
         s["best_tracks"] = perf_list[:3] if len(perf_list) >= 3 else perf_list
         s["worst_tracks"] = perf_list[-3:] if len(perf_list) >= 3 else []
 
-        # Upcoming races affinities
         upc = []
         completed = len([r for r in race_cols if r in calendar_df["Race"].values])
         for i in range(completed + 1, min(completed + 4, len(race_cols) + 1)):
@@ -619,7 +553,6 @@ def process_driver_statistics(
         s["upcoming_races"] = upc
         stats_list.append(s)
 
-    # Rank by VFM
     stats_list.sort(key=lambda x: x["vfm"], reverse=True)
     for rank, entry in enumerate(stats_list, start=1):
         entry["vfm_rank"] = rank
@@ -635,7 +568,6 @@ def process_constructor_statistics(
     calendar_df,
     tracks_df,
 ):
-    """Build a detailed stats dictionary for each constructor."""
     stats_list = []
     race_cols = [c for c in constructor_race_df.columns if c.startswith("Race")]
 
@@ -649,17 +581,17 @@ def process_constructor_statistics(
         valid_pts = [float(p) for p in points_arr if not np.isnan(p)]
 
         s = {
-            "name": name,
-            "cost": str(const_row["Cost"]),
-            "cost_value": float(re.sub(r"[^\d.]", "", str(const_row["Cost"]))),
-            "vfm": float(const_row["VFM"]),
-            "trend": str(const_row.get("Performance_Trend", "Unknown")),
-            "avg_points": float(np.mean(valid_pts)) if valid_pts else 0.0,
-            "total_points": float(np.sum(valid_pts)) if valid_pts else 0.0,
+            "name":            name,
+            "cost":            str(const_row["Cost"]),
+            "cost_value":      float(re.sub(r"[^\d.]", "", str(const_row["Cost"]))),
+            "vfm":             float(const_row["VFM"]),
+            "trend":           str(const_row.get("Performance_Trend", "Unknown")),
+            "avg_points":      float(np.mean(valid_pts)) if valid_pts else 0.0,
+            "total_points":    float(np.sum(valid_pts)) if valid_pts else 0.0,
             "races_completed": len(valid_pts),
-            "consistency": float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
-            "best_race": float(np.max(valid_pts)) if valid_pts else 0.0,
-            "worst_race": float(np.min(valid_pts)) if valid_pts else 0.0,
+            "consistency":     float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
+            "best_race":       float(np.max(valid_pts)) if valid_pts else 0.0,
+            "worst_race":      float(np.min(valid_pts)) if valid_pts else 0.0,
         }
 
         if len(valid_pts) >= 3:
@@ -671,14 +603,20 @@ def process_constructor_statistics(
         if name in constructor_char_df.index:
             char_vals = constructor_char_df.loc[name]
             s["char_affinities"] = {
-                "Corners": float(char_vals.get("Corners", 0.0)),
-                "Length": float(char_vals.get("Length (km)", 0.0)),
-                "Overtaking": float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
-                "Speed": float(char_vals.get("Track Speed_encoded", 0.0)),
-                "Temperature": float(char_vals.get("Expected Temperatures_encoded", 0.0)),
+                "Corners":      float(char_vals.get("Corners", 0.0)),
+                "Length":       float(char_vals.get("Length (km)", 0.0)),
+                "Overtaking":   float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
+                "Speed":        float(char_vals.get("Track Speed_encoded", 0.0)),
+                "Temperature":  float(char_vals.get("Expected Temperatures_encoded", 0.0)),
             }
         else:
-            s["char_affinities"] = {"Corners": 0.0, "Length": 0.0, "Overtaking": 0.0, "Speed": 0.0, "Temperature": 0.0}
+            s["char_affinities"] = {
+                "Corners":      0.0,
+                "Length":       0.0,
+                "Overtaking":   0.0,
+                "Speed":        0.0,
+                "Temperature":  0.0,
+            }
 
         perf_list = []
         for _, cal_row in calendar_df.iterrows():
@@ -726,51 +664,47 @@ def process_constructor_statistics(
 
 @app.route("/api/export_statistics")
 def export_statistics():
-    """Generate and download an Excel file containing driver and constructor stats."""
     try:
         stats_resp = get_statistics()
         stats_data = stats_resp.get_json()
         if not stats_data.get("success", False):
             return stats_resp
 
-        # Build driver summary
         driver_rows = []
         for drv in stats_data["drivers"]:
             driver_rows.append(
                 {
-                    "Driver": drv["name"],
-                    "Team": drv["team"],
-                    "Cost": drv["cost"],
-                    "VFM": drv["vfm"],
-                    "VFM_Rank": drv["vfm_rank"],
-                    "Avg_Points": round(drv["avg_points"], 2),
-                    "Total_Points": drv["total_points"],
+                    "Driver":      drv["name"],
+                    "Team":        drv["team"],
+                    "Cost":        drv["cost"],
+                    "VFM":         drv["vfm"],
+                    "VFM_Rank":    drv["vfm_rank"],
+                    "Avg_Points":  round(drv["avg_points"], 2),
+                    "Total_Points":drv["total_points"],
                     "Consistency": round(drv["consistency"], 2),
                     "Recent_Form": round(drv["recent_form"], 2),
-                    "Trend": drv["trend"],
+                    "Trend":       drv["trend"],
                 }
             )
         df_drv = pd.DataFrame(driver_rows)
 
-        # Build constructor summary
         const_rows = []
         for const in stats_data["constructors"]:
             const_rows.append(
                 {
                     "Constructor": const["name"],
-                    "Cost": const["cost"],
-                    "VFM": const["vfm"],
-                    "VFM_Rank": const["vfm_rank"],
-                    "Avg_Points": round(const["avg_points"], 2),
-                    "Total_Points": const["total_points"],
+                    "Cost":        const["cost"],
+                    "VFM":         const["vfm"],
+                    "VFM_Rank":    const["vfm_rank"],
+                    "Avg_Points":  round(const["avg_points"], 2),
+                    "Total_Points":const["total_points"],
                     "Consistency": round(const["consistency"], 2),
                     "Recent_Form": round(const["recent_form"], 2),
-                    "Trend": const["trend"],
+                    "Trend":       const["trend"],
                 }
             )
         df_const = pd.DataFrame(const_rows)
 
-        # Save to Excel in RESULTS_FOLDER
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         out_path = os.path.join(app.config["RESULTS_FOLDER"], f"statistics_{ts}.xlsx")
         with pd.ExcelWriter(out_path) as writer:

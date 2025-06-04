@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='90' font-size='90'%3E🏎️%3C/text%3E%3C/svg%3E"
+  >
   <title>F1 Fantasy Team Optimiser</title>
   <style>
     * {
@@ -93,7 +97,6 @@
 
     input[type="file"],
     input[type="number"],
-    input[type="text"],
     select {
       width: 100%;
       padding: 10px;
@@ -298,7 +301,6 @@
       border: none;
       border-radius: 0;
       background: transparent;
-      /* keep padding/margin if you still want spacing */
     }
 
     .fp2-config h3 {
@@ -312,10 +314,6 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
       gap: 15px;
-    }
-
-    .test-result {
-      margin-top: 10px;
     }
 
     .pace-adjustment {
@@ -397,7 +395,7 @@
             <label for="driver-mapping-file">Driver Number Mapping</label>
             <input type="file" id="driver-mapping-file" accept=".csv">
             <small>
-              Optional, only required for Race Pace Estimations
+              Optional, only required for Race Pace Estimation
             </small>
           </div>
         </div>
@@ -497,18 +495,13 @@
       <div class="checkbox-group">
         <label>
           <input type="checkbox" id="use-fp2-pace">
-          Include Race Pace Estimation using FP2 Lap Data
+          Include Race Pace Estimation using FP2 Lap Data (if available)
         </label>
       </div>
 
       <div class="fp2-config" id="fp2-config" style="display: none;">
-
+        <h3>Race Pace Settings</h3>
         <div class="fp2-grid">
-          <div class="form-group">
-            <label for="fp2-session-key">FP2 Session Key</label>
-            <input type="number" id="fp2-session-key" placeholder="e.g. 9158">
-          </div>
-
           <div class="form-group">
             <label for="pace-weight">Pace Weight</label>
             <select id="pace-weight">
@@ -521,19 +514,11 @@
           <div class="form-group">
             <label for="pace-modifier-type">Pace Modifier Type</label>
             <select id="pace-modifier-type">
-              <option value="conservative" selected>Conservative (0.8× to 1.2× range)</option>
-              <option value="aggressive">Aggressive (0.6× to 1.4× range)</option>
+              <option value="conservative" selected>Conservative (0.8× to 1.2×)</option>
+              <option value="aggressive">Aggressive (0.6× to 1.4×)</option>
             </select>
           </div>
         </div>
-
-        <div class="button-group">
-          <button class="button button-warning" onclick="testFP2Connection()">
-            Test API Connection
-          </button>
-        </div>
-
-        <div id="fp2-test-result" class="test-result"></div>
       </div>
 
       <div class="button-group">
@@ -566,13 +551,11 @@
     let sessionData = null;
     let usingDefaultData = false;
 
-    // Once the DOM is ready, do all setup here
     window.addEventListener('DOMContentLoaded', async function() {
       try {
         await checkDefaultData();
         await checkDriverMapping();
 
-        // FP2 checkbox listener
         const fp2Checkbox = document.getElementById('use-fp2-pace');
         const fp2Config = document.getElementById('fp2-config');
         if (fp2Checkbox) {
@@ -582,13 +565,10 @@
             }
             if (this.checked) {
               checkDriverMapping();
-              // keep mapping visible
             }
-            // unchecking does not hide mapping anymore
           });
         }
 
-        // If default data is present, immediately switch to config
         const useDefaultBtn = document.getElementById('use-default-btn');
         if (useDefaultBtn && useDefaultBtn.style.display !== 'none') {
           useDefaultData();
@@ -613,9 +593,9 @@
           if (defaultDataMessage) {
             let message = `Using default data with ${data.data.races_completed} races completed.`;
             if (data.data.has_driver_mapping) {
-              message += ' Driver mapping available for FP2 integration.';
+              message += '';
             }
-            message += ` <a href="#" onclick="showUploadSection()">Click here to upload new files instead.</a>`;
+            message += ``;
             defaultDataMessage.innerHTML = message;
           }
           if (useDefaultBtn) {
@@ -637,7 +617,7 @@
         const statusDiv = document.getElementById('mapping-status');
         if (statusDiv) {
           if (data.exists) {
-            statusDiv.innerHTML = '<div class="success">✅ Driver mapping file is available – Race Pace Estimation ready!</div>';
+            statusDiv.innerHTML = '<div class="success">✅ Driver mapping is available.</div>';
           } else {
             statusDiv.innerHTML = '<div class="warning">⚠️ No driver mapping file found. Upload one to enable Race Pace Estimation.</div>';
           }
@@ -656,9 +636,17 @@
       }
     }
 
-    // Overwrite hideDriverMapping to do nothing, so mapping stays visible
-    function hideDriverMapping() {
-      // Intentionally empty
+    function showUploadSection() {
+      document.getElementById('config-section').style.display    = 'none';
+      document.getElementById('upload-section').style.display    = 'block';
+      document.getElementById('results-section').style.display   = 'none';
+      document.getElementById('default-data-status').style.display = 'none';
+
+      document.getElementById('driver-data').value = '';
+      document.getElementById('constructor-data').value = '';
+      document.getElementById('calendar-data').value = '';
+      document.getElementById('tracks-data').value = '';
+      document.getElementById('update-default-checkbox').checked = false;
     }
 
     async function useDefaultData() {
@@ -667,38 +655,26 @@
         .then(data => {
           if (!data.has_default) return;
 
-          sessionId      = 'default';
-          sessionData    = data.data;
-          usingDefaultData = true;
+          sessionId         = 'default';
+          sessionData       = data.data;
+          usingDefaultData  = true;
 
-          // Show races completed
           const racesCompletedEl = document.getElementById('races-completed');
           if (racesCompletedEl) {
             racesCompletedEl.textContent = data.data.races_completed;
           }
 
           populateTeamSelects(data.data.drivers, data.data.constructors);
-
-          // Load saved config, if any
           loadConfigFromCookie();
 
-          // Switch UI sections
-          const configSection = document.getElementById('config-section');
-          const uploadSection = document.getElementById('upload-section');
-          if (configSection) {
-            configSection.style.display = 'block';
-          }
-          if (uploadSection) {
-            uploadSection.style.display = 'none';
-          }
+          document.getElementById('config-section').style.display = 'block';
+          document.getElementById('upload-section').style.display = 'none';
 
-          // Enable FP2 checkbox
           const fp2Checkbox = document.getElementById('use-fp2-pace');
           if (fp2Checkbox) {
             fp2Checkbox.disabled = false;
           }
 
-          // Refresh mapping status
           checkDriverMapping();
         })
         .catch(error => {
@@ -706,7 +682,6 @@
         });
     }
 
-    // Populate driver/constructor dropdowns
     function populateTeamSelects(drivers, constructors) {
       const driverContainer = document.getElementById('driver-selects');
       if (driverContainer) {
@@ -737,41 +712,6 @@
       }
     }
 
-    // Test FP2 API connection
-    async function testFP2Connection() {
-      const sessionKey = document.getElementById('fp2-session-key')?.value;
-      if (!sessionKey) {
-        alert('Please enter an FP2 session key');
-        return;
-      }
-      const resultDiv = document.getElementById('fp2-test-result');
-      if (resultDiv) {
-        resultDiv.innerHTML = '<div class="info">🔄 Testing FP2 connection…</div>';
-      }
-      try {
-        const response = await fetch('/test_fp2_connection', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_key: sessionKey })
-        });
-        const data = await response.json();
-        if (data.success) {
-          resultDiv.innerHTML = `
-            <div class="success">
-              ✅ ${data.message}<br>
-              Found data for ${data.driver_count} drivers<br>
-              ${data.fastest_driver ? `Fastest driver: #${data.fastest_driver}` : ''}
-            </div>
-          `;
-        } else {
-          resultDiv.innerHTML = `<div class="error">❌ ${data.message}</div>`;
-        }
-      } catch (error) {
-        resultDiv.innerHTML = `<div class="error">❌ Error testing connection: ${error.message}</div>`;
-      }
-    }
-
-    // Cookie helpers
     function setCookie(name, value, days = 30) {
       const expires = new Date();
       expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
@@ -805,18 +745,17 @@
         if (sel.value) constructors.push(sel.value);
       });
       const config = {
-        current_drivers:     drivers,
-        current_constructors: constructors,
-        remaining_budget:    document.getElementById('remaining-budget')?.value,
-        step1_swaps:         document.getElementById('step1-swaps')?.value,
-        step2_swaps:         document.getElementById('step2-swaps')?.value,
-        weighting_scheme:    document.getElementById('weighting-scheme')?.value,
-        risk_tolerance:      document.getElementById('risk-tolerance')?.value,
-        multiplier:          document.getElementById('multiplier')?.value,
-        use_fp2_pace:        document.getElementById('use-fp2-pace')?.checked,
-        fp2_session_key:     document.getElementById('fp2-session-key')?.value,
-        pace_weight:         document.getElementById('pace-weight')?.value,
-        pace_modifier_type:  document.getElementById('pace-modifier-type')?.value
+        current_drivers:       drivers,
+        current_constructors:  constructors,
+        remaining_budget:      document.getElementById('remaining-budget')?.value,
+        step1_swaps:           document.getElementById('step1-swaps')?.value,
+        step2_swaps:           document.getElementById('step2-swaps')?.value,
+        weighting_scheme:      document.getElementById('weighting-scheme')?.value,
+        risk_tolerance:        document.getElementById('risk-tolerance')?.value,
+        multiplier:            document.getElementById('multiplier')?.value,
+        use_fp2_pace:          document.getElementById('use-fp2-pace')?.checked,
+        pace_weight:           document.getElementById('pace-weight')?.value,
+        pace_modifier_type:    document.getElementById('pace-modifier-type')?.value
       };
       setCookie('f1_optimizer_config', config);
     }
@@ -827,21 +766,18 @@
     }
 
     function applyConfig(config) {
-      // Drivers
       const driverSelects = document.querySelectorAll('.driver-select');
       if (config.current_drivers) {
         config.current_drivers.forEach((driver, idx) => {
           if (driverSelects[idx]) driverSelects[idx].value = driver;
         });
       }
-      // Constructors
       const constructorSelects = document.querySelectorAll('.constructor-select');
       if (config.current_constructors) {
         config.current_constructors.forEach((cons, idx) => {
           if (constructorSelects[idx]) constructorSelects[idx].value = cons;
         });
       }
-      // Other values
       if (config.remaining_budget) document.getElementById('remaining-budget').value = config.remaining_budget;
       if (config.step1_swaps)       document.getElementById('step1-swaps').value       = config.step1_swaps;
       if (config.step2_swaps)       document.getElementById('step2-swaps').value       = config.step2_swaps;
@@ -849,7 +785,6 @@
       if (config.risk_tolerance)    document.getElementById('risk-tolerance').value    = config.risk_tolerance;
       if (config.multiplier)        document.getElementById('multiplier').value        = config.multiplier;
 
-      // FP2 settings
       if (config.use_fp2_pace !== undefined) {
         const fp2Checkbox = document.getElementById('use-fp2-pace');
         const fp2ConfigEl  = document.getElementById('fp2-config');
@@ -861,7 +796,6 @@
           if (config.use_fp2_pace) showDriverMapping();
         }
       }
-      if (config.fp2_session_key)    document.getElementById('fp2-session-key').value   = config.fp2_session_key;
       if (config.pace_weight)        document.getElementById('pace-weight').value       = config.pace_weight;
       if (config.pace_modifier_type) document.getElementById('pace-modifier-type').value = config.pace_modifier_type;
     }
@@ -908,7 +842,6 @@
         sessionData = data;
         usingDefaultData = false;
 
-        // Show how many races completed
         document.getElementById('races-completed').textContent = data.races_completed;
         populateTeamSelects(data.drivers, data.constructors);
 
@@ -955,25 +888,6 @@
       }
     }
 
-    function showUploadSection() {
-      document.getElementById('config-section').style.display    = 'none';
-      document.getElementById('upload-section').style.display    = 'block';
-      document.getElementById('results-section').style.display   = 'none';
-      document.getElementById('default-data-status').style.display = 'none';
-      // mapping stays visible
-
-      document.getElementById('driver-data').value = '';
-      document.getElementById('constructor-data').value = '';
-      document.getElementById('calendar-data').value = '';
-      document.getElementById('tracks-data').value = '';
-      document.getElementById('update-default-checkbox').checked = false;
-    }
-
-    function runAnotherOptimization() {
-      document.getElementById('results-section').style.display = 'none';
-      document.getElementById('config-section').style.display  = 'block';
-    }
-
     async function runOptimization() {
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => {
@@ -995,34 +909,27 @@
 
       const useFP2 = document.getElementById('use-fp2-pace')?.checked;
       if (useFP2) {
-        const sessionKey = document.getElementById('fp2-session-key')?.value;
-        if (!sessionKey) {
-          alert('Please enter an FP2 session key when using pace data');
-          return;
-        }
         const mappingCheck = await fetch('/check_driver_mapping');
         const mappingData  = await mappingCheck.json();
         if (!mappingData.exists) {
           alert('Driver mapping file is required for Race Pace Estimation. Please upload it first.');
-          // mapping remains visible
           return;
         }
       }
 
       const config = {
-        session_id:        sessionId,
-        current_drivers:   drivers,
+        session_id:          sessionId,
+        current_drivers:     drivers,
         current_constructors: constructors,
-        remaining_budget:  document.getElementById('remaining-budget')?.value,
-        step1_swaps:       document.getElementById('step1-swaps')?.value,
-        step2_swaps:       document.getElementById('step2-swaps')?.value,
-        weighting_scheme:  document.getElementById('weighting-scheme')?.value,
-        risk_tolerance:    document.getElementById('risk-tolerance')?.value,
-        multiplier:        document.getElementById('multiplier')?.value,
-        use_fp2_pace:      useFP2,
-        fp2_session_key:   useFP2 ? document.getElementById('fp2-session-key')?.value : null,
-        pace_weight:       useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
-        pace_modifier_type: useFP2 ? document.getElementById('pace-modifier-type')?.value : null
+        remaining_budget:    document.getElementById('remaining-budget')?.value,
+        step1_swaps:         document.getElementById('step1-swaps')?.value,
+        step2_swaps:         document.getElementById('step2-swaps')?.value,
+        weighting_scheme:    document.getElementById('weighting-scheme')?.value,
+        risk_tolerance:      document.getElementById('risk-tolerance')?.value,
+        multiplier:          document.getElementById('multiplier')?.value,
+        use_fp2_pace:        useFP2,
+        pace_weight:         useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
+        pace_modifier_type:  useFP2 ? document.getElementById('pace-modifier-type')?.value : null
       };
 
       saveConfigToCookie();
@@ -1053,11 +960,12 @@
       const resultsContent = document.getElementById('results-content');
       const opt = data.optimization;
       let fp2InfoHtml = '';
+
+      // Only show FP2 block if “applied” is true
       if (opt.fp2_info && opt.fp2_info.applied) {
         fp2InfoHtml = `
           <div class="result-card" style="border-left-color: #17a2b8;">
             <h3>Race Pace Estimation</h3>
-            <p><strong>Session Key:</strong> ${opt.fp2_info.session_key}</p>
             <p><strong>Pace Weight:</strong> ${(opt.fp2_info.pace_weight * 100).toFixed(0)}% current form, ${(100 - opt.fp2_info.pace_weight * 100).toFixed(0)}% historical</p>
             <p><strong>Modifier Type:</strong> ${opt.fp2_info.modifier_type}</p>
             <p style="color: #28a745; font-weight: bold;">✅ FP2 Lap data successfully integrated</p>
@@ -1130,7 +1038,7 @@
           <p><strong>Patterns Evaluated:</strong> ${opt.summary.patterns_evaluated.toLocaleString()}</p>
           <p><strong>Optimization Time:</strong> ${opt.summary.optimization_time.toFixed(1)}s</p>
           ${opt.fp2_info && opt.fp2_info.applied ?
-            '<p style="color: #17a2b8;"><strong>Enhancement:</strong> FP2 derived race pace estimations</p>' :
+            '<p style="color: #17a2b8;"><strong>Enhancement:</strong> FP2-derived race pace estimations</p>' :
             '<p style="color: #6c757d;"><strong>Analysis:</strong> Historical data only</p>'
           }
         </div>
