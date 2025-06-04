@@ -599,7 +599,7 @@ class F1TrackAffinityCalculator:
     def __init__(self, config):
         self.config = config
         self.base_path = config["base_path"]
-        self.bootstrap_iterations = config.get("bootstrap_iterations", 30)
+        self.bootstrap_iterations = config.get("bootstrap_iterations", 50)
 
     def run(self):
         """Run track affinity calculations"""
