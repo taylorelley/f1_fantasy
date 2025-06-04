@@ -343,8 +343,44 @@
       text-decoration: none;
     }
 
-    small a:hover {
+  small a:hover {
       text-decoration: underline;
+    }
+
+    /* Responsive adjustments for mobile screens */
+    @media (max-width: 768px) {
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .nav-links {
+        flex-direction: column;
+        width: 100%;
+        margin-top: 10px;
+      }
+
+      h1 {
+        font-size: 1.8em;
+      }
+
+      .file-upload,
+      .fp2-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .team-selection {
+        grid-template-columns: 1fr;
+      }
+
+      .button-group {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .team-display {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
     }
   </style>
 </head>
