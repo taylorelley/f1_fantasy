@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY app.py .
 COPY f1_optimizer.py .
+COPY data_cache.py .
 COPY templates/ templates/
 
 # Create necessary directories

@@ -18,6 +18,8 @@ from datetime import datetime
 from multiprocessing import Pool, cpu_count
 from sklearn.preprocessing import LabelEncoder
 from pulp import LpProblem, LpVariable, LpMaximize, lpSum, LpBinary
+
+from data_cache import DataCache
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -306,8 +308,16 @@ class F1VFMCalculator:
         self.pace_weight = config.get("pace_weight", 0.25)
         self.pace_modifier_type = config.get("pace_modifier_type", "conservative")
 
-    def calculate_vfm(self, race_data_file, vfm_data_file, entity_type="driver", weights=None):
-        """Calculate VFM scores with outlier removal and optional FP2 pace integration"""
+    def calculate_vfm(self, race_data_file, vfm_data_file=None, entity_type="driver", weights=None):
+        """Calculate VFM scores with outlier removal and optional FP2 pace integration.
+
+        Parameters
+        ----------
+        race_data_file : str or pandas.DataFrame
+            Path to CSV file or DataFrame containing race results.
+        vfm_data_file : str, optional
+            If provided, save the resulting VFM table to this path.
+        """
         race_df = self._calculate_base_vfm(race_data_file, entity_type, weights)
 
         if self.use_fp2_pace:
@@ -338,8 +348,11 @@ class F1VFMCalculator:
         return race_df
 
     def _calculate_base_vfm(self, race_data_file, entity_type, weights):
-        """Calculate base VFM scores with outlier removal"""
-        race_df = pd.read_csv(race_data_file, skipinitialspace=True)
+        """Calculate base VFM scores with outlier removal."""
+        if isinstance(race_data_file, pd.DataFrame):
+            race_df = race_data_file.copy()
+        else:
+            race_df = pd.read_csv(race_data_file, skipinitialspace=True)
         race_df.columns = [col.strip() for col in race_df.columns]
 
         if "Cost" not in race_df.columns:
@@ -586,17 +599,35 @@ class F1VFMCalculator:
         df["Weights_Used"] = ""
         return df
 
-    def run(self):
-        """Run VFM calculations for both drivers and constructors"""
+    def run(self, raw_data=None):
+        """Run VFM calculations for both drivers and constructors."""
         print("Calculating VFM scores...")
 
-        driver_race_file = f"{self.base_path}driver_race_data.csv"
-        driver_vfm_file = f"{self.base_path}driver_vfm.csv"
-        driver_vfm = self.calculate_vfm(driver_race_file, driver_vfm_file, "driver")
+        if raw_data is None:
+            raw_data = DataCache.load_raw(self.base_path)
 
-        constructor_race_file = f"{self.base_path}constructor_race_data.csv"
+        cached_d = DataCache.get_processed(self.base_path, 'driver_affinity')
+        cached_c = DataCache.get_processed(self.base_path, 'constructor_affinity')
+        if cached_d is not None and cached_c is not None:
+            return cached_d, cached_c
+
+        cached_d = DataCache.get_processed(self.base_path, 'driver_vfm')
+        cached_c = DataCache.get_processed(self.base_path, 'constructor_vfm')
+        if cached_d is not None and cached_c is not None:
+            return cached_d, cached_c
+
+        driver_vfm_file = f"{self.base_path}driver_vfm.csv"
         constructor_vfm_file = f"{self.base_path}constructor_vfm.csv"
-        constructor_vfm = self.calculate_vfm(constructor_race_file, constructor_vfm_file, "constructor")
+
+        driver_vfm = self.calculate_vfm(
+            raw_data['driver_race_data.csv'], driver_vfm_file, "driver"
+        )
+        constructor_vfm = self.calculate_vfm(
+            raw_data['constructor_race_data.csv'], constructor_vfm_file, "constructor"
+        )
+
+        DataCache.store_processed(self.base_path, 'driver_vfm', driver_vfm)
+        DataCache.store_processed(self.base_path, 'constructor_vfm', constructor_vfm)
 
         print(f"VFM calculation complete. Files saved to {self.base_path}")
         return driver_vfm, constructor_vfm
@@ -609,14 +640,17 @@ class F1TrackAffinityCalculator:
         self.config = config
         self.base_path = config["base_path"]
 
-    def run(self):
-        """Run track affinity calculations"""
+    def run(self, raw_data=None):
+        """Run track affinity calculations."""
         print("Calculating track affinities with enhanced algorithms...")
 
-        driver_points = pd.read_csv(f"{self.base_path}driver_race_data.csv")
-        constructor_points = pd.read_csv(f"{self.base_path}constructor_race_data.csv")
-        race_calendar = pd.read_csv(f"{self.base_path}calendar.csv")
-        track_characteristics = pd.read_csv(f"{self.base_path}tracks.csv")
+        if raw_data is None:
+            raw_data = DataCache.load_raw(self.base_path)
+
+        driver_points = raw_data['driver_race_data.csv']
+        constructor_points = raw_data['constructor_race_data.csv']
+        race_calendar = raw_data['calendar.csv']
+        track_characteristics = raw_data['tracks.csv']
 
         race_columns = [col for col in driver_points.columns if col.startswith("Race")]
         constructor_race_columns = [col for col in constructor_points.columns if col.startswith("Race")]
@@ -652,6 +686,10 @@ class F1TrackAffinityCalculator:
         driver_final_output.round(3).to_csv(f"{self.base_path}driver_affinity.csv", index=False)
         constructor_char_affinity_df.round(3).to_csv(f"{self.base_path}constructor_characteristic_affinities.csv")
         constructor_final_output.round(3).to_csv(f"{self.base_path}constructor_affinity.csv", index=False)
+
+        DataCache.store_processed(self.base_path, 'driver_affinity', driver_final_output)
+        DataCache.store_processed(self.base_path, 'constructor_affinity', constructor_final_output)
+        DataCache.store_processed(self.base_path, 'calendar', race_calendar)
 
         print(f"Enhanced track affinity calculation complete. Files saved to {self.base_path}")
         return driver_final_output, constructor_final_output
@@ -1014,14 +1052,21 @@ class F1TeamOptimizer:
             self.affinity_weight = 1.0
             self.vfm_weight = 1.0
 
-    def load_data(self):
-        """Load all required data files"""
+    def load_data(self, processed=None):
+        """Load all required data files or use provided DataFrames."""
         try:
-            self.drivers_df = pd.read_csv(f"{self.base_path}driver_vfm.csv")
-            self.constructors_df = pd.read_csv(f"{self.base_path}constructor_vfm.csv")
-            self.track_affinity_df = pd.read_csv(f"{self.base_path}driver_affinity.csv")
-            self.constructor_affinity_df = pd.read_csv(f"{self.base_path}constructor_affinity.csv")
-            self.race_calendar_df = pd.read_csv(f"{self.base_path}calendar.csv")
+            if processed is None:
+                self.drivers_df = pd.read_csv(f"{self.base_path}driver_vfm.csv")
+                self.constructors_df = pd.read_csv(f"{self.base_path}constructor_vfm.csv")
+                self.track_affinity_df = pd.read_csv(f"{self.base_path}driver_affinity.csv")
+                self.constructor_affinity_df = pd.read_csv(f"{self.base_path}constructor_affinity.csv")
+                self.race_calendar_df = pd.read_csv(f"{self.base_path}calendar.csv")
+            else:
+                self.drivers_df = processed['driver_vfm']
+                self.constructors_df = processed['constructor_vfm']
+                self.track_affinity_df = processed['driver_affinity']
+                self.constructor_affinity_df = processed['constructor_affinity']
+                self.race_calendar_df = processed['calendar']
 
             self.drivers_df["Cost_Value"] = (
                 self.drivers_df["Cost"].str.replace(r"[$M]", "", regex=True).astype(float)

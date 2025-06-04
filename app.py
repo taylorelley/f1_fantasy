@@ -17,6 +17,7 @@ from f1_optimizer import (
     get_races_completed,
     get_expected_race_pace,
 )
+from data_cache import DataCache
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max
@@ -67,10 +68,11 @@ def load_default_data():
 
     try:
         base = app.config["DEFAULT_DATA_FOLDER"] + "/"
+        raw = DataCache.load_raw(base)
         races_completed = get_races_completed(base)
 
-        driver_df = pd.read_csv(os.path.join(base, "driver_race_data.csv"))
-        constructor_df = pd.read_csv(os.path.join(base, "constructor_race_data.csv"))
+        driver_df = raw["driver_race_data.csv"]
+        constructor_df = raw["constructor_race_data.csv"]
 
         drivers_list = sorted(driver_df["Driver"].astype(str).unique().tolist())
         constructors_list = sorted(constructor_df["Constructor"].astype(str).unique().tolist())
@@ -114,6 +116,8 @@ def upload_files():
         else:
             target_folder = os.path.join(app.config["UPLOAD_FOLDER"], session_id)
             os.makedirs(target_folder, exist_ok=True)
+
+        DataCache.clear(target_folder)
 
         required_files = [
             "driver_race_data.csv",
@@ -192,6 +196,7 @@ def upload_driver_mapping():
 
         dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "driver_mapping.csv")
         file.save(dest)
+        DataCache.clear(app.config["DEFAULT_DATA_FOLDER"])
 
         mapping_df = pd.read_csv(dest)
         required_cols = ["driver_number", "driver_name", "team_name"]
@@ -296,9 +301,11 @@ def optimize():
 
         if config["use_fp2_pace"]:
             results["progress"].append(f"Fetching FP2 pace data for meeting_key {meeting_key}...")
+        raw_data = DataCache.load_raw(data_folder)
+
         results["progress"].append("Calculating VFM scores...")
         vfm_calc = F1VFMCalculator(config)
-        driver_vfm_df, constructor_vfm_df = vfm_calc.run()
+        driver_vfm_df, constructor_vfm_df = vfm_calc.run(raw_data)
         results["progress"].append("VFM calculation complete")
 
         # Check whether any Pace_Score column was actually set
@@ -309,12 +316,19 @@ def optimize():
 
         results["progress"].append("Calculating track affinities...")
         affinity_calc = F1TrackAffinityCalculator(config)
-        driver_aff_df, constructor_aff_df = affinity_calc.run()
+        driver_aff_df, constructor_aff_df = affinity_calc.run(raw_data)
         results["progress"].append("Track affinity calculation complete")
 
         results["progress"].append("Optimizing team selection...")
         optimizer = F1TeamOptimizer(config)
-        if not optimizer.load_data():
+        processed = {
+            "driver_vfm": driver_vfm_df,
+            "constructor_vfm": constructor_vfm_df,
+            "driver_affinity": driver_aff_df,
+            "constructor_affinity": constructor_aff_df,
+            "calendar": raw_data["calendar.csv"],
+        }
+        if not optimizer.load_data(processed):
             return jsonify({"success": False, "message": "Error loading data for optimization"})
         best_dict, base_s1, base_s2 = optimizer.run_dual_step_optimization()
 
