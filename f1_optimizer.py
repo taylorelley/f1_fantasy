@@ -18,14 +18,18 @@ from datetime import datetime
 from multiprocessing import Pool, cpu_count
 from sklearn.preprocessing import LabelEncoder
 from pulp import LpProblem, LpVariable, LpMaximize, lpSum, LpBinary
+from data_cache import DataCache
 import warnings
 warnings.filterwarnings('ignore')
 
 
-def get_races_completed(base_path):
+def get_races_completed(base_path, cache: DataCache | None = None):
     """Calculate number of races completed based on race columns in data file"""
     try:
-        driver_data = pd.read_csv(f'{base_path}driver_race_data.csv')
+        if cache:
+            driver_data = cache.load_csv(f"{base_path}driver_race_data.csv")
+        else:
+            driver_data = pd.read_csv(f"{base_path}driver_race_data.csv")
         race_columns = [col for col in driver_data.columns if col.startswith('Race')]
         return len(race_columns)
     except Exception as e:
@@ -105,7 +109,7 @@ def get_expected_race_pace(session_key):
     return result_df
 
 
-def get_user_configuration():
+def get_user_configuration(cache: DataCache | None = None):
     """Get configuration from user input"""
     print("F1 Fantasy Optimizer Configuration")
     print("="*80)
@@ -120,7 +124,7 @@ def get_user_configuration():
     if not config["base_path"].endswith("/"):
         config["base_path"] += "/"
 
-    races_completed = get_races_completed(config["base_path"])
+    races_completed = get_races_completed(config["base_path"], cache)
     if races_completed is None:
         print("Error: Could not read driver data file.")
         sys.exit(1)
@@ -128,7 +132,11 @@ def get_user_configuration():
     print(f"\nDetected {races_completed} races completed.")
 
     # Add meeting_key and year from calendar.csv
-    calendar = pd.read_csv(os.path.join(config["base_path"], "calendar.csv"), skipinitialspace=True)
+    calendar_path = os.path.join(config["base_path"], "calendar.csv")
+    if cache:
+        calendar = cache.load_csv(calendar_path, skipinitialspace=True)
+    else:
+        calendar = pd.read_csv(calendar_path, skipinitialspace=True)
     next_race = f"Race{races_completed + 1}"
     row = calendar[calendar["Race"] == next_race]
     if row.empty:
@@ -298,9 +306,10 @@ def get_user_configuration():
 class F1VFMCalculator:
     """Calculate Value For Money (VFM) scores with outlier removal and FP2 pace integration"""
 
-    def __init__(self, config):
+    def __init__(self, config, cache: DataCache | None = None):
         self.config = config
         self.base_path = config["base_path"]
+        self.cache = cache or DataCache()
         self.scheme = config["weighting_scheme"]
         self.use_fp2_pace = config.get("use_fp2_pace", False)
         self.pace_weight = config.get("pace_weight", 0.25)
@@ -339,7 +348,7 @@ class F1VFMCalculator:
 
     def _calculate_base_vfm(self, race_data_file, entity_type, weights):
         """Calculate base VFM scores with outlier removal"""
-        race_df = pd.read_csv(race_data_file, skipinitialspace=True)
+        race_df = self.cache.load_csv(race_data_file, skipinitialspace=True)
         race_df.columns = [col.strip() for col in race_df.columns]
 
         if "Cost" not in race_df.columns:
@@ -445,12 +454,12 @@ class F1VFMCalculator:
         mapping_file = os.path.join(self.base_path, "driver_mapping.csv")
         if os.path.exists(mapping_file):
             try:
-                return pd.read_csv(mapping_file)
+                return self.cache.load_csv(mapping_file)
             except Exception as e:
                 print(f"Error loading driver mapping: {e}")
 
         try:
-            _ = pd.read_csv(os.path.join(self.base_path, "driver_race_data.csv"))
+            _ = self.cache.load_csv(os.path.join(self.base_path, "driver_race_data.csv"))
             print("No driver mapping file found. Create 'driver_mapping.csv' with columns: driver_number, driver_name, team_name")
             return None
         except:
@@ -605,18 +614,19 @@ class F1VFMCalculator:
 class F1TrackAffinityCalculator:
     """Calculate track affinity scores based on historical performance with enhanced algorithms"""
 
-    def __init__(self, config):
+    def __init__(self, config, cache: DataCache | None = None):
         self.config = config
         self.base_path = config["base_path"]
+        self.cache = cache or DataCache()
 
     def run(self):
         """Run track affinity calculations"""
         print("Calculating track affinities with enhanced algorithms...")
 
-        driver_points = pd.read_csv(f"{self.base_path}driver_race_data.csv")
-        constructor_points = pd.read_csv(f"{self.base_path}constructor_race_data.csv")
-        race_calendar = pd.read_csv(f"{self.base_path}calendar.csv")
-        track_characteristics = pd.read_csv(f"{self.base_path}tracks.csv")
+        driver_points = self.cache.load_csv(f"{self.base_path}driver_race_data.csv")
+        constructor_points = self.cache.load_csv(f"{self.base_path}constructor_race_data.csv")
+        race_calendar = self.cache.load_csv(f"{self.base_path}calendar.csv")
+        track_characteristics = self.cache.load_csv(f"{self.base_path}tracks.csv")
 
         race_columns = [col for col in driver_points.columns if col.startswith("Race")]
         constructor_race_columns = [col for col in constructor_points.columns if col.startswith("Race")]
@@ -973,9 +983,10 @@ class F1TrackAffinityCalculator:
 class F1TeamOptimizer:
     """Optimize F1 Fantasy team selections for upcoming races"""
 
-    def __init__(self, config):
+    def __init__(self, config, cache: DataCache | None = None):
         self.config = config
         self.base_path = config["base_path"]
+        self.cache = cache or DataCache()
         self.multiplier = config["multiplier"]
         self.risk_tolerance = config["risk_tolerance"]
         self.top_n = config.get("top_n_candidates", 10)
@@ -1017,11 +1028,11 @@ class F1TeamOptimizer:
     def load_data(self):
         """Load all required data files"""
         try:
-            self.drivers_df = pd.read_csv(f"{self.base_path}driver_vfm.csv")
-            self.constructors_df = pd.read_csv(f"{self.base_path}constructor_vfm.csv")
-            self.track_affinity_df = pd.read_csv(f"{self.base_path}driver_affinity.csv")
-            self.constructor_affinity_df = pd.read_csv(f"{self.base_path}constructor_affinity.csv")
-            self.race_calendar_df = pd.read_csv(f"{self.base_path}calendar.csv")
+            self.drivers_df = self.cache.load_csv(f"{self.base_path}driver_vfm.csv")
+            self.constructors_df = self.cache.load_csv(f"{self.base_path}constructor_vfm.csv")
+            self.track_affinity_df = self.cache.load_csv(f"{self.base_path}driver_affinity.csv")
+            self.constructor_affinity_df = self.cache.load_csv(f"{self.base_path}constructor_affinity.csv")
+            self.race_calendar_df = self.cache.load_csv(f"{self.base_path}calendar.csv")
 
             self.drivers_df["Cost_Value"] = (
                 self.drivers_df["Cost"].str.replace(r"[$M]", "", regex=True).astype(float)

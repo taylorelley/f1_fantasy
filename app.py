@@ -17,6 +17,7 @@ from f1_optimizer import (
     get_races_completed,
     get_expected_race_pace,
 )
+from data_cache import DataCache
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max
@@ -30,6 +31,7 @@ os.makedirs(app.config["RESULTS_FOLDER"], exist_ok=True)
 os.makedirs(app.config["DEFAULT_DATA_FOLDER"], exist_ok=True)
 
 sessions = {}
+data_cache = DataCache()
 
 
 def get_data_folder(session_id=None):
@@ -67,10 +69,10 @@ def load_default_data():
 
     try:
         base = app.config["DEFAULT_DATA_FOLDER"] + "/"
-        races_completed = get_races_completed(base)
+        races_completed = get_races_completed(base, data_cache)
 
-        driver_df = pd.read_csv(os.path.join(base, "driver_race_data.csv"))
-        constructor_df = pd.read_csv(os.path.join(base, "constructor_race_data.csv"))
+        driver_df = data_cache.load_csv(os.path.join(base, "driver_race_data.csv"))
+        constructor_df = data_cache.load_csv(os.path.join(base, "constructor_race_data.csv"))
 
         drivers_list = sorted(driver_df["Driver"].astype(str).unique().tolist())
         constructors_list = sorted(constructor_df["Constructor"].astype(str).unique().tolist())
@@ -149,10 +151,11 @@ def upload_files():
             )
 
         folder_with_slash = target_folder if target_folder.endswith("/") else target_folder + "/"
-        races_completed = get_races_completed(folder_with_slash)
+        data_cache.clear(folder_with_slash)
+        races_completed = get_races_completed(folder_with_slash, data_cache)
 
-        driver_df = pd.read_csv(os.path.join(folder_with_slash, "driver_race_data.csv"))
-        constructor_df = pd.read_csv(os.path.join(folder_with_slash, "constructor_race_data.csv"))
+        driver_df = data_cache.load_csv(os.path.join(folder_with_slash, "driver_race_data.csv"))
+        constructor_df = data_cache.load_csv(os.path.join(folder_with_slash, "constructor_race_data.csv"))
         drivers_list = sorted(driver_df["Driver"].astype(str).unique().tolist())
         constructors_list = sorted(constructor_df["Constructor"].astype(str).unique().tolist())
 
@@ -193,7 +196,8 @@ def upload_driver_mapping():
         dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "driver_mapping.csv")
         file.save(dest)
 
-        mapping_df = pd.read_csv(dest)
+        data_cache.clear(app.config["DEFAULT_DATA_FOLDER"])
+        mapping_df = data_cache.load_csv(dest)
         required_cols = ["driver_number", "driver_name", "team_name"]
         if not all(col in mapping_df.columns for col in required_cols):
             os.remove(dest)
@@ -297,7 +301,7 @@ def optimize():
         if config["use_fp2_pace"]:
             results["progress"].append(f"Fetching FP2 pace data for meeting_key {meeting_key}...")
         results["progress"].append("Calculating VFM scores...")
-        vfm_calc = F1VFMCalculator(config)
+        vfm_calc = F1VFMCalculator(config, data_cache)
         driver_vfm_df, constructor_vfm_df = vfm_calc.run()
         results["progress"].append("VFM calculation complete")
 
@@ -308,12 +312,12 @@ def optimize():
                 actual_fp2_applied = True
 
         results["progress"].append("Calculating track affinities...")
-        affinity_calc = F1TrackAffinityCalculator(config)
+        affinity_calc = F1TrackAffinityCalculator(config, data_cache)
         driver_aff_df, constructor_aff_df = affinity_calc.run()
         results["progress"].append("Track affinity calculation complete")
 
         results["progress"].append("Optimizing team selection...")
-        optimizer = F1TeamOptimizer(config)
+        optimizer = F1TeamOptimizer(config, data_cache)
         if not optimizer.load_data():
             return jsonify({"success": False, "message": "Error loading data for optimization"})
         best_dict, base_s1, base_s2 = optimizer.run_dual_step_optimization()
@@ -412,10 +416,10 @@ def get_statistics():
         if not data_folder:
             return jsonify({"success": False, "message": "No data; upload files first."})
 
-        driver_race_df = pd.read_csv(os.path.join(data_folder, "driver_race_data.csv"))
-        constructor_race_df = pd.read_csv(os.path.join(data_folder, "constructor_race_data.csv"))
-        calendar_df = pd.read_csv(os.path.join(data_folder, "calendar.csv"))
-        tracks_df = pd.read_csv(os.path.join(data_folder, "tracks.csv"))
+        driver_race_df = data_cache.load_csv(os.path.join(data_folder, "driver_race_data.csv"))
+        constructor_race_df = data_cache.load_csv(os.path.join(data_folder, "constructor_race_data.csv"))
+        calendar_df = data_cache.load_csv(os.path.join(data_folder, "calendar.csv"))
+        tracks_df = data_cache.load_csv(os.path.join(data_folder, "tracks.csv"))
 
         driver_aff_path = os.path.join(data_folder, "driver_affinity.csv")
         constructor_aff_path = os.path.join(data_folder, "constructor_affinity.csv")
@@ -425,21 +429,21 @@ def get_statistics():
         if not all(os.path.exists(p) for p in [driver_aff_path, constructor_aff_path, driver_char_aff, constructor_char_aff]):
             cfg = {
                 "base_path":         data_folder,
-                "races_completed":   get_races_completed(data_folder),
+                "races_completed":   get_races_completed(data_folder, data_cache),
                 "weighting_scheme":  "trend_based",
                 "use_fp2_pace":      False,
             }
-            vfm_calc = F1VFMCalculator(cfg)
+            vfm_calc = F1VFMCalculator(cfg, data_cache)
             vfm_calc.run()
-            aff_calc = F1TrackAffinityCalculator(cfg)
+            aff_calc = F1TrackAffinityCalculator(cfg, data_cache)
             aff_calc.run()
 
-        driver_vfm_df = pd.read_csv(os.path.join(data_folder, "driver_vfm.csv"))
-        constructor_vfm_df = pd.read_csv(os.path.join(data_folder, "constructor_vfm.csv"))
-        driver_aff_df = pd.read_csv(driver_aff_path)
-        constructor_aff_df = pd.read_csv(constructor_aff_path)
-        driver_char_df = pd.read_csv(driver_char_aff, index_col=0)
-        constructor_char_df = pd.read_csv(constructor_char_aff, index_col=0)
+        driver_vfm_df = data_cache.load_csv(os.path.join(data_folder, "driver_vfm.csv"))
+        constructor_vfm_df = data_cache.load_csv(os.path.join(data_folder, "constructor_vfm.csv"))
+        driver_aff_df = data_cache.load_csv(driver_aff_path)
+        constructor_aff_df = data_cache.load_csv(constructor_aff_path)
+        driver_char_df = data_cache.load_csv(driver_char_aff, index_col=0)
+        constructor_char_df = data_cache.load_csv(constructor_char_aff, index_col=0)
 
         driver_stats = process_driver_statistics(
             driver_race_df, driver_vfm_df, driver_aff_df, driver_char_df, calendar_df, tracks_df
