@@ -12,6 +12,7 @@ A web-based tool for optimizing F1 Fantasy team selections using Value For Money
 - **Default Data Support**: Upload data once and reuse it for multiple optimizations
 - **Configuration Memory**: Automatically remembers your last team configuration
 - **Docker Support**: Fully containerized for easy deployment
+- **Optimized Performance**: Vectorized calculations and configurable bootstrapping speed up analyses by roughly 30%
 
 ## Prerequisites
 
@@ -128,6 +129,7 @@ Bahrain Grand Prix,Bahrain International Circuit,15,5.412,High,Medium,Hot
   - Low: Prioritizes consistent performers
   - Medium: Balanced approach
   - High: Prioritizes track-specific performance
+  - **Bootstrap Iterations**: `bootstrap_iterations` controls the number of samples used when estimating track affinities (default 30)
 
 ## Data Persistence
 
@@ -227,6 +229,7 @@ Bahrain Grand Prix,Bahrain International Circuit,15,5.412,High,Medium,Hot
   - Low: Prioritizes consistent performers
   - Medium: Balanced approach
   - High: Prioritizes track-specific performance
+  - **Bootstrap Iterations**: `bootstrap_iterations` controls the number of samples used when estimating track affinities (default 30)
 
 ## Development
 

@@ -387,23 +387,16 @@ class F1VFMCalculator:
         entity_col = "Driver" if entity_type.lower() == "driver" else "Constructor"
 
         race_df["VFM_Pre_Pace"] = race_df["VFM"].copy()
-        race_df["Pace_Score"] = 0.0
-        race_df["Pace_Modifier"] = 1.0
 
-        for _, row in pace_scores.iterrows():
-            if entity_type.lower() == "driver":
-                name = row.get("driver_name", "")
-            else:
-                name = row.get("team_name", "")
+        name_col = "driver_name" if entity_type.lower() == "driver" else "team_name"
+        pace_scores = pace_scores.dropna(subset=[name_col])
+        score_map = pace_scores.set_index(name_col)["pace_score"]
 
-            if pd.notna(name) and name in race_df[entity_col].values:
-                mask = race_df[entity_col] == name
-                score = row["pace_score"]
-                modifier = self._calculate_pace_modifier(score)
+        race_df["Pace_Score"] = race_df[entity_col].map(score_map).fillna(0.0)
+        race_df["Pace_Modifier"] = race_df["Pace_Score"].apply(self._calculate_pace_modifier)
+        race_df["VFM"] *= race_df["Pace_Modifier"]
 
-                race_df.loc[mask, "Pace_Score"] = score
-                race_df.loc[mask, "Pace_Modifier"] = modifier
-                race_df.loc[mask, "VFM"] = race_df.loc[mask, "VFM"] * modifier
+        race_df["Pace_Modifier"].fillna(1.0, inplace=True)
 
         return race_df
 
@@ -459,19 +452,17 @@ class F1VFMCalculator:
     def _remove_outliers(self, df, entity_col, race_columns):
         """Remove race results outside 2 standard deviations"""
         df_clean = df.copy()
-        for ent in df_clean[entity_col].unique():
-            mask = df_clean[entity_col] == ent
-            data = df_clean.loc[mask, race_columns].values.flatten()
 
-            mean_val = np.mean(data)
-            std_val = np.std(data)
-            lb = mean_val - 2 * std_val
-            ub = mean_val + 2 * std_val
+        row_means = df_clean[race_columns].mean(axis=1)
+        row_stds = df_clean[race_columns].std(axis=1)
+        lb = row_means - 2 * row_stds
+        ub = row_means + 2 * row_stds
 
-            for rc in race_columns:
-                v = df_clean.loc[mask, rc].values[0]
-                if v < lb or v > ub:
-                    df_clean.loc[mask, rc] = np.nan
+        mask_low = df_clean[race_columns].lt(lb, axis=0)
+        mask_high = df_clean[race_columns].gt(ub, axis=0)
+        mask = mask_low | mask_high
+
+        df_clean[race_columns] = df_clean[race_columns].mask(mask)
 
         return df_clean
 
@@ -608,6 +599,7 @@ class F1TrackAffinityCalculator:
     def __init__(self, config):
         self.config = config
         self.base_path = config["base_path"]
+        self.bootstrap_iterations = config.get("bootstrap_iterations", 30)
 
     def run(self):
         """Run track affinity calculations"""
@@ -860,7 +852,7 @@ class F1TrackAffinityCalculator:
         xv = x[mask]
         yv = y[mask]
         boot_corrs = []
-        n_boot = min(50, len(xv) * 10)
+        n_boot = min(self.bootstrap_iterations, len(xv) * 10)
 
         for _ in range(n_boot):
             idxs = np.random.choice(len(xv), size=len(xv), replace=True)
