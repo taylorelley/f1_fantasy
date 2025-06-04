@@ -489,6 +489,18 @@
           <label for="multiplier">Multiplier</label>
           <input type="number" id="multiplier" value="2" min="2" max="3">
         </div>
+
+        <div class="form-group">
+          <label for="top-n">Candidate Pool Size</label>
+          <input type="number" id="top-n" value="10" min="1">
+        </div>
+
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" id="use-ilp">
+            Use ILP-based optimisation (experimental)
+          </label>
+        </div>
       </div>
 
       <!-- FP2 Race Pace Configuration -->
@@ -756,6 +768,8 @@
         use_fp2_pace:          document.getElementById('use-fp2-pace')?.checked,
         pace_weight:           document.getElementById('pace-weight')?.value,
         pace_modifier_type:    document.getElementById('pace-modifier-type')?.value
+        ,top_n_candidates:     document.getElementById('top-n')?.value
+        ,use_ilp:              document.getElementById('use-ilp')?.checked
       };
       setCookie('f1_optimizer_config', config);
     }
@@ -784,6 +798,8 @@
       if (config.weighting_scheme)  document.getElementById('weighting-scheme').value  = config.weighting_scheme;
       if (config.risk_tolerance)    document.getElementById('risk-tolerance').value    = config.risk_tolerance;
       if (config.multiplier)        document.getElementById('multiplier').value        = config.multiplier;
+      if (config.top_n_candidates) document.getElementById('top-n').value = config.top_n_candidates;
+      if (config.use_ilp !== undefined) document.getElementById('use-ilp').checked = config.use_ilp;
 
       if (config.use_fp2_pace !== undefined) {
         const fp2Checkbox = document.getElementById('use-fp2-pace');
@@ -927,6 +943,8 @@
         weighting_scheme:    document.getElementById('weighting-scheme')?.value,
         risk_tolerance:      document.getElementById('risk-tolerance')?.value,
         multiplier:          document.getElementById('multiplier')?.value,
+        top_n_candidates:   document.getElementById('top-n')?.value,
+        use_ilp:            document.getElementById('use-ilp')?.checked,
         use_fp2_pace:        useFP2,
         pace_weight:         useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
         pace_modifier_type:  useFP2 ? document.getElementById('pace-modifier-type')?.value : null
