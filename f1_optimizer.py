@@ -445,8 +445,8 @@ class F1VFMCalculator:
             mask = df_clean[entity_col] == ent
             data = df_clean.loc[mask, race_columns].values.flatten()
 
-            mean_val = np.mean(data)
-            std_val = np.std(data)
+            mean_val = np.nanmean(data)
+            std_val = np.nanstd(data)
             lb = mean_val - 2 * std_val
             ub = mean_val + 2 * std_val
 
