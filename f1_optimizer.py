@@ -1109,6 +1109,12 @@ class F1TeamOptimizer:
                         self.constructors_df.loc[idx2, f"Step {step}_Affinity"] = affinity2
                         self.constructors_df.loc[idx2, f"Step {step}_VFM"] = adj_vfm2
 
+        # Precalculate each driver's VFM when boosted by the multiplier
+        for step in (1, 2):
+            self.drivers_df[f"Step {step}_VFM_Boost"] = (
+                self.drivers_df[f"Step {step}_VFM"] * self.multiplier
+            )
+
     def _get_team_data(self, drivers, constructors, step):
         """Get team data with step-specific VFM"""
         d_df = self.drivers_df[self.drivers_df["Driver"].isin(drivers)].copy()
@@ -1135,7 +1141,7 @@ class F1TeamOptimizer:
     def evaluate_team(self, drivers, constructors, step):
         """Evaluate team performance"""
         cache = self.step1_cache if step == 1 else self.step2_cache
-        key = "|".join(sorted(drivers)) + "#" + "|".join(sorted(constructors))
+        key = (tuple(sorted(drivers)), tuple(sorted(constructors)))
         if key in cache:
             self.performance_stats["cache_hits"] += 1
             return cache[key]
@@ -1148,21 +1154,16 @@ class F1TeamOptimizer:
 
         base_vfm = d_df["VFM"].sum() + c_df["VFM"].sum()
         count = len(drivers) + len(constructors)
-        best_ppm = -1
-        best_pts = -1
-        best_driver = None
 
-        for _, row in d_df.iterrows():
-            boosted = base_vfm + (self.multiplier - 1) * row["VFM"]
-            ppm = boosted / count
-            total_pts = ppm * cost
-            if total_pts > best_pts:
-                best_pts = total_pts
-                best_ppm = ppm
-                best_driver = row["Driver"]
+        boosted_totals = base_vfm - d_df["VFM"] + d_df[f"Step {step}_VFM_Boost"]
+        best_idx = boosted_totals.idxmax()
+        best_total = boosted_totals.max()
+        ppm = best_total / count
+        pts = ppm * cost
+        best_driver = d_df.loc[best_idx, "Driver"]
 
-        cache[key] = (best_pts, best_ppm, cost, best_driver)
-        return best_pts, best_ppm, cost, best_driver
+        cache[key] = (pts, ppm, cost, best_driver)
+        return pts, ppm, cost, best_driver
 
     def generate_swap_patterns(self, current_drivers, current_constructors, max_swaps, step):
         """Generate all valid swap patterns limited by top-N candidates"""
