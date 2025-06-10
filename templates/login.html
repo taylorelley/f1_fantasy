@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <h1>Sign In</h1>
+      <nav class="nav-links">
+        <a href="/login" class="active">Login</a>
+      </nav>
+    </div>
+  </header>
+  <div class="container">
+    <div class="section">
+      <h2>Choose a provider</h2>
+      <div class="button-group">
+        <a class="button" href="{{ url_for('login_provider', provider='google') }}">Google</a>
+        <a class="button" href="{{ url_for('login_provider', provider='facebook') }}">Facebook</a>
+        <a class="button" href="{{ url_for('login_provider', provider='github') }}">GitHub</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
