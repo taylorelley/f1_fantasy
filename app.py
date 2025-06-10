@@ -6,8 +6,17 @@ import traceback
 import pandas as pd
 import numpy as np
 import re
+import io
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import (
+    Flask,
+    render_template,
+    request,
+    jsonify,
+    send_file,
+    redirect,
+    url_for,
+)
 from werkzeug.utils import secure_filename
 
 from f1_optimizer import (
@@ -115,12 +124,11 @@ def upload_files():
             target_folder = os.path.join(app.config["UPLOAD_FOLDER"], session_id)
             os.makedirs(target_folder, exist_ok=True)
 
-        required_files = [
-            "driver_race_data.csv",
-            "constructor_race_data.csv",
-            "calendar.csv",
-            "tracks.csv",
-        ]
+        required_files = ["calendar.csv", "tracks.csv"]
+        if not os.path.exists(os.path.join(target_folder, "driver_race_data.csv")):
+            required_files.append("driver_race_data.csv")
+        if not os.path.exists(os.path.join(target_folder, "constructor_race_data.csv")):
+            required_files.append("constructor_race_data.csv")
 
         uploaded_files = []
         for field_name, file in request.files.items():
@@ -403,6 +411,58 @@ def optimize():
 @app.route("/statistics")
 def statistics():
     return render_template("statistics.html")
+
+
+@app.route("/manage_data")
+def manage_data_page():
+    base = app.config["DEFAULT_DATA_FOLDER"]
+    driver_path = os.path.join(base, "driver_race_data.csv")
+    constructor_path = os.path.join(base, "constructor_race_data.csv")
+
+    driver_csv = ""
+    constructor_csv = ""
+    if os.path.exists(driver_path):
+        with open(driver_path, "r") as f:
+            driver_csv = f.read()
+    if os.path.exists(constructor_path):
+        with open(constructor_path, "r") as f:
+            constructor_csv = f.read()
+
+    message = request.args.get("message")
+    return render_template(
+        "manage_data.html",
+        driver_csv=driver_csv,
+        constructor_csv=constructor_csv,
+        message=message,
+    )
+
+
+@app.route("/save_driver_data", methods=["POST"])
+def save_driver_data():
+    csv_text = request.form.get("driver_data", "")
+    dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "driver_race_data.csv")
+    try:
+        pd.read_csv(io.StringIO(csv_text))
+        with open(dest, "w") as f:
+            f.write(csv_text)
+        msg = "Driver data saved successfully."
+    except Exception as e:
+        msg = f"Failed to save driver data: {e}"
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_constructor_data", methods=["POST"])
+def save_constructor_data():
+    csv_text = request.form.get("constructor_data", "")
+    dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "constructor_race_data.csv")
+    try:
+        pd.read_csv(io.StringIO(csv_text))
+        with open(dest, "w") as f:
+            f.write(csv_text)
+        msg = "Constructor data saved successfully."
+    except Exception as e:
+        msg = f"Failed to save constructor data: {e}"
+    return redirect(url_for("manage_data_page", message=msg))
 
 
 @app.route("/api/statistics")
