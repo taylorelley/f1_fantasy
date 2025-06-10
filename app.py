@@ -70,6 +70,37 @@ def has_driver_mapping():
     return os.path.exists(mapping_path)
 
 
+def load_settings():
+    """Load optimisation parameter settings from settings.json"""
+    settings_path = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "settings.json")
+    defaults = {
+        "outlier_stddev_factor": 2.0,
+        "trend_slope_threshold": 1.7,
+        "recent_races_fraction": 0.4,
+        "long_term_weight": 0.7,
+        "interaction_weight": 0.5,
+    }
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r") as f:
+                data = json.load(f)
+            defaults.update({k: float(v) for k, v in data.items()})
+        except Exception:
+            pass
+    return defaults
+
+
+def save_settings(data):
+    """Save optimisation parameter settings to settings.json"""
+    settings_path = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "settings.json")
+    try:
+        with open(settings_path, "w") as f:
+            json.dump(data, f, indent=2)
+        return True
+    except Exception:
+        return False
+
+
 def load_default_data():
     if not has_default_data():
         return None
@@ -300,6 +331,10 @@ def optimize():
             "next_race_year":       race_year,
         }
 
+        # Load tuning parameters from settings.json
+        settings = load_settings()
+        config.update(settings)
+
         results = {"status": "running", "progress": []}
 
         if config["use_fp2_pace"]:
@@ -443,6 +478,8 @@ def manage_data_page():
         with open(mapping_path, "r") as f:
             mapping_csv = f.read()
 
+    settings = load_settings()
+
     message = request.args.get("message")
     return render_template(
         "manage_data.html",
@@ -452,6 +489,7 @@ def manage_data_page():
         tracks_csv=tracks_csv,
         mapping_csv=mapping_csv,
         message=message,
+        settings=settings,
     )
 
 
@@ -530,6 +568,20 @@ def save_mapping_data():
         msg = "Driver mapping saved successfully."
     except Exception as e:
         msg = f"Failed to save driver mapping: {e}"
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_settings", methods=["POST"])
+def save_settings_route():
+    data = {
+        "outlier_stddev_factor": request.form.get("outlier_stddev_factor", type=float),
+        "trend_slope_threshold": request.form.get("trend_slope_threshold", type=float),
+        "recent_races_fraction": request.form.get("recent_races_fraction", type=float),
+        "long_term_weight": request.form.get("long_term_weight", type=float),
+        "interaction_weight": request.form.get("interaction_weight", type=float),
+    }
+    success = save_settings(data)
+    msg = "Settings saved." if success else "Failed to save settings."
     return redirect(url_for("manage_data_page", message=msg))
 
 
