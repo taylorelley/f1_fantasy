@@ -18,6 +18,7 @@ from flask import (
     url_for,
 )
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
@@ -91,6 +92,8 @@ class User(db.Model, UserMixin):
     provider = db.Column(db.String(50), nullable=False)
     name = db.Column(db.String(256))
     email = db.Column(db.String(256))
+    username = db.Column(db.String(256), unique=True)
+    password_hash = db.Column(db.String(256))
     admin = db.Column(db.Boolean, default=False)
 
 @login_manager.user_loader
@@ -190,11 +193,45 @@ def load_default_data():
         return None
 
 
-@app.route("/login")
+@app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        if username and password:
+            user = User.query.filter_by(provider="local", username=username).first()
+            if user and check_password_hash(user.password_hash or "", password):
+                login_user(user)
+                return redirect(url_for("index"))
+            return render_template("login.html", message="Invalid credentials")
     return render_template("login.html")
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        if not username or not password:
+            return render_template("register.html", message="All fields required")
+        if User.query.filter_by(username=username).first():
+            return render_template("register.html", message="Username taken")
+        user = User(
+            provider="local",
+            provider_id=username,
+            username=username,
+            name=username,
+        )
+        user.password_hash = generate_password_hash(password)
+        db.session.add(user)
+        db.session.commit()
+        login_user(user)
+        return redirect(url_for("index"))
+    return render_template("register.html")
 
 
 @app.route("/login/<provider>")

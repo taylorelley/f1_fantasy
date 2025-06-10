@@ -21,7 +21,21 @@
       <div class="col-md-6 col-lg-4">
         <div class="card shadow-sm">
           <div class="card-body">
-            <h1 class="h4 mb-4 text-center">Sign In</h1>
+            <h1 class="h4 mb-3 text-center">Sign In</h1>
+            {% if message %}
+              <div class="alert alert-danger" role="alert">{{ message }}</div>
+            {% endif %}
+            <form method="post" action="/login" class="mb-3">
+              <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" name="username" required>
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+              </div>
+              <button type="submit" class="btn btn-primary w-100">Login</button>
+            </form>
             <a class="btn btn-outline-danger w-100 mb-2 d-flex align-items-center justify-content-center" href="{{ url_for('login_provider', provider='google') }}">
               <img src="{{ url_for('static', filename='icons/google.svg') }}" alt="Google" class="me-2" width="20" height="20">
               Sign in with Google
@@ -34,6 +48,9 @@
               <img src="{{ url_for('static', filename='icons/github.svg') }}" alt="GitHub" class="me-2" width="20" height="20">
               Sign in with GitHub
             </a>
+            <div class="mt-2 text-center">
+              <small>Don't have an account? <a href="/register">Register</a></small>
+            </div>
           </div>
         </div>
       </div>

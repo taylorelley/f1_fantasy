@@ -333,7 +333,8 @@ Only users whose email appears in `ADMIN_EMAILS` will see the Administration pag
 ## Security Notes
 
 - This is designed for local/private use
-- Authentication via Google, Facebook and GitHub SSO is now supported
+- Authentication via Google, Facebook and GitHub SSO is now supported. A local
+  username/password option is also available
 - Uploaded files are stored locally
 
 ## License
