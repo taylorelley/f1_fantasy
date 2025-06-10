@@ -156,11 +156,12 @@ flowchart TD
 ## Quick Start
 
 1. Clone the repository.
-2. Build and start the containers:
+2. Copy `.env.example` to `.env` and fill in your OAuth credentials.
+3. Build and start the containers:
 ```bash
 docker-compose up --build
 ```
-3. Open `http://localhost:5000` in your browser.
+4. Open `http://localhost:5000` in your browser.
 
 ## Using the Application
 
@@ -310,6 +311,9 @@ f1-optimizer/
 - `GITHUB_CLIENT_ID`: Github OAuth client ID
 - `GITHUB_CLIENT_SECRET`: Github OAuth client secret
 - `ADMIN_EMAILS`: Comma separated list of administrator emails
+
+Create a `.env` file (or copy `.env.example`) with the variables above set to
+your provider credentials. Docker Compose will automatically load this file.
 
 ## Authentication
 
