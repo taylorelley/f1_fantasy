@@ -37,14 +37,6 @@
 
       <div class="file-upload">
         <div class="form-group">
-          <label for="driver-data">Driver Race Data</label>
-          <input type="file" id="driver-data" accept=".csv">
-        </div>
-        <div class="form-group">
-          <label for="constructor-data">Constructor Race Data</label>
-          <input type="file" id="constructor-data" accept=".csv">
-        </div>
-        <div class="form-group">
           <label for="calendar-data">Race Calendar</label>
           <input type="file" id="calendar-data" accept=".csv">
         </div>
@@ -78,6 +70,7 @@
                 style="display: none;">
           Use Default Data
         </button>
+        <a class="button button-secondary" href="/manage_data">Manage Data</a>
       </div>
 
       <div id="mapping-status"></div>
@@ -255,6 +248,10 @@
     async function checkDefaultData() {
       try {
         const response = await fetch('/check_default_data');
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Status ${response.status}: ${text}`);
+        }
         const data = await response.json();
 
         if (data.has_default) {
@@ -325,7 +322,13 @@
 
     async function useDefaultData() {
       fetch('/check_default_data')
-        .then(response => response.json())
+        .then(async response => {
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Status ${response.status}: ${text}`);
+          }
+          return response.json();
+        })
         .then(data => {
           if (!data.has_default) return;
 
@@ -480,10 +483,8 @@
 
     async function uploadFiles() {
       const files = {
-        'driver_race_data.csv':      document.getElementById('driver-data')?.files[0],
-        'constructor_race_data.csv': document.getElementById('constructor-data')?.files[0],
-        'calendar.csv':              document.getElementById('calendar-data')?.files[0],
-        'tracks.csv':                document.getElementById('tracks-data')?.files[0]
+        'calendar.csv': document.getElementById('calendar-data')?.files[0],
+        'tracks.csv':   document.getElementById('tracks-data')?.files[0]
       };
 
       let allFilesSelected = true;
@@ -494,7 +495,7 @@
         }
       }
       if (!allFilesSelected) {
-        alert('Please select all 4 required CSV files');
+        alert('Please select both required CSV files');
         return;
       }
 

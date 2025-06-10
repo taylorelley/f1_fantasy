@@ -84,15 +84,24 @@
       font-weight: 500;
     }
 
-    input[type="file"],
-    input[type="number"],
-    select {
+input[type="file"],
+input[type="number"],
+select {
       width: 100%;
       padding: 10px;
       border: 1px solid #ddd;
       border-radius: 4px;
       font-size: 16px;
-    }
+}
+
+textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 14px;
+}
 
     .file-upload {
       display: grid;
@@ -189,6 +198,30 @@
       justify-content: space-between;
       align-items: center;
     }
+
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+table.data-table th,
+table.data-table td {
+  border: 1px solid #ddd;
+  padding: 6px;
+}
+
+table.data-table th {
+  background: #f8f8f8;
+  text-align: left;
+}
+
+table.data-table input[type="text"] {
+  width: 100%;
+  border: none;
+  font-size: 14px;
+  background: transparent;
+}
 
     .improvement {
       color: #28a745;
