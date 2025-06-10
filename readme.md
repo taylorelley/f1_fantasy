@@ -303,6 +303,20 @@ f1-optimizer/
 
 - `FLASK_SECRET_KEY`: Secret key for Flask sessions (default: auto-generated)
 - `FLASK_ENV`: Flask environment (production/development)
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret
+- `FACEBOOK_CLIENT_ID`: Facebook OAuth client ID
+- `FACEBOOK_CLIENT_SECRET`: Facebook OAuth client secret
+- `GITHUB_CLIENT_ID`: Github OAuth client ID
+- `GITHUB_CLIENT_SECRET`: Github OAuth client secret
+- `ADMIN_EMAILS`: Comma separated list of administrator emails
+
+## Authentication
+
+Register OAuth credentials with each provider and set the environment variables above.
+Use the following callback URL for all providers: `https://<your-domain>/authorize/<provider>`.
+Replace `<provider>` with `google`, `facebook`, or `github`.
+Only users whose email appears in `ADMIN_EMAILS` will see the Administration page.
 
 ## Troubleshooting
 
@@ -315,9 +329,8 @@ f1-optimizer/
 ## Security Notes
 
 - This is designed for local/private use
-- No authentication is implemented
+- Authentication via Google, Facebook and GitHub SSO is now supported
 - Uploaded files are stored locally
-- Consider adding authentication for public deployment
 
 ## License
 
