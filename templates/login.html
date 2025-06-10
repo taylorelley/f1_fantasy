@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login</title>
+  <link href="{{ url_for('static', filename='bootstrap.min.css') }}" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -15,13 +16,26 @@
       </nav>
     </div>
   </header>
-  <div class="container">
-    <div class="section">
-      <h2>Choose a provider</h2>
-      <div class="button-group">
-        <a class="button" href="{{ url_for('login_provider', provider='google') }}">Google</a>
-        <a class="button" href="{{ url_for('login_provider', provider='facebook') }}">Facebook</a>
-        <a class="button" href="{{ url_for('login_provider', provider='github') }}">GitHub</a>
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h1 class="h4 mb-4 text-center">Sign In</h1>
+            <a class="btn btn-outline-danger w-100 mb-2 d-flex align-items-center justify-content-center" href="{{ url_for('login_provider', provider='google') }}">
+              <img src="{{ url_for('static', filename='icons/google.svg') }}" alt="Google" class="me-2" width="20" height="20">
+              Sign in with Google
+            </a>
+            <a class="btn btn-outline-primary w-100 mb-2 d-flex align-items-center justify-content-center" href="{{ url_for('login_provider', provider='facebook') }}">
+              <img src="{{ url_for('static', filename='icons/facebook.svg') }}" alt="Facebook" class="me-2" width="20" height="20">
+              Sign in with Facebook
+            </a>
+            <a class="btn btn-outline-dark w-100 d-flex align-items-center justify-content-center" href="{{ url_for('login_provider', provider='github') }}">
+              <img src="{{ url_for('static', filename='icons/github.svg') }}" alt="GitHub" class="me-2" width="20" height="20">
+              Sign in with GitHub
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
