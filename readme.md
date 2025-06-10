@@ -59,6 +59,83 @@ and the search can optionally use an integer linear programming solver for exact
 optimisation. Results for both steps are compared to the baseline team to report
 the expected improvement.
 
+### Optimisation Architecture
+
+```mermaid
+flowchart TD
+    %% ----- User Interaction ----- %%
+    subgraph "User Interface"
+        UI["index.html form"]
+        STATS["statistics.html"]
+        APP["app.py /optimize"]
+        UI --> APP
+    end
+
+    %% ----- Persistent & Uploaded Data ----- %%
+    subgraph "Default & Uploaded Data"
+        D1["driver_race_data.csv"]
+        D2["constructor_race_data.csv"]
+        C1["calendar.csv"]
+        T1["tracks.csv"]
+        M["driver_mapping.csv"]
+        S["settings.json"]
+    end
+
+    APP --> LOAD["Load config & files"]
+    LOAD --> D1
+    LOAD --> D2
+    LOAD --> C1
+    LOAD --> T1
+    LOAD --> M
+    LOAD --> S
+
+    %% ----- Stage 1: VFM Calculation ----- %%
+    subgraph "Stage 1: VFM Calculation"
+        CLEAN["Outlier filter"]
+        WEIGH["Weight points"]
+        FP2["Apply FP2 pace"]
+        VFMOUT["driver_vfm.csv\nconstructor_vfm.csv"]
+        CLEAN --> WEIGH --> FP2 --> VFMOUT
+        FP2 -- fetch --> API[("OpenF1 API")]
+        API -- pace --> FP2
+    end
+    APP --> CLEAN
+
+    %% ----- Stage 2: Track Affinity ----- %%
+    subgraph "Stage 2: Track Affinity"
+        OUT["Remove outliers"]
+        ENCODE["Encode track features"]
+        CORR["Blend correlations"]
+        INTER["Interaction effects"]
+        AFFOUT["driver_affinity.csv\nconstructor_affinity.csv"]
+        OUT --> ENCODE --> CORR --> INTER --> AFFOUT
+    end
+    APP --> OUT
+    OUT --> D1
+    OUT --> D2
+    OUT --> C1
+    OUT --> T1
+
+    %% ----- Stage 3: Team Optimizer ----- %%
+    subgraph "Stage 3: Team Optimizer"
+        PREP["Apply affinities & VFM"]
+        CANDS["Generate candidates"]
+        STEP1["Optimise Step 1"]
+        STEP2["Optimise Step 2"]
+        RESULT["optimization_*.json"]
+        PREP --> CANDS --> STEP1 --> STEP2 --> RESULT
+    end
+    APP --> PREP
+    PREP --> VFMOUT
+    PREP --> AFFOUT
+    PREP --> C1
+    PREP --> S
+
+    RESULT --> APP
+    APP --> UI
+    APP --> STATS
+```
+
 ## Prerequisites
 
 - Docker and Docker Compose installed
@@ -250,80 +327,6 @@ f1-optimizer/
 - **Port already in use**: Change the port in docker-compose.yml and app.py
 - **File upload errors**: Ensure CSV files are properly formatted
 - **Default data not loading**: Check that files exist in `default_data/` directory
-- **Optimization errors**: Check that driver/constructor names match exactly between files
-- **Memory issues**: For large datasets, increase Docker memory allocation
-
-## Security Notes
-
-- This is designed for local/private use
-- No authentication is implemented
-- Uploaded files are stored locally
-- Consider adding authentication for public deployment
-
-## License
-
-This project is provided as-is for educational and personal use.1,Race2,Race3,...
-Max VERSTAPPEN,Red Bull,$30.5M,44,48,43,...
-```
-
-### constructor_race_data.csv
-```csv
-Constructor,Cost,Race1,Race2,Race3,...
-Red Bull,$25.4M,73,78,73,...
-```
-
-### calendar.csv
-```csv
-Race,Grand Prix,Circuit
-Race1,Bahrain Grand Prix,Bahrain International Circuit
-Race2,Saudi Arabian Grand Prix,Jeddah Corniche Circuit
-```
-
-### tracks.csv
-```csv
-Grand Prix,Circuit,Corners,Length (km),Overtaking Opportunities,Track Speed,Expected Temperatures
-Bahrain Grand Prix,Bahrain International Circuit,15,5.412,High,Medium,Hot
-```
-
-## Configuration Options
-
-- **Weighting Scheme**: How to weight historical performance
-  - Trend-based: Adaptive weights based on performance trends
-  - Equal: All races weighted equally
-  - Linear/Exponential decay: Recent races weighted more
-
-- **Risk Tolerance**:
-  - Low: Prioritizes consistent performers
-  - Medium: Balanced approach
-  - High: Prioritizes track-specific performance
-
-## Development
-
-### Running without Docker
-
-1. Install Python 3.9+
-2. Install dependencies: `pip install -r requirements.txt`
-3. Run the app: `python app.py`
-
-### File Structure
-```
-f1-optimizer/
-├── app.py                 # Flask web application
-├── f1_optimizer.py        # Core optimization logic
-├── templates/
-│   └── index.html        # Web interface
-├── uploads/              # Uploaded CSV files (created automatically)
-├── results/              # Optimization results (created automatically)
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-└── README.md
-```
-
-## Troubleshooting
-
-- **Port already in use**: Change the port in docker-compose.yml and app.py
-- **File upload errors**: Ensure CSV files are properly formatted
 - **Optimization errors**: Check that driver/constructor names match exactly between files
 - **Memory issues**: For large datasets, increase Docker memory allocation
 
