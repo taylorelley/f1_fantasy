@@ -248,6 +248,10 @@
     async function checkDefaultData() {
       try {
         const response = await fetch('/check_default_data');
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Status ${response.status}: ${text}`);
+        }
         const data = await response.json();
 
         if (data.has_default) {
@@ -318,7 +322,13 @@
 
     async function useDefaultData() {
       fetch('/check_default_data')
-        .then(response => response.json())
+        .then(async response => {
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Status ${response.status}: ${text}`);
+          }
+          return response.json();
+        })
         .then(data => {
           if (!data.has_default) return;
 
