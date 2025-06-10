@@ -79,12 +79,20 @@ def load_settings():
         "recent_races_fraction": 0.4,
         "long_term_weight": 0.7,
         "interaction_weight": 0.5,
+        "top_n_candidates": 10,
+        "use_ilp": False,
     }
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r") as f:
                 data = json.load(f)
-            defaults.update({k: float(v) for k, v in data.items()})
+            for k, v in data.items():
+                if k == "use_ilp":
+                    defaults[k] = bool(v)
+                elif k == "top_n_candidates":
+                    defaults[k] = int(v)
+                else:
+                    defaults[k] = float(v)
         except Exception:
             pass
     return defaults
@@ -321,8 +329,6 @@ def optimize():
             "weighting_scheme":     data.get("weighting_scheme", "trend_based"),
             "risk_tolerance":       data.get("risk_tolerance", "medium"),
             "multiplier":           int(data.get("multiplier", 1)),
-            "top_n_candidates":     int(data.get("top_n_candidates", 10)),
-            "use_ilp":              bool(data.get("use_ilp", False)),
             "use_parallel":         False,
             "use_fp2_pace":         use_fp2,
             "pace_weight":          pace_weight,
@@ -579,6 +585,8 @@ def save_settings_route():
         "recent_races_fraction": request.form.get("recent_races_fraction", type=float),
         "long_term_weight": request.form.get("long_term_weight", type=float),
         "interaction_weight": request.form.get("interaction_weight", type=float),
+        "top_n_candidates": request.form.get("top_n_candidates", type=int),
+        "use_ilp": bool(request.form.get("use_ilp")),
     }
     success = save_settings(data)
     msg = "Settings saved." if success else "Failed to save settings."
