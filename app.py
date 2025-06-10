@@ -418,21 +418,39 @@ def manage_data_page():
     base = app.config["DEFAULT_DATA_FOLDER"]
     driver_path = os.path.join(base, "driver_race_data.csv")
     constructor_path = os.path.join(base, "constructor_race_data.csv")
+    calendar_path = os.path.join(base, "calendar.csv")
+    tracks_path = os.path.join(base, "tracks.csv")
+    mapping_path = os.path.join(base, "driver_mapping.csv")
 
     driver_csv = ""
     constructor_csv = ""
+    calendar_csv = ""
+    tracks_csv = ""
+    mapping_csv = ""
     if os.path.exists(driver_path):
         with open(driver_path, "r") as f:
             driver_csv = f.read()
     if os.path.exists(constructor_path):
         with open(constructor_path, "r") as f:
             constructor_csv = f.read()
+    if os.path.exists(calendar_path):
+        with open(calendar_path, "r") as f:
+            calendar_csv = f.read()
+    if os.path.exists(tracks_path):
+        with open(tracks_path, "r") as f:
+            tracks_csv = f.read()
+    if os.path.exists(mapping_path):
+        with open(mapping_path, "r") as f:
+            mapping_csv = f.read()
 
     message = request.args.get("message")
     return render_template(
         "manage_data.html",
         driver_csv=driver_csv,
         constructor_csv=constructor_csv,
+        calendar_csv=calendar_csv,
+        tracks_csv=tracks_csv,
+        mapping_csv=mapping_csv,
         message=message,
     )
 
@@ -462,6 +480,56 @@ def save_constructor_data():
         msg = "Constructor data saved successfully."
     except Exception as e:
         msg = f"Failed to save constructor data: {e}"
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_calendar_data", methods=["POST"])
+def save_calendar_data():
+    csv_text = request.form.get("calendar_data", "")
+    dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "calendar.csv")
+    try:
+        pd.read_csv(io.StringIO(csv_text))
+        with open(dest, "w") as f:
+            f.write(csv_text)
+        msg = "Calendar data saved successfully."
+    except Exception as e:
+        msg = f"Failed to save calendar data: {e}"
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_tracks_data", methods=["POST"])
+def save_tracks_data():
+    csv_text = request.form.get("tracks_data", "")
+    dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "tracks.csv")
+    try:
+        pd.read_csv(io.StringIO(csv_text))
+        with open(dest, "w") as f:
+            f.write(csv_text)
+        msg = "Track data saved successfully."
+    except Exception as e:
+        msg = f"Failed to save track data: {e}"
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_mapping_data", methods=["POST"])
+def save_mapping_data():
+    csv_text = request.form.get("mapping_data", "")
+    dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "driver_mapping.csv")
+    try:
+        df = pd.read_csv(io.StringIO(csv_text))
+        required_cols = ["driver_number", "driver_name", "team_name"]
+        if not all(col in df.columns for col in required_cols):
+            raise ValueError(
+                f"driver_mapping.csv must contain columns: {', '.join(required_cols)}"
+            )
+        if df.empty:
+            raise ValueError("Driver mapping file is empty")
+        if not pd.api.types.is_numeric_dtype(df["driver_number"]):
+            raise ValueError("driver_number must be numeric")
+        df.to_csv(dest, index=False)
+        msg = "Driver mapping saved successfully."
+    except Exception as e:
+        msg = f"Failed to save driver mapping: {e}"
     return redirect(url_for("manage_data_page", message=msg))
 
 

@@ -25,6 +25,7 @@
     <div class="section">
       <h2>Driver Race Data</h2>
       <form method="post" action="/save_driver_data" onsubmit="prepareDriverCsv()">
+        <input type="file" accept=".csv" onchange="loadCsv(event,'driver-table')" />
         <table id="driver-table" class="data-table"></table>
         <input type="hidden" name="driver_data" id="driver-data-hidden">
         <div class="button-group">
@@ -38,6 +39,7 @@
     <div class="section">
       <h2>Constructor Race Data</h2>
       <form method="post" action="/save_constructor_data" onsubmit="prepareConstructorCsv()">
+        <input type="file" accept=".csv" onchange="loadCsv(event,'constructor-table')" />
         <table id="constructor-table" class="data-table"></table>
         <input type="hidden" name="constructor_data" id="constructor-data-hidden">
         <div class="button-group">
@@ -47,11 +49,56 @@
         </div>
       </form>
     </div>
+
+    <div class="section">
+      <h2>Race Calendar</h2>
+      <form method="post" action="/save_calendar_data" onsubmit="prepareCalendarCsv()">
+        <input type="file" accept=".csv" onchange="loadCsv(event,'calendar-table')" />
+        <table id="calendar-table" class="data-table"></table>
+        <input type="hidden" name="calendar_data" id="calendar-data-hidden">
+        <div class="button-group">
+          <button type="button" class="button-secondary" onclick="addRow('calendar-table')">Add Row</button>
+          <button type="button" class="button-secondary" onclick="addColumn('calendar-table')">Add Column</button>
+          <button class="button" type="submit">Save Calendar</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2>Track Characteristics</h2>
+      <form method="post" action="/save_tracks_data" onsubmit="prepareTracksCsv()">
+        <input type="file" accept=".csv" onchange="loadCsv(event,'tracks-table')" />
+        <table id="tracks-table" class="data-table"></table>
+        <input type="hidden" name="tracks_data" id="tracks-data-hidden">
+        <div class="button-group">
+          <button type="button" class="button-secondary" onclick="addRow('tracks-table')">Add Row</button>
+          <button type="button" class="button-secondary" onclick="addColumn('tracks-table')">Add Column</button>
+          <button class="button" type="submit">Save Tracks</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2>Driver Number Mapping</h2>
+      <form method="post" action="/save_mapping_data" onsubmit="prepareMappingCsv()">
+        <input type="file" accept=".csv" onchange="loadCsv(event,'mapping-table')" />
+        <table id="mapping-table" class="data-table"></table>
+        <input type="hidden" name="mapping_data" id="mapping-data-hidden">
+        <div class="button-group">
+          <button type="button" class="button-secondary" onclick="addRow('mapping-table')">Add Row</button>
+          <button type="button" class="button-secondary" onclick="addColumn('mapping-table')">Add Column</button>
+          <button class="button" type="submit">Save Mapping</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>
     const driverCSV = {{ driver_csv|tojson|safe }};
     const constructorCSV = {{ constructor_csv|tojson|safe }};
+    const calendarCSV = {{ calendar_csv|tojson|safe }};
+    const tracksCSV = {{ tracks_csv|tojson|safe }};
+    const mappingCSV = {{ mapping_csv|tojson|safe }};
 
     function parseCSV(text) {
       return text.trim().split(/\r?\n/).map(r => r.split(','));
@@ -132,6 +179,14 @@
       });
     }
 
+    function loadCsv(event, tableId) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => buildTable(e.target.result, tableId);
+      reader.readAsText(file);
+    }
+
     function prepareDriverCsv() {
       document.getElementById('driver-data-hidden').value = tableToCSV('driver-table');
     }
@@ -140,9 +195,24 @@
       document.getElementById('constructor-data-hidden').value = tableToCSV('constructor-table');
     }
 
+    function prepareCalendarCsv() {
+      document.getElementById('calendar-data-hidden').value = tableToCSV('calendar-table');
+    }
+
+    function prepareTracksCsv() {
+      document.getElementById('tracks-data-hidden').value = tableToCSV('tracks-table');
+    }
+
+    function prepareMappingCsv() {
+      document.getElementById('mapping-data-hidden').value = tableToCSV('mapping-table');
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       buildTable(driverCSV, 'driver-table');
       buildTable(constructorCSV, 'constructor-table');
+      buildTable(calendarCSV, 'calendar-table');
+      buildTable(tracksCSV, 'tracks-table');
+      buildTable(mappingCSV, 'mapping-table');
     });
   </script>
 </body>
