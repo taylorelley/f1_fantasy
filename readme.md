@@ -10,7 +10,7 @@ A Dockerized Flask application for building the optimal F1 Fantasy team. It calc
 - **Risk Tolerance Settings**: Choose between consistent performers or track-specific optimization
 - **Interactive Web Interface**: Easy-to-use web UI for configuration and results
 - **Default Data Support**: Upload data once and reuse it for multiple optimizations
-- **Configuration Memory**: Automatically remembers your last team configuration
+- **Configuration Memory**: Each user's last team configuration is saved and reloaded on login
 - **Docker Support**: Fully containerized for easy deployment
 
 ## Optimization Process
@@ -267,9 +267,9 @@ The application supports three types of data persistence:
    - Shared across all optimization sessions
    - Updated only when explicitly requested
 
-2. **Configuration Memory**: Last used team configuration
-   - Automatically saved after each optimization
-   - Loaded when using default data
+2. **Configuration Memory**: Last used team configuration per user
+   - Saved to the user's profile after each optimization
+   - Automatically loaded whenever the user logs in
 
 3. **Results History**: All optimization results
    - Saved in `results/` directory

@@ -95,6 +95,7 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(256), unique=True)
     password_hash = db.Column(db.String(256))
     admin = db.Column(db.Boolean, default=False)
+    config_json = db.Column(db.Text, default="{}")
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -292,7 +293,13 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html")
+    cfg = None
+    if current_user.config_json:
+        try:
+            cfg = json.loads(current_user.config_json)
+        except Exception:
+            cfg = None
+    return render_template("index.html", user_config=cfg)
 
 
 @app.route("/check_default_data")
@@ -502,6 +509,12 @@ def optimize():
         # Load tuning parameters from settings.json
         settings = load_settings()
         config.update(settings)
+
+        try:
+            current_user.config_json = json.dumps(config)
+            db.session.commit()
+        except Exception:
+            pass
 
         results = {"status": "running", "progress": []}
 
