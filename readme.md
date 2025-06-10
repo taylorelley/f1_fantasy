@@ -129,6 +129,29 @@ Bahrain Grand Prix,Bahrain International Circuit,15,5.412,High,Medium,Hot
   - Medium: Balanced approach
   - High: Prioritizes track-specific performance
 
+## Optimisation Parameters
+
+These advanced settings are loaded from `default_data/settings.json` and can be
+adjusted on the Administration page.
+
+- **outlier_stddev_factor** – Number of standard deviations used to filter
+  outlier race results. Increase this value to keep more data and smooth
+  performance trends. Decrease it to remove anomalies and focus on typical
+  results.
+- **trend_slope_threshold** – Minimum slope for the trend-based weighting to
+  treat a driver or constructor as improving or declining. Higher values make
+  the algorithm less sensitive to short-term swings, while lower values react
+  more quickly.
+- **recent_races_fraction** – Fraction of all races considered "recent" when
+  blending long-term and short-term correlations. A larger fraction incorporates
+  more races, whereas a smaller fraction focuses on the latest events.
+- **long_term_weight** – Proportion of long-term correlation in the blended
+  score. Increase to rely more on season-long form; decrease to emphasize recent
+  results.
+- **interaction_weight** – Weight applied to track interaction correlations.
+  Raising this value makes driver/constructor-track affinities more influential
+  in the final optimisation, while lowering it reduces that effect.
+
 ## Data Persistence
 
 The application supports three types of data persistence:
