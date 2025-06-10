@@ -17,6 +17,7 @@ uploads/
 results/
 *.csv
 *.json
+*.db
 
 # IDE
 .vscode/

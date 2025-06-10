@@ -13,4 +13,11 @@ services:
     environment:
       - FLASK_ENV=production
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-your-secret-key-here}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-your-google-client-id}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-your-google-client-secret}
+      - FACEBOOK_CLIENT_ID=${FACEBOOK_CLIENT_ID:-your-facebook-client-id}
+      - FACEBOOK_CLIENT_SECRET=${FACEBOOK_CLIENT_SECRET:-your-facebook-client-secret}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-your-github-client-id}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-your-github-client-secret}
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-admin@example.com}
     restart: unless-stopped
