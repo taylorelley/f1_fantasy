@@ -115,6 +115,16 @@
           <label for="interaction_weight">Interaction Weight</label>
           <input type="number" step="0.1" name="interaction_weight" id="interaction_weight" value="{{ settings.interaction_weight }}">
         </div>
+        <div class="form-group">
+          <label for="top_n_candidates">Candidate Pool Size</label>
+          <input type="number" name="top_n_candidates" id="top_n_candidates" value="{{ settings.top_n_candidates }}" min="1">
+        </div>
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" name="use_ilp" id="use_ilp" {% if settings.use_ilp %}checked{% endif %}>
+            Use ILP-based optimisation (experimental)
+          </label>
+        </div>
         <div class="button-group">
           <button class="button" type="submit">Save Settings</button>
         </div>
