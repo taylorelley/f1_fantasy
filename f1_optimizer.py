@@ -17,6 +17,7 @@ import requests
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 from sklearn.preprocessing import LabelEncoder
+from pulp import LpProblem, LpVariable, LpMaximize, lpSum, LpBinary
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -252,6 +253,21 @@ def get_user_configuration():
     parallel = input().strip().lower()
     config["use_parallel"] = (parallel != "n")
 
+    print("\nAdvanced Options:")
+    while True:
+        tn = input("Top candidate limit for swaps [10]: ").strip()
+        try:
+            config["top_n_candidates"] = int(tn) if tn else 10
+            if config["top_n_candidates"] < 1:
+                print("  Candidate limit must be at least 1.")
+                continue
+            break
+        except ValueError:
+            print("  Please enter a valid integer.")
+
+    ilp = input("Use ILP optimization? (y/n) [n]: ").strip().lower()
+    config["use_ilp"] = (ilp == "y")
+
     print("\n" + "="*80)
     print("Configuration Summary:")
     print("="*80)
@@ -268,6 +284,8 @@ def get_user_configuration():
     print(f"Multiplier: {config['multiplier']}")
     print(f"Use FP2 pace: {'Yes' if config['use_fp2_pace'] else 'No'}")
     print(f"Parallel processing: {'Enabled' if config['use_parallel'] else 'Disabled'}")
+    print(f"Top candidates: {config['top_n_candidates']}")
+    print(f"Use ILP optimization: {'Yes' if config['use_ilp'] else 'No'}")
 
     confirm = input("\nProceed with this configuration? (y/n) [y]: ").strip().lower()
     if confirm == "n":
@@ -960,6 +978,8 @@ class F1TeamOptimizer:
         self.base_path = config["base_path"]
         self.multiplier = config["multiplier"]
         self.risk_tolerance = config["risk_tolerance"]
+        self.top_n = config.get("top_n_candidates", 10)
+        self.use_ilp = config.get("use_ilp", False)
 
         self.drivers_df = None
         self.constructors_df = None
@@ -977,7 +997,9 @@ class F1TeamOptimizer:
         self.performance_stats = {
             "patterns_evaluated": 0,
             "cache_hits": 0,
-            "optimization_time": 0
+            "optimization_time": 0,
+            "step1_time": 0,
+            "step2_time": 0
         }
 
     def _set_risk_weights(self):
@@ -1043,6 +1065,16 @@ class F1TeamOptimizer:
         self.drivers_df["VFM_Original"] = self.drivers_df["VFM"].copy()
         self.constructors_df["VFM_Original"] = self.constructors_df["VFM"].copy()
 
+        # Initialize step-specific columns to sensible defaults so that any
+        # driver/constructor without an explicit affinity entry still retains
+        # usable VFM values. Missing columns previously caused NaNs which
+        # propagated through the optimization logic.
+        for step in (1, 2):
+            self.drivers_df[f"Step {step}_Affinity"] = 0.0
+            self.drivers_df[f"Step {step}_VFM"] = self.drivers_df["VFM_Original"]
+            self.constructors_df[f"Step {step}_Affinity"] = 0.0
+            self.constructors_df[f"Step {step}_VFM"] = self.constructors_df["VFM_Original"]
+
         driver_affinity_cols = [
             col for col in self.track_affinity_df.columns if col.endswith("_affinity")
         ]
@@ -1077,6 +1109,12 @@ class F1TeamOptimizer:
                         self.constructors_df.loc[idx2, f"Step {step}_Affinity"] = affinity2
                         self.constructors_df.loc[idx2, f"Step {step}_VFM"] = adj_vfm2
 
+        # Precalculate each driver's VFM when boosted by the multiplier
+        for step in (1, 2):
+            self.drivers_df[f"Step {step}_VFM_Boost"] = (
+                self.drivers_df[f"Step {step}_VFM"] * self.multiplier
+            )
+
     def _get_team_data(self, drivers, constructors, step):
         """Get team data with step-specific VFM"""
         d_df = self.drivers_df[self.drivers_df["Driver"].isin(drivers)].copy()
@@ -1086,10 +1124,24 @@ class F1TeamOptimizer:
         c_df["VFM"] = c_df[f"Step {step}_VFM"]
         return d_df, c_df
 
+    def _get_top_candidates(self, entity, step, exclude):
+        """Return top-N candidate names for drivers or constructors"""
+        if entity == "driver":
+            df = self.drivers_df.sort_values(
+                f"Step {step}_VFM", ascending=False
+            )
+            names = [n for n in df["Driver"] if n not in exclude]
+        else:
+            df = self.constructors_df.sort_values(
+                f"Step {step}_VFM", ascending=False
+            )
+            names = [n for n in df["Constructor"] if n not in exclude]
+        return names[: self.top_n]
+
     def evaluate_team(self, drivers, constructors, step):
         """Evaluate team performance"""
         cache = self.step1_cache if step == 1 else self.step2_cache
-        key = "|".join(sorted(drivers)) + "#" + "|".join(sorted(constructors))
+        key = (tuple(sorted(drivers)), tuple(sorted(constructors)))
         if key in cache:
             self.performance_stats["cache_hits"] += 1
             return cache[key]
@@ -1102,27 +1154,28 @@ class F1TeamOptimizer:
 
         base_vfm = d_df["VFM"].sum() + c_df["VFM"].sum()
         count = len(drivers) + len(constructors)
-        best_ppm = -1
-        best_pts = -1
-        best_driver = None
 
-        for _, row in d_df.iterrows():
-            boosted = base_vfm + (self.multiplier - 1) * row["VFM"]
-            ppm = boosted / count
-            total_pts = ppm * cost
-            if total_pts > best_pts:
-                best_pts = total_pts
-                best_ppm = ppm
-                best_driver = row["Driver"]
+        boosted_totals = base_vfm - d_df["VFM"] + d_df[f"Step {step}_VFM_Boost"]
+        best_idx = boosted_totals.idxmax()
+        best_total = boosted_totals.max()
+        ppm = best_total / count
+        pts = ppm * cost
+        best_driver = d_df.loc[best_idx, "Driver"]
 
-        cache[key] = (best_pts, best_ppm, cost, best_driver)
-        return best_pts, best_ppm, cost, best_driver
+        cache[key] = (pts, ppm, cost, best_driver)
+        return pts, ppm, cost, best_driver
 
-    def generate_swap_patterns(self, current_drivers, current_constructors, max_swaps):
-        """Generate all valid swap patterns"""
+    def generate_swap_patterns(self, current_drivers, current_constructors, max_swaps, step):
+        """Generate all valid swap patterns limited by top-N candidates"""
         patterns = []
-        min_d = self.drivers_df["Cost_Value"].min()
-        min_c = self.constructors_df["Cost_Value"].min()
+        top_ds = self._get_top_candidates("driver", step, current_drivers)
+        top_cs = self._get_top_candidates("constructor", step, current_constructors)
+        min_d = self.drivers_df[self.drivers_df["Driver"].isin(top_ds)]["Cost_Value"].min()
+        min_c = self.constructors_df[self.constructors_df["Constructor"].isin(top_cs)]["Cost_Value"].min()
+        if np.isnan(min_d):
+            min_d = self.drivers_df["Cost_Value"].min()
+        if np.isnan(min_c):
+            min_c = self.constructors_df["Cost_Value"].min()
 
         for total in range(max_swaps + 1):
             for d_swaps in range(min(total + 1, len(current_drivers) + 1)):
@@ -1178,9 +1231,19 @@ class F1TeamOptimizer:
 
     def optimize_step(self, current_drivers, current_constructors, max_swaps, step):
         """Optimize team for a specific step"""
-        patterns = self.generate_swap_patterns(current_drivers, current_constructors, max_swaps)
-        avail_d = [d for d in self.drivers_df["Driver"] if d not in current_drivers]
-        avail_c = [c for c in self.constructors_df["Constructor"] if c not in current_constructors]
+        start_time = time.time()
+        if self.use_ilp:
+            result = self._optimize_step_ilp(current_drivers, current_constructors, max_swaps, step)
+            elapsed = time.time() - start_time
+            if step == 1:
+                self.performance_stats["step1_time"] += elapsed
+            else:
+                self.performance_stats["step2_time"] += elapsed
+            return result
+
+        patterns = self.generate_swap_patterns(current_drivers, current_constructors, max_swaps, step)
+        avail_d = self._get_top_candidates("driver", step, current_drivers)
+        avail_c = self._get_top_candidates("constructor", step, current_constructors)
 
         best_result = {
             "points": -1,
@@ -1228,7 +1291,74 @@ class F1TeamOptimizer:
                 if r["points"] > best_result["points"]:
                     best_result = r
 
+        elapsed = time.time() - start_time
+        if step == 1:
+            self.performance_stats["step1_time"] += elapsed
+        else:
+            self.performance_stats["step2_time"] += elapsed
         return best_result
+
+    def _optimize_step_ilp(self, current_drivers, current_constructors, max_swaps, step):
+        """ILP-based optimization for a single step"""
+        prob = LpProblem("team_opt", LpMaximize)
+        d_vars = {row["Driver"]: LpVariable(f"d_{i}", cat=LpBinary)
+                  for i, row in self.drivers_df.iterrows()}
+        c_vars = {row["Constructor"]: LpVariable(f"c_{i}", cat=LpBinary)
+                  for i, row in self.constructors_df.iterrows()}
+
+        prob += lpSum(
+            self.drivers_df.loc[i, f"Step {step}_VFM"] * d_vars[row["Driver"]]
+            for i, row in self.drivers_df.iterrows()
+        ) + lpSum(
+            self.constructors_df.loc[j, f"Step {step}_VFM"] * c_vars[row["Constructor"]]
+            for j, row in self.constructors_df.iterrows()
+        )
+
+        prob += lpSum(d_vars.values()) == 5
+        prob += lpSum(c_vars.values()) == 2
+        prob += (
+            lpSum(
+                self.drivers_df.loc[i, "Cost_Value"] * d_vars[row["Driver"]]
+                for i, row in self.drivers_df.iterrows()
+            )
+            + lpSum(
+                self.constructors_df.loc[j, "Cost_Value"] * c_vars[row["Constructor"]]
+                for j, row in self.constructors_df.iterrows()
+            )
+            <= self.max_budget
+        )
+
+        prob += (
+            lpSum(d_vars[name] for name in d_vars if name not in current_drivers)
+            + lpSum(c_vars[name] for name in c_vars if name not in current_constructors)
+            <= max_swaps
+        )
+
+        prob.solve()
+
+        selected_drivers = [name for name, var in d_vars.items() if var.value() == 1]
+        selected_constructors = [name for name, var in c_vars.items() if var.value() == 1]
+
+        pts, ppm, cost, boost = self.evaluate_team(selected_drivers, selected_constructors, step)
+        swaps = []
+        add_d = [d for d in selected_drivers if d not in current_drivers]
+        rem_d = [d for d in current_drivers if d not in selected_drivers]
+        for old, new in zip(rem_d, add_d):
+            swaps.append(("Driver", old, new))
+        add_c = [c for c in selected_constructors if c not in current_constructors]
+        rem_c = [c for c in current_constructors if c not in selected_constructors]
+        for old, new in zip(rem_c, add_c):
+            swaps.append(("Constructor", old, new))
+
+        return {
+            "points": pts,
+            "ppm": ppm,
+            "swaps": swaps,
+            "drivers": selected_drivers,
+            "constructors": selected_constructors,
+            "cost": cost,
+            "boost_driver": boost,
+        }
 
     def run_dual_step_optimization(self):
         """Run the complete two-step optimization"""
@@ -1250,7 +1380,7 @@ class F1TeamOptimizer:
         }
 
         print("\nEvaluating Step 1 options...")
-        patterns1 = self.generate_swap_patterns(cd, cc, self.config["step1_swaps"])
+        patterns1 = self.generate_swap_patterns(cd, cc, self.config["step1_swaps"], 1)
 
         for i, pat in enumerate(patterns1):
             if i % 100 == 0:
@@ -1258,8 +1388,8 @@ class F1TeamOptimizer:
 
             s1_res = self.evaluate_swap_pattern(
                 pat, cd, cc,
-                [d for d in self.drivers_df["Driver"] if d not in cd],
-                [c for c in self.constructors_df["Constructor"] if c not in cc],
+                self._get_top_candidates("driver", 1, cd),
+                self._get_top_candidates("constructor", 1, cc),
                 1
             )
             if s1_res["points"] <= 0:
@@ -1337,6 +1467,7 @@ class F1TeamOptimizer:
         print(f"Patterns evaluated: {self.performance_stats['patterns_evaluated']:,}")
         print(f"Cache hits: {self.performance_stats['cache_hits']:,}")
         print(f"Time taken: {self.performance_stats['optimization_time']:.1f}s")
+        print(f"Step1 time: {self.performance_stats['step1_time']:.2f}s, Step2 time: {self.performance_stats['step2_time']:.2f}s")
 
         if self.config.get("use_fp2_pace", False):
             print("\n" + "-"*80)

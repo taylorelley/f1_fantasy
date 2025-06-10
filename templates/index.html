@@ -8,345 +8,7 @@
     href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='90' font-size='90'%3E🏎️%3C/text%3E%3C/svg%3E"
   >
   <title>F1 Fantasy Team Optimiser</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f5f5;
-      color: #333;
-      line-height: 1.6;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-
-    header {
-      background: #e10600;
-      color: white;
-      padding: 20px 0;
-      margin-bottom: 30px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .header-content {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    h1 {
-      font-size: 2.5em;
-      font-weight: 300;
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 20px;
-    }
-
-    .nav-links a {
-      color: white;
-      text-decoration: none;
-      padding: 8px 16px;
-      border-radius: 4px;
-      transition: background 0.3s;
-    }
-
-    .nav-links a:hover {
-      background: rgba(255,255,255,0.2);
-    }
-
-    .nav-links a.active {
-      background: rgba(255,255,255,0.2);
-    }
-
-    .section {
-      background: white;
-      padding: 30px;
-      margin-bottom: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    h2 {
-      color: #e10600;
-      margin-bottom: 20px;
-      font-weight: 400;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: 500;
-    }
-
-    input[type="file"],
-    input[type="number"],
-    select {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 16px;
-    }
-
-    .file-upload {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 15px;
-    }
-
-    .team-selection {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    .driver-select, .constructor-select {
-      margin-bottom: 10px;
-    }
-
-    .button {
-      background: #e10600;
-      color: white;
-      padding: 12px 30px;
-      border: none;
-      border-radius: 4px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-
-    .button:hover {
-      background: #b30500;
-    }
-
-    .button:disabled {
-      background: #999;
-      cursor: not-allowed;
-    }
-
-    .button-secondary {
-      background: #6c757d;
-    }
-
-    .button-secondary:hover {
-      background: #5a6268;
-    }
-
-    .button-success {
-      background: #28a745;
-    }
-
-    .button-success:hover {
-      background: #218838;
-    }
-
-    .button-warning {
-      background: #ffc107;
-      color: #212529;
-    }
-
-    .button-warning:hover {
-      background: #e0a800;
-    }
-
-    .progress {
-      display: none;
-      margin-top: 20px;
-      padding: 20px;
-      background: #f0f0f0;
-      border-radius: 4px;
-    }
-
-    .progress-item {
-      margin: 5px 0;
-      color: #666;
-    }
-
-    .results {
-      display: none;
-    }
-
-    .result-card {
-      background: #f9f9f9;
-      padding: 20px;
-      margin: 15px 0;
-      border-radius: 4px;
-      border-left: 4px solid #e10600;
-    }
-
-    .swap-item {
-      background: #fff;
-      padding: 10px;
-      margin: 5px 0;
-      border-radius: 4px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .improvement {
-      color: #28a745;
-      font-weight: bold;
-    }
-
-    .team-display {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .team-member {
-      background: #fff;
-      padding: 10px;
-      border-radius: 4px;
-      text-align: center;
-      border: 1px solid #e0e0e0;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 40px;
-    }
-
-    .spinner {
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #e10600;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin: 20px auto;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .error {
-      background: #f8d7da;
-      color: #721c24;
-      padding: 15px;
-      border-radius: 4px;
-      margin: 15px 0;
-    }
-
-    .success {
-      background: #d4edda;
-      color: #155724;
-      padding: 15px;
-      border-radius: 4px;
-      margin: 15px 0;
-    }
-
-    .info {
-      background: #d1ecf1;
-      color: #0c5460;
-      padding: 15px;
-      border-radius: 4px;
-      margin: 15px 0;
-    }
-
-    .warning {
-      background: #fff3cd;
-      color: #856404;
-      padding: 15px;
-      border-radius: 4px;
-      margin: 15px 0;
-    }
-
-    .default-data-status {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #e8f4f8;
-      border-radius: 4px;
-      border: 1px solid #bee5eb;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-      flex-wrap: wrap;
-    }
-
-    .checkbox-group {
-      margin: 20px 0;
-    }
-
-    .checkbox-group input[type="checkbox"] {
-      width: auto;
-      margin-right: 10px;
-    }
-
-    .fp2-config {
-      border: none;
-      border-radius: 0;
-      background: transparent;
-    }
-
-    .fp2-config h3 {
-      color: #333;
-      margin-bottom: 15px;
-      display: flex;
-      align-items: center;
-    }
-
-    .fp2-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 15px;
-    }
-
-    .pace-adjustment {
-      background: #e9ecef;
-      padding: 8px 12px;
-      margin: 5px 0;
-      border-radius: 4px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .pace-score {
-      font-weight: bold;
-      color: #495057;
-    }
-
-    small {
-      font-size: 0.875em;
-      color: #6c757d;
-      margin-top: 5px;
-      display: block;
-    }
-
-    small a {
-      color: #007bff;
-      text-decoration: none;
-    }
-
-    small a:hover {
-      text-decoration: underline;
-    }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <header>
@@ -355,71 +17,13 @@
       <nav class="nav-links">
         <a href="/" class="active">Optimiser</a>
         <a href="/statistics">Statistics</a>
+         <a href="/manage_data">Administration</a>
       </nav>
     </div>
   </header>
 
   <div class="container">
-    <!-- Default Data Status -->
-    <div class="section default-data-status" id="default-data-status" style="display: none;">
-      <h3>📁 Default Data</h3>
-      <p id="default-data-message"></p>
-    </div>
 
-    <!-- File Upload Section -->
-    <div class="section" id="upload-section">
-      <h2>Load Data Files</h2>
-      <p style="margin-bottom: 20px;">
-        Upload new data files or use existing default data if available.
-      </p>
-
-      <div class="file-upload">
-        <div class="form-group">
-          <label for="driver-data">Driver Race Data</label>
-          <input type="file" id="driver-data" accept=".csv">
-        </div>
-        <div class="form-group">
-          <label for="constructor-data">Constructor Race Data</label>
-          <input type="file" id="constructor-data" accept=".csv">
-        </div>
-        <div class="form-group">
-          <label for="calendar-data">Race Calendar</label>
-          <input type="file" id="calendar-data" accept=".csv">
-        </div>
-        <div class="form-group">
-          <label for="tracks-data">Track Characteristics</label>
-          <input type="file" id="tracks-data" accept=".csv">
-        </div>
-        <div id="driver-mapping-section">
-          <div class="form-group">
-            <label for="driver-mapping-file">Driver Number Mapping</label>
-            <input type="file" id="driver-mapping-file" accept=".csv">
-            <small>
-              Optional, only required for Race Pace Estimation
-            </small>
-          </div>
-        </div>
-      </div>
-
-      <div class="checkbox-group">
-        <label>
-          <input type="checkbox" id="update-default-checkbox">
-          Save these files as default data (will replace existing default data)
-        </label>
-      </div>
-
-      <div class="button-group">
-        <button class="button" onclick="uploadFiles()">Upload New Files</button>
-        <button class="button button-success"
-                id="use-default-btn"
-                onclick="useDefaultData()"
-                style="display: none;">
-          Use Default Data
-        </button>
-      </div>
-
-      <div id="mapping-status"></div>
-    </div>
 
     <!-- Configuration Section -->
     <div class="section" id="config-section" style="display: none;">
@@ -489,6 +93,18 @@
           <label for="multiplier">Multiplier</label>
           <input type="number" id="multiplier" value="2" min="2" max="3">
         </div>
+
+        <div class="form-group">
+          <label for="top-n">Candidate Pool Size</label>
+          <input type="number" id="top-n" value="10" min="1">
+        </div>
+
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" id="use-ilp">
+            Use ILP-based optimisation (experimental)
+          </label>
+        </div>
       </div>
 
       <!-- FP2 Race Pace Configuration -->
@@ -523,9 +139,6 @@
 
       <div class="button-group">
         <button class="button" onclick="runOptimization()">Run Optimisation</button>
-        <button class="button button-secondary" onclick="showUploadSection()">
-          Change Data Files
-        </button>
       </div>
     </div>
 
@@ -553,8 +166,14 @@
 
     window.addEventListener('DOMContentLoaded', async function() {
       try {
-        await checkDefaultData();
+        const hasDefault = await checkDefaultData();
         await checkDriverMapping();
+
+        if (hasDefault) {
+          useDefaultData();
+        } else {
+          document.getElementById('config-section').style.display = 'none';
+        }
 
         const fp2Checkbox = document.getElementById('use-fp2-pace');
         const fp2Config = document.getElementById('fp2-config');
@@ -568,11 +187,6 @@
             }
           });
         }
-
-        const useDefaultBtn = document.getElementById('use-default-btn');
-        if (useDefaultBtn && useDefaultBtn.style.display !== 'none') {
-          useDefaultData();
-        }
       } catch (error) {
         console.error('Error during page initialization:', error);
       }
@@ -581,29 +195,12 @@
     async function checkDefaultData() {
       try {
         const response = await fetch('/check_default_data');
-        const data = await response.json();
-
-        if (data.has_default) {
-          const defaultDataStatus  = document.getElementById('default-data-status');
-          const defaultDataMessage = document.getElementById('default-data-message');
-          const useDefaultBtn      = document.getElementById('use-default-btn');
-          if (defaultDataStatus) {
-            defaultDataStatus.style.display = 'block';
-          }
-          if (defaultDataMessage) {
-            let message = `Using default data with ${data.data.races_completed} races completed.`;
-            if (data.data.has_driver_mapping) {
-              message += '';
-            }
-            message += ``;
-            defaultDataMessage.innerHTML = message;
-          }
-          if (useDefaultBtn) {
-            useDefaultBtn.style.display = 'inline-block';
-          }
-          return true;
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Status ${response.status}: ${text}`);
         }
-        return false;
+        const data = await response.json();
+        return data.has_default;
       } catch (error) {
         console.error('Error checking default data:', error);
         return false;
@@ -637,21 +234,36 @@
     }
 
     function showUploadSection() {
-      document.getElementById('config-section').style.display    = 'none';
-      document.getElementById('upload-section').style.display    = 'block';
-      document.getElementById('results-section').style.display   = 'none';
-      document.getElementById('default-data-status').style.display = 'none';
+      const configSection = document.getElementById('config-section');
+      if (configSection) configSection.style.display = 'none';
+      const uploadSection = document.getElementById('upload-section');
+      if (uploadSection) uploadSection.style.display = 'block';
+      const resultsSection = document.getElementById('results-section');
+      if (resultsSection) resultsSection.style.display = 'none';
+      const defaultStatus = document.getElementById('default-data-status');
+      if (defaultStatus) defaultStatus.style.display = 'none';
 
-      document.getElementById('driver-data').value = '';
-      document.getElementById('constructor-data').value = '';
-      document.getElementById('calendar-data').value = '';
-      document.getElementById('tracks-data').value = '';
-      document.getElementById('update-default-checkbox').checked = false;
+      const driverInput = document.getElementById('driver-data');
+      if (driverInput) driverInput.value = '';
+      const consInput = document.getElementById('constructor-data');
+      if (consInput) consInput.value = '';
+      const calInput = document.getElementById('calendar-data');
+      if (calInput) calInput.value = '';
+      const tracksInput = document.getElementById('tracks-data');
+      if (tracksInput) tracksInput.value = '';
+      const updateChk = document.getElementById('update-default-checkbox');
+      if (updateChk) updateChk.checked = false;
     }
 
     async function useDefaultData() {
       fetch('/check_default_data')
-        .then(response => response.json())
+        .then(async response => {
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Status ${response.status}: ${text}`);
+          }
+          return response.json();
+        })
         .then(data => {
           if (!data.has_default) return;
 
@@ -668,7 +280,10 @@
           loadConfigFromCookie();
 
           document.getElementById('config-section').style.display = 'block';
-          document.getElementById('upload-section').style.display = 'none';
+          const uploadSection = document.getElementById('upload-section');
+          if (uploadSection) {
+            uploadSection.style.display = 'none';
+          }
 
           const fp2Checkbox = document.getElementById('use-fp2-pace');
           if (fp2Checkbox) {
@@ -756,6 +371,8 @@
         use_fp2_pace:          document.getElementById('use-fp2-pace')?.checked,
         pace_weight:           document.getElementById('pace-weight')?.value,
         pace_modifier_type:    document.getElementById('pace-modifier-type')?.value
+        ,top_n_candidates:     document.getElementById('top-n')?.value
+        ,use_ilp:              document.getElementById('use-ilp')?.checked
       };
       setCookie('f1_optimizer_config', config);
     }
@@ -784,6 +401,8 @@
       if (config.weighting_scheme)  document.getElementById('weighting-scheme').value  = config.weighting_scheme;
       if (config.risk_tolerance)    document.getElementById('risk-tolerance').value    = config.risk_tolerance;
       if (config.multiplier)        document.getElementById('multiplier').value        = config.multiplier;
+      if (config.top_n_candidates) document.getElementById('top-n').value = config.top_n_candidates;
+      if (config.use_ilp !== undefined) document.getElementById('use-ilp').checked = config.use_ilp;
 
       if (config.use_fp2_pace !== undefined) {
         const fp2Checkbox = document.getElementById('use-fp2-pace');
@@ -802,10 +421,8 @@
 
     async function uploadFiles() {
       const files = {
-        'driver_race_data.csv':      document.getElementById('driver-data')?.files[0],
-        'constructor_race_data.csv': document.getElementById('constructor-data')?.files[0],
-        'calendar.csv':              document.getElementById('calendar-data')?.files[0],
-        'tracks.csv':                document.getElementById('tracks-data')?.files[0]
+        'calendar.csv': document.getElementById('calendar-data')?.files[0],
+        'tracks.csv':   document.getElementById('tracks-data')?.files[0]
       };
 
       let allFilesSelected = true;
@@ -816,7 +433,7 @@
         }
       }
       if (!allFilesSelected) {
-        alert('Please select all 4 required CSV files');
+        alert('Please select both required CSV files');
         return;
       }
 
@@ -927,6 +544,8 @@
         weighting_scheme:    document.getElementById('weighting-scheme')?.value,
         risk_tolerance:      document.getElementById('risk-tolerance')?.value,
         multiplier:          document.getElementById('multiplier')?.value,
+        top_n_candidates:   document.getElementById('top-n')?.value,
+        use_ilp:            document.getElementById('use-ilp')?.checked,
         use_fp2_pace:        useFP2,
         pace_weight:         useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
         pace_modifier_type:  useFP2 ? document.getElementById('pace-modifier-type')?.value : null
