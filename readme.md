@@ -1,6 +1,6 @@
 # F1 Fantasy Optimizer Web Application
 
-A web-based tool for optimizing F1 Fantasy team selections using Value For Money (VFM) calculations and track affinity analysis.
+A Dockerized Flask application for building the optimal F1 Fantasy team. It calculates driver and constructor value for money (VFM) metrics and analyzes track affinity to recommend the best swaps.
 
 ## Features
 
@@ -13,53 +13,51 @@ A web-based tool for optimizing F1 Fantasy team selections using Value For Money
 - **Configuration Memory**: Automatically remembers your last team configuration
 - **Docker Support**: Fully containerized for easy deployment
 
-## Optimisation Process
+## Optimization Process
 
-The optimiser runs in three main stages:
+The optimizer runs in three main stages:
 
 ### 1. Value For Money (VFM) Calculation
 
 Driver and constructor race results are cleaned using a standard deviation based
 outlier filter before calculating a weighted average of points. Outliers more
 than `outlier_stddev_factor` standard deviations from the mean are replaced with
-`NaN`【F:f1_optimizer.py†L464-L481】. When using the trend‑based weighting scheme,
-points are weighted according to the slope of recent performance. Improving
-trends favour exponential weights while declining trends receive heavier decay
-【F:f1_optimizer.py†L496-L517】. Other schemes (equal, linear, exponential and
-moderate decay) compute fixed weights for all races【F:f1_optimizer.py†L557-L576】.
+`NaN`. When using the trend‑based weighting scheme, points are weighted
+according to the slope of recent performance. Improving trends favour
+exponential weights while declining trends receive heavier decay. Other schemes
+(equal, linear, exponential and moderate decay) compute fixed weights for all
+races.
 
-If FP2 lap data is available the optimiser queries the OpenF1 API, converts lap
-times into pace scores and scales VFM values accordingly【F:f1_optimizer.py†L336-L410】.
+If FP2 lap data is available the optimizer queries the OpenF1 API, converts lap
+times into pace scores and scales VFM values accordingly.
 
 ### 2. Track Affinity Analysis
 
 Historical race points are merged with circuit characteristics and cleansed with
 an IQR‑based outlier detector that also uses rolling standard deviation to
-dynamically tighten bounds【F:f1_optimizer.py†L667-L696】. Categorical track
-features are label encoded before estimating how strongly each characteristic
-correlates with past points. Importance weights are derived from the variance of
-each characteristic【F:f1_optimizer.py†L718-L763】.
+dynamically tighten bounds. Categorical track features are label encoded before
+estimating how strongly each characteristic correlates with past points.
+Importance weights are derived from the variance of each characteristic.
 
 Correlations combine long and short term trends. Robust correlation metrics
 (linear, quadratic and threshold based) are blended and weighted by bootstrap
-confidence estimates to reduce noise【F:f1_optimizer.py†L765-L888】. Interaction
-effects between pairs of characteristics further refine each driver or
-constructor affinity, producing a score for every circuit【F:f1_optimizer.py†L890-L965】.
+confidence estimates to reduce noise. Interaction effects between pairs of
+characteristics further refine each driver or constructor affinity, producing a
+score for every circuit.
 
-### 3. Two‑Step Team Optimisation
+### 3. Two‑Step Team Optimization
 
-Team selection is optimised for the next two races. Track affinities adjust VFM
+Team selection is optimized for the next two races. Track affinities adjust VFM
 for each upcoming circuit and points are scaled by the selected driver boost
 multiplier. Candidate swaps are generated from the top ranked drivers and
-constructors while respecting the budget and maximum swap limits
-【F:f1_optimizer.py†L1149-L1203】.
+constructors while respecting the budget and maximum swap limits.
 
 Each swap pattern is evaluated to maximise expected points per million of budget
 and the search can optionally use an integer linear programming solver for exact
-optimisation. Results for both steps are compared to the baseline team to report
+optimization. Results for both steps are compared to the baseline team to report
 the expected improvement.
 
-### Optimisation Architecture
+### Optimization Architecture
 
 ```mermaid
 flowchart TD
@@ -98,7 +96,7 @@ flowchart TD
         WEIGH[⚖️ Weight Points]:::stage1
         FP2[🏎️ Apply FP2 Pace]:::stage1
         VFMOUT[📤 VFM Output<br/>driver_vfm.csv<br/>constructor_vfm.csv]:::output
-        
+
         CLEAN1 --> WEIGH --> FP2 --> VFMOUT
     end
 
@@ -110,7 +108,7 @@ flowchart TD
         CORR[🔗 Blend Correlations]:::stage2
         INTER[⚡ Interaction Effects]:::stage2
         AFFOUT[📤 Affinity Output<br/>driver_affinity.csv<br/>constructor_affinity.csv]:::output
-        
+
         CLEAN2 --> ENCODE --> CORR --> INTER --> AFFOUT
     end
 
@@ -122,7 +120,7 @@ flowchart TD
         STEP1[🔄 Optimize Step 1]:::stage3
         STEP2[🔄 Optimize Step 2]:::stage3
         RESULT[🏆 Final Results<br/>optimization_*.json]:::output
-        
+
         PREP --> CANDS --> STEP1 --> STEP2 --> RESULT
     end
 
@@ -157,38 +155,12 @@ flowchart TD
 
 ## Quick Start
 
-1. **Clone or download the project files**
-
-2. **Create the project structure**:
-```bash
-mkdir f1-optimizer
-cd f1-optimizer
-
-# Create directories
-mkdir templates
-mkdir default_data  # For storing default data files
-
-# Save the provided files:
-# - app.py (main Flask application)
-# - f1_optimizer.py (optimization logic from the CLI version)
-# - templates/index.html (web interface)
-# - Dockerfile
-# - docker-compose.yml
-# - requirements.txt
-```
-
-3. **Prepare the f1_optimizer.py file**:
-   
-   Take the complete F1 optimizer code from the CLI version and save it as `f1_optimizer.py`, but remove the `main()` function and the `if __name__ == "__main__"` block at the end.
-
-4. **Build and run with Docker Compose**:
+1. Clone the repository.
+2. Build and start the containers:
 ```bash
 docker-compose up --build
 ```
-
-5. **Access the application**:
-   
-   Open your browser and go to `http://localhost:5000`
+3. Open `http://localhost:5000` in your browser.
 
 ## Using the Application
 
@@ -262,7 +234,7 @@ Bahrain Grand Prix,Bahrain International Circuit,15,5.412,High,Medium,Hot
   - Medium: Balanced approach
   - High: Prioritizes track-specific performance
 
-## Optimisation Parameters
+## Optimization Parameters
 
 These advanced settings are loaded from `default_data/settings.json` and can be
 adjusted on the Administration page.
@@ -283,7 +255,7 @@ adjusted on the Administration page.
   results.
 - **interaction_weight** – Weight applied to track interaction correlations.
   Raising this value makes driver/constructor-track affinities more influential
-  in the final optimisation, while lowering it reduces that effect.
+  in the final optimization, while lowering it reduces that effect.
 
 ## Data Persistence
 
