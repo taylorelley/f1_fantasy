@@ -29,6 +29,7 @@
         <input type="hidden" name="driver_data" id="driver-data-hidden">
         <div class="button-group">
           <button type="button" class="button-secondary" onclick="addRow('driver-table')">Add Row</button>
+          <button type="button" class="button-secondary" onclick="addColumn('driver-table')">Add Column</button>
           <button class="button" type="submit">Save Drivers</button>
         </div>
       </form>
@@ -41,6 +42,7 @@
         <input type="hidden" name="constructor_data" id="constructor-data-hidden">
         <div class="button-group">
           <button type="button" class="button-secondary" onclick="addRow('constructor-table')">Add Row</button>
+          <button type="button" class="button-secondary" onclick="addColumn('constructor-table')">Add Column</button>
           <button class="button" type="submit">Save Constructors</button>
         </div>
       </form>
@@ -110,6 +112,24 @@
         tr.appendChild(td);
       }
       table.querySelector('tbody').appendChild(tr);
+    }
+
+    function addColumn(tableId) {
+      const table = document.getElementById(tableId);
+      const headerRow = table.querySelector('thead tr');
+      if (!headerRow) return;
+      const colName = prompt('Column name?');
+      if (!colName) return;
+      const th = document.createElement('th');
+      th.textContent = colName;
+      headerRow.appendChild(th);
+      table.querySelectorAll('tbody tr').forEach(tr => {
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = 'text';
+        td.appendChild(input);
+        tr.appendChild(td);
+      });
     }
 
     function prepareDriverCsv() {
