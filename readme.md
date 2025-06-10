@@ -63,77 +63,87 @@ the expected improvement.
 
 ```mermaid
 flowchart TD
-    %% ----- User Interaction ----- %%
-    subgraph "User Interface"
-        UI["index.html form"]
-        STATS["statistics.html"]
-        APP["app.py /optimize"]
-        UI --> APP
+    %% Styling
+    classDef userInterface fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000
+    classDef dataFiles fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
+    classDef stage1 fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px,color:#000
+    classDef stage2 fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
+    classDef stage3 fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000
+    classDef api fill:#ffeb3b,stroke:#f57f17,stroke-width:3px,color:#000
+    classDef output fill:#f1f8e9,stroke:#33691e,stroke-width:2px,color:#000
+
+    %% Top Row: User Interface
+    UI[📱 User Form<br/>index.html]:::userInterface
+    STATS[📊 Statistics Page<br/>statistics.html]:::userInterface
+    APP[⚙️ Flask App<br/>app.py /optimize]:::userInterface
+
+    %% Second Row: Data Sources
+    subgraph DATA ["📁 Data Sources"]
+        direction LR
+        D1[🏎️ driver_race_data.csv]:::dataFiles
+        D2[🏭 constructor_race_data.csv]:::dataFiles
+        C1[📅 calendar.csv]:::dataFiles
+        T1[🏁 tracks.csv]:::dataFiles
+        M[🔗 driver_mapping.csv]:::dataFiles
+        S[⚙️ settings.json]:::dataFiles
     end
 
-    %% ----- Persistent & Uploaded Data ----- %%
-    subgraph "Default & Uploaded Data"
-        D1["driver_race_data.csv"]
-        D2["constructor_race_data.csv"]
-        C1["calendar.csv"]
-        T1["tracks.csv"]
-        M["driver_mapping.csv"]
-        S["settings.json"]
+    %% External API
+    API[🌐 OpenF1 API<br/>FP2 Pace Data]:::api
+
+    %% Third Row: Stage 1 (highest priority)
+    subgraph STAGE1 ["🎯 Stage 1: Value for Money (VFM)"]
+        direction LR
+        CLEAN1[🧹 Filter Outliers]:::stage1
+        WEIGH[⚖️ Weight Points]:::stage1
+        FP2[🏎️ Apply FP2 Pace]:::stage1
+        VFMOUT[📤 VFM Output<br/>driver_vfm.csv<br/>constructor_vfm.csv]:::output
+        
+        CLEAN1 --> WEIGH --> FP2 --> VFMOUT
     end
 
-    APP --> LOAD["Load config & files"]
-    LOAD --> D1
-    LOAD --> D2
-    LOAD --> C1
-    LOAD --> T1
-    LOAD --> M
-    LOAD --> S
-
-    %% ----- Stage 1: VFM Calculation ----- %%
-    subgraph "Stage 1: VFM Calculation"
-        CLEAN["Outlier filter"]
-        WEIGH["Weight points"]
-        FP2["Apply FP2 pace"]
-        VFMOUT["driver_vfm.csv\nconstructor_vfm.csv"]
-        CLEAN --> WEIGH --> FP2 --> VFMOUT
-        FP2 -- fetch --> API[("OpenF1 API")]
-        API -- pace --> FP2
+    %% Fourth Row: Stage 2
+    subgraph STAGE2 ["🎪 Stage 2: Track Affinity"]
+        direction LR
+        CLEAN2[🧹 Remove Outliers]:::stage2
+        ENCODE[🔢 Encode Track Features]:::stage2
+        CORR[🔗 Blend Correlations]:::stage2
+        INTER[⚡ Interaction Effects]:::stage2
+        AFFOUT[📤 Affinity Output<br/>driver_affinity.csv<br/>constructor_affinity.csv]:::output
+        
+        CLEAN2 --> ENCODE --> CORR --> INTER --> AFFOUT
     end
-    APP --> CLEAN
 
-    %% ----- Stage 2: Track Affinity ----- %%
-    subgraph "Stage 2: Track Affinity"
-        OUT["Remove outliers"]
-        ENCODE["Encode track features"]
-        CORR["Blend correlations"]
-        INTER["Interaction effects"]
-        AFFOUT["driver_affinity.csv\nconstructor_affinity.csv"]
-        OUT --> ENCODE --> CORR --> INTER --> AFFOUT
-    end
-    APP --> OUT
-    OUT --> D1
-    OUT --> D2
-    OUT --> C1
-    OUT --> T1
-
-    %% ----- Stage 3: Team Optimizer ----- %%
-    subgraph "Stage 3: Team Optimizer"
-        PREP["Apply affinities & VFM"]
-        CANDS["Generate candidates"]
-        STEP1["Optimise Step 1"]
-        STEP2["Optimise Step 2"]
-        RESULT["optimization_*.json"]
+    %% Fifth Row: Stage 3 (lowest priority)
+    subgraph STAGE3 ["🎯 Stage 3: Team Optimization"]
+        direction LR
+        PREP[📋 Apply Affinities & VFM]:::stage3
+        CANDS[👥 Generate Candidates]:::stage3
+        STEP1[🔄 Optimize Step 1]:::stage3
+        STEP2[🔄 Optimize Step 2]:::stage3
+        RESULT[🏆 Final Results<br/>optimization_*.json]:::output
+        
         PREP --> CANDS --> STEP1 --> STEP2 --> RESULT
     end
-    APP --> PREP
-    PREP --> VFMOUT
-    PREP --> AFFOUT
-    PREP --> C1
-    PREP --> S
 
-    RESULT --> APP
-    APP --> UI
-    APP --> STATS
+    %% Vertical Flow Connections
+    UI --> APP
+    APP --> DATA
+    DATA --> STAGE1
+    STAGE1 --> STAGE2
+    STAGE2 --> STAGE3
+    RESULT --> STATS
+
+    %% Data Dependencies
+    API -.-> FP2
+    D1 -.-> CLEAN1
+    D2 -.-> CLEAN1
+    D1 -.-> CLEAN2
+    D2 -.-> CLEAN2
+    T1 -.-> CLEAN2
+    VFMOUT -.-> PREP
+    AFFOUT -.-> PREP
+    S -.-> PREP
 ```
 
 ## Prerequisites
