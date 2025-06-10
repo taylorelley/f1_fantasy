@@ -334,7 +334,9 @@ Only users whose email appears in `ADMIN_EMAILS` will see the Administration pag
 
 - This is designed for local/private use
 - Authentication via Google, Facebook and GitHub SSO is now supported. A local
-  username/password option is also available
+  username/password option is also available. Local accounts require an email
+  address so administrator permissions can be granted via the `ADMIN_EMAILS`
+  environment variable.
 - Uploaded files are stored locally
 
 ## License
