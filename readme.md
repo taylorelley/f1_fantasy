@@ -13,6 +13,52 @@ A web-based tool for optimizing F1 Fantasy team selections using Value For Money
 - **Configuration Memory**: Automatically remembers your last team configuration
 - **Docker Support**: Fully containerized for easy deployment
 
+## Optimisation Process
+
+The optimiser runs in three main stages:
+
+### 1. Value For Money (VFM) Calculation
+
+Driver and constructor race results are cleaned using a standard deviation based
+outlier filter before calculating a weighted average of points. Outliers more
+than `outlier_stddev_factor` standard deviations from the mean are replaced with
+`NaN`【F:f1_optimizer.py†L464-L481】. When using the trend‑based weighting scheme,
+points are weighted according to the slope of recent performance. Improving
+trends favour exponential weights while declining trends receive heavier decay
+【F:f1_optimizer.py†L496-L517】. Other schemes (equal, linear, exponential and
+moderate decay) compute fixed weights for all races【F:f1_optimizer.py†L557-L576】.
+
+If FP2 lap data is available the optimiser queries the OpenF1 API, converts lap
+times into pace scores and scales VFM values accordingly【F:f1_optimizer.py†L336-L410】.
+
+### 2. Track Affinity Analysis
+
+Historical race points are merged with circuit characteristics and cleansed with
+an IQR‑based outlier detector that also uses rolling standard deviation to
+dynamically tighten bounds【F:f1_optimizer.py†L667-L696】. Categorical track
+features are label encoded before estimating how strongly each characteristic
+correlates with past points. Importance weights are derived from the variance of
+each characteristic【F:f1_optimizer.py†L718-L763】.
+
+Correlations combine long and short term trends. Robust correlation metrics
+(linear, quadratic and threshold based) are blended and weighted by bootstrap
+confidence estimates to reduce noise【F:f1_optimizer.py†L765-L888】. Interaction
+effects between pairs of characteristics further refine each driver or
+constructor affinity, producing a score for every circuit【F:f1_optimizer.py†L890-L965】.
+
+### 3. Two‑Step Team Optimisation
+
+Team selection is optimised for the next two races. Track affinities adjust VFM
+for each upcoming circuit and points are scaled by the selected driver boost
+multiplier. Candidate swaps are generated from the top ranked drivers and
+constructors while respecting the budget and maximum swap limits
+【F:f1_optimizer.py†L1149-L1203】.
+
+Each swap pattern is evaluated to maximise expected points per million of budget
+and the search can optionally use an integer linear programming solver for exact
+optimisation. Results for both steps are compared to the baseline team to report
+the expected improvement.
+
 ## Prerequisites
 
 - Docker and Docker Compose installed
