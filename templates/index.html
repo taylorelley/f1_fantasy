@@ -17,64 +17,13 @@
       <nav class="nav-links">
         <a href="/" class="active">Optimiser</a>
         <a href="/statistics">Statistics</a>
+        <a href="/manage_data">Data Editor</a>
       </nav>
     </div>
   </header>
 
   <div class="container">
-    <!-- Default Data Status -->
-    <div class="section default-data-status" id="default-data-status" style="display: none;">
-      <h3>📁 Default Data</h3>
-      <p id="default-data-message"></p>
-    </div>
 
-    <!-- File Upload Section -->
-    <div class="section" id="upload-section">
-      <h2>Load Data Files</h2>
-      <p style="margin-bottom: 20px;">
-        Upload new data files or use existing default data if available.
-      </p>
-
-      <div class="file-upload">
-        <div class="form-group">
-          <label for="calendar-data">Race Calendar</label>
-          <input type="file" id="calendar-data" accept=".csv">
-        </div>
-        <div class="form-group">
-          <label for="tracks-data">Track Characteristics</label>
-          <input type="file" id="tracks-data" accept=".csv">
-        </div>
-        <div id="driver-mapping-section">
-          <div class="form-group">
-            <label for="driver-mapping-file">Driver Number Mapping</label>
-            <input type="file" id="driver-mapping-file" accept=".csv">
-            <small>
-              Optional, only required for Race Pace Estimation
-            </small>
-          </div>
-        </div>
-      </div>
-
-      <div class="checkbox-group">
-        <label>
-          <input type="checkbox" id="update-default-checkbox">
-          Save these files as default data (will replace existing default data)
-        </label>
-      </div>
-
-      <div class="button-group">
-        <button class="button" onclick="uploadFiles()">Upload New Files</button>
-        <button class="button button-success"
-                id="use-default-btn"
-                onclick="useDefaultData()"
-                style="display: none;">
-          Use Default Data
-        </button>
-        <a class="button button-secondary" href="/manage_data">Manage Data</a>
-      </div>
-
-      <div id="mapping-status"></div>
-    </div>
 
     <!-- Configuration Section -->
     <div class="section" id="config-section" style="display: none;">
@@ -190,9 +139,6 @@
 
       <div class="button-group">
         <button class="button" onclick="runOptimization()">Run Optimisation</button>
-        <button class="button button-secondary" onclick="showUploadSection()">
-          Change Data Files
-        </button>
       </div>
     </div>
 
