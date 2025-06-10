@@ -9,6 +9,9 @@
   >
   <title>F1 Fantasy Team Optimiser</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script>
+    const serverConfig = {{ user_config|tojson|safe }};
+  </script>
 </head>
 <body>
   <header>
@@ -273,7 +276,7 @@
           }
 
           populateTeamSelects(data.data.drivers, data.data.constructors);
-          loadConfigFromCookie();
+          loadConfig();
 
           document.getElementById('config-section').style.display = 'block';
           const uploadSection = document.getElementById('upload-section');
@@ -376,6 +379,15 @@
       if (config) applyConfig(config);
     }
 
+    function loadConfig() {
+      if (serverConfig) {
+        applyConfig(serverConfig);
+        setCookie('f1_optimizer_config', serverConfig);
+      } else {
+        loadConfigFromCookie();
+      }
+    }
+
     function applyConfig(config) {
       const driverSelects = document.querySelectorAll('.driver-select');
       if (config.current_drivers) {
@@ -467,7 +479,7 @@
           alert('Files uploaded successfully!');
         }
 
-        loadConfigFromCookie();
+        loadConfig();
         document.getElementById('config-section').style.display = 'block';
         document.getElementById('upload-section').style.display = 'none';
       } catch (error) {
