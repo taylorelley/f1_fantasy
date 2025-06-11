@@ -13,6 +13,14 @@ from email.mime.text import MIMEText
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pytz
+
+# Timezone used for scheduled jobs
+LOCAL_TIMEZONE = os.environ.get("TIMEZONE", "UTC")
+try:
+    CRON_TZ = pytz.timezone(LOCAL_TIMEZONE)
+except Exception:
+    CRON_TZ = pytz.utc
+    LOCAL_TIMEZONE = "UTC"
 from flask import (
     Flask,
     render_template,
@@ -219,7 +227,7 @@ def load_default_data():
         return None
 
 
-scheduler = BackgroundScheduler()
+scheduler = BackgroundScheduler(timezone=CRON_TZ)
 
 def send_email(to_email, subject, html_body, settings):
     if not settings.get("smtp_host"):
@@ -449,11 +457,12 @@ def schedule_job():
     except Exception:
         pass
     try:
-        trigger = CronTrigger.from_crontab(cron_expr, timezone=pytz.utc)
+        trigger = CronTrigger.from_crontab(cron_expr, timezone=CRON_TZ)
     except ValueError:
         print(f"Invalid cron expression: {cron_expr}, using default")
-        trigger = CronTrigger.from_crontab('0 18 * * 6', timezone=pytz.utc)
+        trigger = CronTrigger.from_crontab('0 18 * * 6', timezone=CRON_TZ)
     scheduler.add_job(process_queue, trigger, id='opt_job', replace_existing=True, kwargs={'email_only': True})
+    print(f"Scheduled job with cron '{cron_expr}' in timezone {LOCAL_TIMEZONE}")
 
 
 @app.route("/login", methods=["GET", "POST"])
