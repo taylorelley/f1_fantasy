@@ -1,0 +1,8 @@
+{
+  "cron": "0 18 * * SAT",
+  "smtp_server": "",
+  "smtp_port": 587,
+  "smtp_user": "",
+  "smtp_password": "",
+  "smtp_tls": true
+}

@@ -137,6 +137,38 @@
         </div>
       </form>
     </div>
+
+    <div class="section">
+      <h2>Email Settings</h2>
+      <form method="post" action="/save_email_config">
+        <div class="form-group">
+          <label for="cron">Optimisation Cron Schedule</label>
+          <input type="text" name="cron" id="cron" value="{{ email_settings.cron }}" placeholder="0 18 * * SAT">
+        </div>
+        <div class="form-group">
+          <label for="smtp_server">SMTP Server</label>
+          <input type="text" name="smtp_server" id="smtp_server" value="{{ email_settings.smtp_server }}">
+        </div>
+        <div class="form-group">
+          <label for="smtp_port">SMTP Port</label>
+          <input type="number" name="smtp_port" id="smtp_port" value="{{ email_settings.smtp_port }}">
+        </div>
+        <div class="form-group">
+          <label for="smtp_user">SMTP Username</label>
+          <input type="text" name="smtp_user" id="smtp_user" value="{{ email_settings.smtp_user }}">
+        </div>
+        <div class="form-group">
+          <label for="smtp_password">SMTP Password</label>
+          <input type="password" name="smtp_password" id="smtp_password" value="{{ email_settings.smtp_password }}">
+        </div>
+        <div class="checkbox-group">
+          <label><input type="checkbox" name="smtp_tls" id="smtp_tls" {% if email_settings.smtp_tls %}checked{% endif %}> Use TLS</label>
+        </div>
+        <div class="button-group">
+          <button class="button" type="submit">Save Email Settings</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>

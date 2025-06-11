@@ -138,6 +138,7 @@
 
       <div class="button-group">
         <button class="button" onclick="runOptimization()">Run Optimisation</button>
+        <button class="button" onclick="scheduleEmail()">Email Results Automatically</button>
       </div>
     </div>
 
@@ -574,6 +575,20 @@
         alert('Error running optimization: ' + error.message);
       } finally {
         document.getElementById('progress-section').style.display = 'none';
+      }
+    }
+
+    async function scheduleEmail() {
+      try {
+        const response = await fetch('/schedule_email', { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+          alert('Optimisation scheduled for ' + new Date(data.next_run).toLocaleString());
+        } else {
+          alert('Failed to schedule optimisation');
+        }
+      } catch (error) {
+        alert('Error scheduling optimisation: ' + error.message);
       }
     }
 
