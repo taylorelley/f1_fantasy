@@ -20,6 +20,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 COPY f1_optimizer.py .
 COPY templates/ templates/
+COPY static/ static/
+COPY default_data/ default_data/
 
 # Create necessary directories
 RUN mkdir -p uploads results
