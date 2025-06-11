@@ -12,6 +12,7 @@ import smtplib
 from email.mime.text import MIMEText
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+import pytz
 from flask import (
     Flask,
     render_template,
@@ -437,7 +438,11 @@ def schedule_job():
         scheduler.remove_all_jobs()
     except Exception:
         pass
-    trigger = CronTrigger.from_crontab(cron_expr)
+    try:
+        trigger = CronTrigger.from_crontab(cron_expr, timezone=pytz.utc)
+    except ValueError:
+        print(f"Invalid cron expression: {cron_expr}, using default")
+        trigger = CronTrigger.from_crontab('0 18 * * 6', timezone=pytz.utc)
     scheduler.add_job(run_pending_tasks, trigger, id='opt_job', replace_existing=True)
 
 
@@ -722,6 +727,10 @@ def schedule_optimization_route():
     )
     db.session.add(task)
     db.session.commit()
+    try:
+        schedule_job()
+    except Exception:
+        pass
     return jsonify({"success": True})
 
 
@@ -1227,7 +1236,8 @@ def export_statistics():
 with app.app_context():
     db.create_all()
     schedule_job()
-    scheduler.start()
+    if not scheduler.running:
+        scheduler.start()
 
 
 
