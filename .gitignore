@@ -17,6 +17,7 @@ uploads/
 results/
 *.csv
 *.json
+*.db
 
 # IDE
 .vscode/
@@ -30,3 +31,4 @@ Thumbs.db
 
 # Docker
 .dockerignore
+.env

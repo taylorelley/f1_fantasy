@@ -10,7 +10,7 @@ A Dockerized Flask application for building the optimal F1 Fantasy team. It calc
 - **Risk Tolerance Settings**: Choose between consistent performers or track-specific optimization
 - **Interactive Web Interface**: Easy-to-use web UI for configuration and results
 - **Default Data Support**: Upload data once and reuse it for multiple optimizations
-- **Configuration Memory**: Automatically remembers your last team configuration
+- **Configuration Memory**: Each user's last team configuration is saved and reloaded on login
 - **Docker Support**: Fully containerized for easy deployment
 
 ## Optimization Process
@@ -156,11 +156,12 @@ flowchart TD
 ## Quick Start
 
 1. Clone the repository.
-2. Build and start the containers:
+2. Copy `.env.example` to `.env` and fill in your OAuth credentials.
+3. Build and start the containers:
 ```bash
 docker-compose up --build
 ```
-3. Open `http://localhost:5000` in your browser.
+4. Open `http://localhost:5000` in your browser.
 
 ## Using the Application
 
@@ -266,9 +267,9 @@ The application supports three types of data persistence:
    - Shared across all optimization sessions
    - Updated only when explicitly requested
 
-2. **Configuration Memory**: Last used team configuration
-   - Automatically saved after each optimization
-   - Loaded when using default data
+2. **Configuration Memory**: Last used team configuration per user
+   - Saved to the user's profile after each optimization
+   - Automatically loaded whenever the user logs in
 
 3. **Results History**: All optimization results
    - Saved in `results/` directory
@@ -303,6 +304,23 @@ f1-optimizer/
 
 - `FLASK_SECRET_KEY`: Secret key for Flask sessions (default: auto-generated)
 - `FLASK_ENV`: Flask environment (production/development)
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret
+- `FACEBOOK_CLIENT_ID`: Facebook OAuth client ID
+- `FACEBOOK_CLIENT_SECRET`: Facebook OAuth client secret
+- `GITHUB_CLIENT_ID`: Github OAuth client ID
+- `GITHUB_CLIENT_SECRET`: Github OAuth client secret
+- `ADMIN_EMAILS`: Comma separated list of administrator emails
+
+Create a `.env` file (or copy `.env.example`) with the variables above set to
+your provider credentials. Docker Compose will automatically load this file.
+
+## Authentication
+
+Register OAuth credentials with each provider and set the environment variables above.
+Use the following callback URL for all providers: `https://<your-domain>/authorize/<provider>`.
+Replace `<provider>` with `google`, `facebook`, or `github`.
+Only users whose email appears in `ADMIN_EMAILS` will see the Administration page.
 
 ## Troubleshooting
 
@@ -315,9 +333,11 @@ f1-optimizer/
 ## Security Notes
 
 - This is designed for local/private use
-- No authentication is implemented
+- Authentication via Google, Facebook and GitHub SSO is now supported. A local
+  username/password option is also available. Local accounts require an email
+  address so administrator permissions can be granted via the `ADMIN_EMAILS`
+  environment variable.
 - Uploaded files are stored locally
-- Consider adding authentication for public deployment
 
 ## License
 
