@@ -1236,8 +1236,10 @@ def export_statistics():
 with app.app_context():
     db.create_all()
     schedule_job()
-    if not scheduler.running:
-        scheduler.start()
+    # Start the scheduler only in the main process
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
+        if not scheduler.running:
+            scheduler.start()
 
 
 
