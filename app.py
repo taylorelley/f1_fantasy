@@ -161,6 +161,7 @@ def load_settings():
         "smtp_username": "",
         "smtp_password": "",
         "smtp_tls": True,
+        "smtp_from": "",
     }
     if os.path.exists(settings_path):
         try:
@@ -171,7 +172,7 @@ def load_settings():
                     defaults[k] = bool(v)
                 elif k in ("top_n_candidates", "smtp_port"):
                     defaults[k] = int(v)
-                elif k in ("cron_schedule", "smtp_host", "smtp_username", "smtp_password"):
+                elif k in ("cron_schedule", "smtp_host", "smtp_username", "smtp_password", "smtp_from"):
                     defaults[k] = str(v)
                 elif k == "smtp_tls":
                     defaults[k] = bool(v)
@@ -224,7 +225,7 @@ def send_email(to_email, subject, html_body, settings):
         return False
     msg = MIMEText(html_body, "html")
     msg["Subject"] = subject
-    msg["From"] = settings.get("smtp_username") or settings.get("smtp_host")
+    msg["From"] = settings.get("smtp_from") or settings.get("smtp_username") or settings.get("smtp_host")
     msg["To"] = to_email
     try:
         server = smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port"))
@@ -878,6 +879,7 @@ def save_settings_route():
         "smtp_username": request.form.get("smtp_username", ""),
         "smtp_password": request.form.get("smtp_password", ""),
         "smtp_tls": bool(request.form.get("smtp_tls")),
+        "smtp_from": request.form.get("smtp_from", ""),
     }
     success = save_settings(data)
     if success:
