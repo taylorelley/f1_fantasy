@@ -162,6 +162,7 @@
         </div>
         <div class="button-group">
           <button class="button" type="submit">Save Settings</button>
+          <button type="button" class="button-secondary" onclick="sendTestEmail()">Send Test Email</button>
         </div>
       </form>
     </div>
@@ -279,6 +280,20 @@
 
     function prepareMappingCsv() {
       document.getElementById('mapping-data-hidden').value = tableToCSV('mapping-table');
+    }
+
+    async function sendTestEmail() {
+      try {
+        const resp = await fetch('/send_test_email', { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+          alert('Test email sent. Check your inbox.');
+        } else {
+          alert('Failed to send test email: ' + (data.message || 'unknown error'));
+        }
+      } catch (err) {
+        alert('Failed to send test email: ' + err.message);
+      }
     }
 
     document.addEventListener('DOMContentLoaded', () => {

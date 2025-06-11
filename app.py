@@ -221,7 +221,7 @@ scheduler = BackgroundScheduler()
 def send_email(to_email, subject, html_body, settings):
     if not settings.get("smtp_host"):
         print("SMTP host not configured; skipping email")
-        return
+        return False
     msg = MIMEText(html_body, "html")
     msg["Subject"] = subject
     msg["From"] = settings.get("smtp_username") or settings.get("smtp_host")
@@ -234,8 +234,10 @@ def send_email(to_email, subject, html_body, settings):
             server.login(settings.get("smtp_username"), settings.get("smtp_password"))
         server.sendmail(msg["From"], [to_email], msg.as_string())
         server.quit()
+        return True
     except Exception as e:
         print("Failed to send email", e)
+        return False
 
 
 def perform_optimization(data, user=None):
@@ -885,6 +887,19 @@ def save_settings_route():
             pass
     msg = "Settings saved." if success else "Failed to save settings."
     return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/send_test_email", methods=["POST"])
+@login_required
+def send_test_email_route():
+    if not current_user.admin:
+        return jsonify({"success": False, "message": "Unauthorized"})
+    settings = load_settings()
+    html = "<p>This is a test email from the F1 Fantasy optimiser.</p>"
+    ok = send_email(current_user.email, "SMTP Test", html, settings)
+    if ok:
+        return jsonify({"success": True})
+    return jsonify({"success": False, "message": "Failed to send email"})
 
 
 @app.route("/api/statistics")
