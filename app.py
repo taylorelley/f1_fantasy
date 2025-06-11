@@ -204,6 +204,11 @@ def login():
         if username and password:
             user = User.query.filter_by(provider="local", username=username).first()
             if user and check_password_hash(user.password_hash or "", password):
+                admin_emails = [e.strip() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+                new_admin = user.email in admin_emails
+                if new_admin != user.admin:
+                    user.admin = new_admin
+                    db.session.commit()
                 login_user(user)
                 return redirect(url_for("index"))
             return render_template("login.html", message="Invalid credentials")
@@ -216,8 +221,9 @@ def register():
         return redirect(url_for("index"))
     if request.method == "POST":
         username = request.form.get("username")
+        email = request.form.get("email")
         password = request.form.get("password")
-        if not username or not password:
+        if not username or not email or not password:
             return render_template("register.html", message="All fields required")
         if User.query.filter_by(username=username).first():
             return render_template("register.html", message="Username taken")
@@ -226,8 +232,11 @@ def register():
             provider_id=username,
             username=username,
             name=username,
+            email=email,
         )
         user.password_hash = generate_password_hash(password)
+        admin_emails = [e.strip() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+        user.admin = email in admin_emails
         db.session.add(user)
         db.session.commit()
         login_user(user)
