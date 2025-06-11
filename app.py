@@ -18,6 +18,17 @@ from flask import (
     url_for,
 )
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    login_user,
+    login_required,
+    logout_user,
+    current_user,
+)
+from authlib.integrations.flask_client import OAuth
 
 from f1_optimizer import (
     F1VFMCalculator,
@@ -32,13 +43,64 @@ app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max
 app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["RESULTS_FOLDER"] = "results"
 app.config["DEFAULT_DATA_FOLDER"] = "default_data"
-app.secret_key = "your-secret-key-here"
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "replace-me")
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///users.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db = SQLAlchemy(app)
+
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
+
+oauth = OAuth(app)
+oauth.register(
+    name="google",
+    client_id=os.environ.get("GOOGLE_CLIENT_ID"),
+    client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile"},
+)
+oauth.register(
+    name="facebook",
+    client_id=os.environ.get("FACEBOOK_CLIENT_ID"),
+    client_secret=os.environ.get("FACEBOOK_CLIENT_SECRET"),
+    access_token_url="https://graph.facebook.com/v12.0/oauth/access_token",
+    access_token_params=None,
+    authorize_url="https://www.facebook.com/v12.0/dialog/oauth",
+    authorize_params=None,
+    api_base_url="https://graph.facebook.com/v12.0/",
+    client_kwargs={"scope": "email"},
+)
+oauth.register(
+    name="github",
+    client_id=os.environ.get("GITHUB_CLIENT_ID"),
+    client_secret=os.environ.get("GITHUB_CLIENT_SECRET"),
+    access_token_url="https://github.com/login/oauth/access_token",
+    authorize_url="https://github.com/login/oauth/authorize",
+    api_base_url="https://api.github.com/",
+    client_kwargs={"scope": "user:email"},
+)
 
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 os.makedirs(app.config["RESULTS_FOLDER"], exist_ok=True)
 os.makedirs(app.config["DEFAULT_DATA_FOLDER"], exist_ok=True)
 
 sessions = {}
+
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    provider_id = db.Column(db.String(256), unique=True, nullable=False)
+    provider = db.Column(db.String(50), nullable=False)
+    name = db.Column(db.String(256))
+    email = db.Column(db.String(256))
+    username = db.Column(db.String(256), unique=True)
+    password_hash = db.Column(db.String(256))
+    admin = db.Column(db.Boolean, default=False)
+    config_json = db.Column(db.Text, default="{}")
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 
 
 def get_data_folder(session_id=None):
@@ -70,10 +132,48 @@ def has_driver_mapping():
     return os.path.exists(mapping_path)
 
 
+def load_settings():
+    """Load optimisation parameter settings from settings.json"""
+    settings_path = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "settings.json")
+    defaults = {
+        "outlier_stddev_factor": 2.0,
+        "trend_slope_threshold": 1.7,
+        "recent_races_fraction": 0.4,
+        "long_term_weight": 0.7,
+        "interaction_weight": 0.5,
+        "top_n_candidates": 10,
+        "use_ilp": False,
+    }
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r") as f:
+                data = json.load(f)
+            for k, v in data.items():
+                if k == "use_ilp":
+                    defaults[k] = bool(v)
+                elif k == "top_n_candidates":
+                    defaults[k] = int(v)
+                else:
+                    defaults[k] = float(v)
+        except Exception:
+            pass
+    return defaults
+
+
+def save_settings(data):
+    """Save optimisation parameter settings to settings.json"""
+    settings_path = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "settings.json")
+    try:
+        with open(settings_path, "w") as f:
+            json.dump(data, f, indent=2)
+        return True
+    except Exception:
+        return False
+
+
 def load_default_data():
     if not has_default_data():
         return None
-
     try:
         base = app.config["DEFAULT_DATA_FOLDER"] + "/"
         races_completed = get_races_completed(base)
@@ -94,23 +194,138 @@ def load_default_data():
         return None
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        if username and password:
+            user = User.query.filter_by(provider="local", username=username).first()
+            if user and check_password_hash(user.password_hash or "", password):
+                admin_emails = [e.strip() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+                new_admin = user.email in admin_emails
+                if new_admin != user.admin:
+                    user.admin = new_admin
+                    db.session.commit()
+                login_user(user)
+                return redirect(url_for("index"))
+            return render_template("login.html", message="Invalid credentials")
+    return render_template("login.html")
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        username = request.form.get("username")
+        email = request.form.get("email")
+        password = request.form.get("password")
+        if not username or not email or not password:
+            return render_template("register.html", message="All fields required")
+        if User.query.filter_by(username=username).first():
+            return render_template("register.html", message="Username taken")
+        user = User(
+            provider="local",
+            provider_id=username,
+            username=username,
+            name=username,
+            email=email,
+        )
+        user.password_hash = generate_password_hash(password)
+        admin_emails = [e.strip() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+        user.admin = email in admin_emails
+        db.session.add(user)
+        db.session.commit()
+        login_user(user)
+        return redirect(url_for("index"))
+    return render_template("register.html")
+
+
+@app.route("/login/<provider>")
+def login_provider(provider):
+    if provider not in ("google", "facebook", "github"):
+        return redirect(url_for("login"))
+    redirect_uri = url_for("authorize", provider=provider, _external=True)
+    return oauth.create_client(provider).authorize_redirect(redirect_uri)
+
+
+@app.route("/authorize/<provider>")
+def authorize(provider):
+    if provider not in ("google", "facebook", "github"):
+        return redirect(url_for("login"))
+    client = oauth.create_client(provider)
+    token = client.authorize_access_token()
+    if provider == "google":
+        user_info = client.get("userinfo").json()
+        provider_id = user_info.get("sub")
+        email = user_info.get("email")
+        name = user_info.get("name")
+    elif provider == "facebook":
+        user_info = client.get("me?fields=id,name,email").json()
+        provider_id = user_info.get("id")
+        email = user_info.get("email")
+        name = user_info.get("name")
+    else:
+        user_info = client.get("user").json()
+        provider_id = str(user_info.get("id"))
+        name = user_info.get("name") or user_info.get("login")
+        email = user_info.get("email")
+        if not email:
+            emails = client.get("user/emails").json()
+            if emails:
+                email = next((e["email"] for e in emails if e.get("primary")), emails[0]["email"])
+
+    if not provider_id:
+        return redirect(url_for("login"))
+
+    user = User.query.filter_by(provider=provider, provider_id=provider_id).first()
+    if not user:
+        user = User(provider=provider, provider_id=provider_id, name=name, email=email)
+        admin_emails = [e.strip() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+        user.admin = email in admin_emails
+        db.session.add(user)
+        db.session.commit()
+
+    login_user(user)
+    return redirect(url_for("index"))
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("login"))
+
 @app.route("/")
+@login_required
 def index():
-    return render_template("index.html")
+    cfg = None
+    if current_user.config_json:
+        try:
+            cfg = json.loads(current_user.config_json)
+        except Exception:
+            cfg = None
+    return render_template("index.html", user_config=cfg)
 
 
 @app.route("/check_default_data")
+@login_required
 def check_default_data():
     default_info = load_default_data()
     return jsonify({"has_default": default_info is not None, "data": default_info})
 
 
 @app.route("/check_driver_mapping")
+@login_required
 def check_driver_mapping():
     return jsonify({"exists": has_driver_mapping()})
 
 
 @app.route("/upload", methods=["POST"])
+@login_required
 def upload_files():
     try:
         update_default = request.form.get("update_default", "false") == "true"
@@ -189,6 +404,7 @@ def upload_files():
 
 
 @app.route("/upload_driver_mapping", methods=["POST"])
+@login_required
 def upload_driver_mapping():
     try:
         if "driver_mapping" not in request.files:
@@ -234,6 +450,7 @@ def upload_driver_mapping():
 
 
 @app.route("/optimize", methods=["POST"])
+@login_required
 def optimize():
     try:
         data = request.get_json() or {}
@@ -290,8 +507,6 @@ def optimize():
             "weighting_scheme":     data.get("weighting_scheme", "trend_based"),
             "risk_tolerance":       data.get("risk_tolerance", "medium"),
             "multiplier":           int(data.get("multiplier", 1)),
-            "top_n_candidates":     int(data.get("top_n_candidates", 10)),
-            "use_ilp":              bool(data.get("use_ilp", False)),
             "use_parallel":         False,
             "use_fp2_pace":         use_fp2,
             "pace_weight":          pace_weight,
@@ -299,6 +514,16 @@ def optimize():
             "next_meeting_key":     meeting_key,
             "next_race_year":       race_year,
         }
+
+        # Load tuning parameters from settings.json
+        settings = load_settings()
+        config.update(settings)
+
+        try:
+            current_user.config_json = json.dumps(config)
+            db.session.commit()
+        except Exception:
+            pass
 
         results = {"status": "running", "progress": []}
 
@@ -409,12 +634,16 @@ def optimize():
 
 
 @app.route("/statistics")
+@login_required
 def statistics():
     return render_template("statistics.html")
 
 
 @app.route("/manage_data")
+@login_required
 def manage_data_page():
+    if not current_user.admin:
+        return redirect(url_for("index"))
     base = app.config["DEFAULT_DATA_FOLDER"]
     driver_path = os.path.join(base, "driver_race_data.csv")
     constructor_path = os.path.join(base, "constructor_race_data.csv")
@@ -443,6 +672,8 @@ def manage_data_page():
         with open(mapping_path, "r") as f:
             mapping_csv = f.read()
 
+    settings = load_settings()
+
     message = request.args.get("message")
     return render_template(
         "manage_data.html",
@@ -452,10 +683,12 @@ def manage_data_page():
         tracks_csv=tracks_csv,
         mapping_csv=mapping_csv,
         message=message,
+        settings=settings,
     )
 
 
 @app.route("/save_driver_data", methods=["POST"])
+@login_required
 def save_driver_data():
     csv_text = request.form.get("driver_data", "")
     dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "driver_race_data.csv")
@@ -470,6 +703,7 @@ def save_driver_data():
 
 
 @app.route("/save_constructor_data", methods=["POST"])
+@login_required
 def save_constructor_data():
     csv_text = request.form.get("constructor_data", "")
     dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "constructor_race_data.csv")
@@ -484,6 +718,7 @@ def save_constructor_data():
 
 
 @app.route("/save_calendar_data", methods=["POST"])
+@login_required
 def save_calendar_data():
     csv_text = request.form.get("calendar_data", "")
     dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "calendar.csv")
@@ -498,6 +733,7 @@ def save_calendar_data():
 
 
 @app.route("/save_tracks_data", methods=["POST"])
+@login_required
 def save_tracks_data():
     csv_text = request.form.get("tracks_data", "")
     dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "tracks.csv")
@@ -512,6 +748,7 @@ def save_tracks_data():
 
 
 @app.route("/save_mapping_data", methods=["POST"])
+@login_required
 def save_mapping_data():
     csv_text = request.form.get("mapping_data", "")
     dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "driver_mapping.csv")
@@ -533,7 +770,25 @@ def save_mapping_data():
     return redirect(url_for("manage_data_page", message=msg))
 
 
+@app.route("/save_settings", methods=["POST"])
+@login_required
+def save_settings_route():
+    data = {
+        "outlier_stddev_factor": request.form.get("outlier_stddev_factor", type=float),
+        "trend_slope_threshold": request.form.get("trend_slope_threshold", type=float),
+        "recent_races_fraction": request.form.get("recent_races_fraction", type=float),
+        "long_term_weight": request.form.get("long_term_weight", type=float),
+        "interaction_weight": request.form.get("interaction_weight", type=float),
+        "top_n_candidates": request.form.get("top_n_candidates", type=int),
+        "use_ilp": bool(request.form.get("use_ilp")),
+    }
+    success = save_settings(data)
+    msg = "Settings saved." if success else "Failed to save settings."
+    return redirect(url_for("manage_data_page", message=msg))
+
+
 @app.route("/api/statistics")
+@login_required
 def get_statistics():
     try:
         data_folder = get_data_folder("default")
@@ -795,6 +1050,7 @@ def process_constructor_statistics(
 
 
 @app.route("/api/export_statistics")
+@login_required
 def export_statistics():
     try:
         stats_resp = get_statistics()
@@ -851,6 +1107,10 @@ def export_statistics():
     except Exception:
         traceback.print_exc()
         return jsonify({"success": False, "message": "Error exporting statistics"})
+with app.app_context():
+    db.create_all()
+
+
 
 
 if __name__ == "__main__":

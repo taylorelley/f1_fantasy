@@ -1,0 +1,9 @@
+{
+  "outlier_stddev_factor": 2.0,
+  "trend_slope_threshold": 1.7,
+  "recent_races_fraction": 0.4,
+  "long_term_weight": 0.7,
+  "interaction_weight": 0.5
+ ,"top_n_candidates": 10
+ ,"use_ilp": false
+}

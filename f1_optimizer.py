@@ -301,10 +301,15 @@ class F1VFMCalculator:
     def __init__(self, config):
         self.config = config
         self.base_path = config["base_path"]
+        self.recent_frac = config.get("recent_races_fraction", 0.4)
+        self.long_weight = config.get("long_term_weight", 0.7)
+        self.interaction_weight = config.get("interaction_weight", 0.5)
         self.scheme = config["weighting_scheme"]
         self.use_fp2_pace = config.get("use_fp2_pace", False)
         self.pace_weight = config.get("pace_weight", 0.25)
         self.pace_modifier_type = config.get("pace_modifier_type", "conservative")
+        self.outlier_std = config.get("outlier_stddev_factor", 2.0)
+        self.trend_threshold = config.get("trend_slope_threshold", 1.7)
 
     def calculate_vfm(self, race_data_file, vfm_data_file, entity_type="driver", weights=None):
         """Calculate VFM scores with outlier removal and optional FP2 pace integration"""
@@ -457,7 +462,7 @@ class F1VFMCalculator:
             return None
 
     def _remove_outliers(self, df, entity_col, race_columns):
-        """Remove race results outside 2 standard deviations"""
+        """Remove race results outside configurable standard deviations"""
         df_clean = df.copy()
         for ent in df_clean[entity_col].unique():
             mask = df_clean[entity_col] == ent
@@ -465,8 +470,8 @@ class F1VFMCalculator:
 
             mean_val = np.mean(data)
             std_val = np.std(data)
-            lb = mean_val - 2 * std_val
-            ub = mean_val + 2 * std_val
+            lb = mean_val - self.outlier_std * std_val
+            ub = mean_val + self.outlier_std * std_val
 
             for rc in race_columns:
                 v = df_clean.loc[mask, rc].values[0]
@@ -494,7 +499,7 @@ class F1VFMCalculator:
                 x = np.array(idxs)
                 coeffs = np.polyfit(x, pts, 1)
                 slope = coeffs[0]
-                threshold = 1.7
+                threshold = self.trend_threshold
                 full_w = [np.nan] * num_races
 
                 if slope > threshold:
@@ -608,6 +613,9 @@ class F1TrackAffinityCalculator:
     def __init__(self, config):
         self.config = config
         self.base_path = config["base_path"]
+        self.recent_frac = config.get("recent_races_fraction", 0.4)
+        self.long_weight = config.get("long_term_weight", 0.7)
+        self.interaction_weight = config.get("interaction_weight", 0.5)
 
     def run(self):
         """Run track affinity calculations"""
@@ -787,14 +795,14 @@ class F1TrackAffinityCalculator:
 
                     long_corr = self._calculate_robust_correlation(x, y)
                     short_corr = None
-                    threshold = max(2, int(0.4 * n_races))
+                    threshold = max(2, int(self.recent_frac * n_races))
                     if n_races >= threshold:
                         x_recent = x[-threshold:]
                         y_recent = y[-threshold:]
                         short_corr = self._calculate_robust_correlation(x_recent, y_recent)
 
                     if short_corr is not None and not np.isnan(short_corr):
-                        blend = 0.7 * long_corr + 0.3 * short_corr
+                        blend = self.long_weight * long_corr + (1 - self.long_weight) * short_corr
                     else:
                         blend = long_corr
 
@@ -813,7 +821,7 @@ class F1TrackAffinityCalculator:
                     pts = ent_data["Points"].values
                     inter_corr = self._calculate_robust_correlation(inter, pts)
                     conf_w = self._calculate_confidence_weight(inter, pts)
-                    scores[f"{c1}_x_{c2}"] = inter_corr * conf_w * 0.5
+                    scores[f"{c1}_x_{c2}"] = inter_corr * conf_w * self.interaction_weight
                 else:
                     scores[f"{c1}_x_{c2}"] = 0
 
