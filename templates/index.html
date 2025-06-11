@@ -138,6 +138,7 @@
 
       <div class="button-group">
         <button class="button" onclick="runOptimization()">Run Optimisation</button>
+        <button class="button" onclick="scheduleOptimization()">Schedule Email Optimisation</button>
       </div>
     </div>
 
@@ -574,6 +575,46 @@
         alert('Error running optimization: ' + error.message);
       } finally {
         document.getElementById('progress-section').style.display = 'none';
+      }
+    }
+
+    async function scheduleOptimization() {
+      const drivers = [];
+      document.querySelectorAll('.driver-select').forEach(sel => { if (sel.value) drivers.push(sel.value); });
+      if (drivers.length !== 5) { alert('Please select exactly 5 drivers'); return; }
+      const constructors = [];
+      document.querySelectorAll('.constructor-select').forEach(sel => { if (sel.value) constructors.push(sel.value); });
+      if (constructors.length !== 2) { alert('Please select exactly 2 constructors'); return; }
+      const useFP2 = document.getElementById('use-fp2-pace')?.checked;
+      const config = {
+        session_id: sessionId,
+        current_drivers: drivers,
+        current_constructors: constructors,
+        remaining_budget: document.getElementById('remaining-budget')?.value,
+        step1_swaps: document.getElementById('step1-swaps')?.value,
+        step2_swaps: document.getElementById('step2-swaps')?.value,
+        weighting_scheme: document.getElementById('weighting-scheme')?.value,
+        risk_tolerance: document.getElementById('risk-tolerance')?.value,
+        multiplier: document.getElementById('multiplier')?.value,
+        use_fp2_pace: useFP2,
+        pace_weight: useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
+        pace_modifier_type: useFP2 ? document.getElementById('pace-modifier-type')?.value : null
+      };
+      saveConfigToCookie();
+      try {
+        const resp = await fetch('/schedule_optimization', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        });
+        const data = await resp.json();
+        if (data.success) {
+          alert('Optimisation scheduled. Results will be emailed to you.');
+        } else {
+          alert('Error: ' + data.message);
+        }
+      } catch (err) {
+        alert('Error scheduling optimisation: ' + err.message);
       }
     }
 
