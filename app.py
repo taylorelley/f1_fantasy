@@ -102,13 +102,14 @@ class User(db.Model, UserMixin):
     admin = db.Column(db.Boolean, default=False)
     config_json = db.Column(db.Text, default="{}")
 
-class ScheduledOptimization(db.Model):
+class OptimizationTask(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     config_json = db.Column(db.Text, nullable=False)
-    scheduled_for = db.Column(db.DateTime, nullable=False)
+    notify = db.Column(db.Boolean, default=False)
     status = db.Column(db.String(20), default='pending')
     result_json = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -406,12 +407,18 @@ def perform_optimization(data, user=None):
     return resp
 
 
-def run_pending_tasks():
+def process_queue(email_only=False, task_id=None):
     with app.app_context():
-        tasks = ScheduledOptimization.query.filter_by(status='pending').all()
+        query = OptimizationTask.query.filter_by(status='pending')
+        if email_only:
+            query = query.filter_by(notify=True)
+        if task_id:
+            query = query.filter_by(id=task_id)
+        tasks = query.all()
         if not tasks:
-            return
+            return []
         settings = load_settings()
+        results = []
         for task in tasks:
             user = User.query.get(task.user_id)
             if not user:
@@ -421,15 +428,18 @@ def run_pending_tasks():
             try:
                 config = json.loads(task.config_json)
                 result = perform_optimization(config, user)
-                html = render_template('email_results.html', opt=result['optimization'])
-                send_email(user.email, 'F1 Optimisation Results', html, settings)
+                if task.notify:
+                    html = render_template('email_results.html', opt=result['optimization'])
+                    send_email(user.email, 'F1 Optimisation Results', html, settings)
                 task.status = 'completed'
                 task.result_json = json.dumps(result)
+                results.append((task.id, result))
             except Exception as e:
                 traceback.print_exc()
                 task.status = 'failed'
                 task.result_json = json.dumps({'error': str(e)})
         db.session.commit()
+        return results
 
 
 def schedule_job():
@@ -443,7 +453,7 @@ def schedule_job():
     except ValueError:
         print(f"Invalid cron expression: {cron_expr}, using default")
         trigger = CronTrigger.from_crontab('0 18 * * 6', timezone=pytz.utc)
-    scheduler.add_job(run_pending_tasks, trigger, id='opt_job', replace_existing=True)
+    scheduler.add_job(process_queue, trigger, id='opt_job', replace_existing=True, kwargs={'email_only': True})
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -706,8 +716,18 @@ def upload_driver_mapping():
 def optimize():
     try:
         data = request.get_json() or {}
-        result = perform_optimization(data, current_user)
-        return jsonify(result)
+        task = OptimizationTask(
+            user_id=current_user.id,
+            config_json=json.dumps(data),
+            notify=False,
+            status='pending',
+        )
+        db.session.add(task)
+        db.session.commit()
+        results = process_queue(task_id=task.id)
+        if results:
+            return jsonify(results[0][1])
+        return jsonify({"success": False, "message": "Queue processing failed"})
     except ValueError as e:
         return jsonify({"success": False, "message": str(e)})
     except Exception:
@@ -719,10 +739,10 @@ def optimize():
 @login_required
 def schedule_optimization_route():
     data = request.get_json() or {}
-    task = ScheduledOptimization(
+    task = OptimizationTask(
         user_id=current_user.id,
         config_json=json.dumps(data),
-        scheduled_for=datetime.utcnow(),
+        notify=True,
         status='pending',
     )
     db.session.add(task)
