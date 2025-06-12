@@ -17,7 +17,14 @@ import requests
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 from sklearn.preprocessing import LabelEncoder
-from pulp import LpProblem, LpVariable, LpMaximize, lpSum, LpBinary
+from pulp import (
+    LpProblem,
+    LpVariable,
+    LpMaximize,
+    lpSum,
+    LpBinary,
+    PULP_CBC_CMD,
+)
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -1342,7 +1349,7 @@ class F1TeamOptimizer:
             <= max_swaps
         )
 
-        prob.solve()
+        prob.solve(PULP_CBC_CMD(msg=False))
 
         selected_drivers = [name for name, var in d_vars.items() if var.value() == 1]
         selected_constructors = [name for name, var in c_vars.items() if var.value() == 1]
