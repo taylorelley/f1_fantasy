@@ -12,6 +12,10 @@ A Dockerized Flask application for building the optimal F1 Fantasy team. It calc
 - **Default Data Support**: Upload data once and reuse it for multiple optimizations
 - **Configuration Memory**: Each user's last team configuration is saved and reloaded on login
 - **Docker Support**: Fully containerized for easy deployment
+- **User Authentication**: Login via Google, Facebook, GitHub or a local account
+- **Administration Panel**: Manage data files, adjust settings and schedule optimisations
+- **Queued & Scheduled Jobs**: Optimisations run in the background and can email results
+- **Statistics Dashboard**: Visualise data and export statistics to Excel
 
 ## Optimization Process
 
@@ -195,6 +199,13 @@ docker-compose up --build
 3. **Updating Data**:
    - To update default data, upload new files and check "Save these files as default data"
    - To use different data temporarily, upload files without checking the box
+4. **Viewing Statistics**:
+   - Click the "Statistics" link in the navigation bar
+   - Charts show VFM rankings and upcoming race affinities
+   - Use "Export Stats" to download an Excel summary
+5. **Queued & Scheduled Runs**:
+   - Optimisations are placed in a background queue
+   - Configure SMTP and a cron schedule on the Administration page to receive weekly results via email
 
 ## Data File Formats
 
@@ -257,6 +268,10 @@ adjusted on the Administration page.
 - **interaction_weight** – Weight applied to track interaction correlations.
   Raising this value makes driver/constructor-track affinities more influential
   in the final optimization, while lowering it reduces that effect.
+- **top_n_candidates** – Limit on the number of swap candidates considered.
+- **use_ilp** – Use integer linear programming for exact optimisation.
+- **cron_schedule** – Cron expression for weekly queued optimisation.
+- **smtp_host**/**smtp_port**/**smtp_username**/**smtp_password**/**smtp_tls**/**smtp_from** – SMTP settings for email results.
 
 ## Data Persistence
 
