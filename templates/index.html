@@ -8,6 +8,7 @@
     href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='90' font-size='90'%3E🏎️%3C/text%3E%3C/svg%3E"
   >
   <title>F1 Fantasy Team Optimiser</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script>
     const serverConfig = {{ user_config|tojson|safe }};
@@ -138,11 +139,12 @@
 
       <div class="button-group">
         <button class="button" onclick="runOptimization()">Run Optimisation</button>
+        <button class="button" onclick="scheduleOptimization()">Schedule Email Optimisation</button>
       </div>
     </div>
 
     <!-- Progress Section -->
-    <div class="section progress" id="progress-section">
+    <div class="section" id="progress-section">
       <h2>Optimisation Progress</h2>
       <div class="loading">
         <div class="spinner"></div>
@@ -307,6 +309,7 @@
           drivers.forEach(driver => {
             select.innerHTML += `<option value="${driver}">${driver}</option>`;
           });
+          select.addEventListener('change', validateUniqueSelections);
           driverContainer.appendChild(select);
         }
       }
@@ -321,9 +324,38 @@
           constructors.forEach(cons => {
             select.innerHTML += `<option value="${cons}">${cons}</option>`;
           });
+          select.addEventListener('change', validateUniqueSelections);
           constructorContainer.appendChild(select);
         }
       }
+
+      validateUniqueSelections();
+    }
+
+    function validateUniqueSelections() {
+      const drivers = [];
+      document.querySelectorAll('.driver-select').forEach(sel => drivers.push(sel.value));
+      const driverDuplicates = drivers.filter((val, idx, arr) => val && arr.indexOf(val) !== idx);
+      document.querySelectorAll('.driver-select').forEach(sel => {
+        if (driverDuplicates.includes(sel.value) && sel.value) {
+          sel.classList.add('duplicate-selection');
+        } else {
+          sel.classList.remove('duplicate-selection');
+        }
+      });
+
+      const constructors = [];
+      document.querySelectorAll('.constructor-select').forEach(sel => constructors.push(sel.value));
+      const consDuplicates = constructors.filter((val, idx, arr) => val && arr.indexOf(val) !== idx);
+      document.querySelectorAll('.constructor-select').forEach(sel => {
+        if (consDuplicates.includes(sel.value) && sel.value) {
+          sel.classList.add('duplicate-selection');
+        } else {
+          sel.classList.remove('duplicate-selection');
+        }
+      });
+
+      return driverDuplicates.length === 0 && consDuplicates.length === 0;
     }
 
     function setCookie(name, value, days = 30) {
@@ -421,6 +453,8 @@
       }
       if (config.pace_weight)        document.getElementById('pace-weight').value       = config.pace_weight;
       if (config.pace_modifier_type) document.getElementById('pace-modifier-type').value = config.pace_modifier_type;
+
+      validateUniqueSelections();
     }
 
     async function uploadFiles() {
@@ -510,12 +544,17 @@
     }
 
     async function runOptimization() {
+      validateUniqueSelections();
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => {
         if (sel.value) drivers.push(sel.value);
       });
       if (drivers.length !== 5) {
         alert('Please select exactly 5 drivers');
+        return;
+      }
+      if (new Set(drivers).size !== drivers.length) {
+        alert('Each driver must be unique');
         return;
       }
 
@@ -525,6 +564,10 @@
       });
       if (constructors.length !== 2) {
         alert('Please select exactly 2 constructors');
+        return;
+      }
+      if (new Set(constructors).size !== constructors.length) {
+        alert('Each constructor must be unique');
         return;
       }
 
@@ -574,6 +617,49 @@
         alert('Error running optimization: ' + error.message);
       } finally {
         document.getElementById('progress-section').style.display = 'none';
+      }
+    }
+
+    async function scheduleOptimization() {
+      validateUniqueSelections();
+      const drivers = [];
+      document.querySelectorAll('.driver-select').forEach(sel => { if (sel.value) drivers.push(sel.value); });
+      if (drivers.length !== 5) { alert('Please select exactly 5 drivers'); return; }
+      if (new Set(drivers).size !== drivers.length) { alert('Each driver must be unique'); return; }
+      const constructors = [];
+      document.querySelectorAll('.constructor-select').forEach(sel => { if (sel.value) constructors.push(sel.value); });
+      if (constructors.length !== 2) { alert('Please select exactly 2 constructors'); return; }
+      if (new Set(constructors).size !== constructors.length) { alert('Each constructor must be unique'); return; }
+      const useFP2 = document.getElementById('use-fp2-pace')?.checked;
+      const config = {
+        session_id: sessionId,
+        current_drivers: drivers,
+        current_constructors: constructors,
+        remaining_budget: document.getElementById('remaining-budget')?.value,
+        step1_swaps: document.getElementById('step1-swaps')?.value,
+        step2_swaps: document.getElementById('step2-swaps')?.value,
+        weighting_scheme: document.getElementById('weighting-scheme')?.value,
+        risk_tolerance: document.getElementById('risk-tolerance')?.value,
+        multiplier: document.getElementById('multiplier')?.value,
+        use_fp2_pace: useFP2,
+        pace_weight: useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
+        pace_modifier_type: useFP2 ? document.getElementById('pace-modifier-type')?.value : null
+      };
+      saveConfigToCookie();
+      try {
+        const resp = await fetch('/schedule_optimization', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        });
+        const data = await resp.json();
+        if (data.success) {
+          alert('Optimisation scheduled. Results will be emailed to you.');
+        } else {
+          alert('Error: ' + data.message);
+        }
+      } catch (err) {
+        alert('Error scheduling optimisation: ' + err.message);
       }
     }
 

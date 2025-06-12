@@ -115,8 +115,12 @@ textarea {
       gap: 20px;
     }
 
-    .driver-select, .constructor-select {
+.driver-select, .constructor-select {
       margin-bottom: 10px;
+    }
+
+    .duplicate-selection {
+      border: 2px solid #dc3545;
     }
 
     .button {
@@ -164,7 +168,8 @@ textarea {
       background: #e0a800;
     }
 
-    .progress {
+    /* Style for the optimisation progress box */
+    #progress-section {
       display: none;
       margin-top: 20px;
       padding: 20px;

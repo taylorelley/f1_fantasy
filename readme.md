@@ -311,6 +311,7 @@ f1-optimizer/
 - `GITHUB_CLIENT_ID`: Github OAuth client ID
 - `GITHUB_CLIENT_SECRET`: Github OAuth client secret
 - `ADMIN_EMAILS`: Comma separated list of administrator emails
+- `TIMEZONE`: Timezone for scheduled optimisations (default: UTC)
 
 Create a `.env` file (or copy `.env.example`) with the variables above set to
 your provider credentials. Docker Compose will automatically load this file.
