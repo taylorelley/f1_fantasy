@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Administration</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -132,8 +133,40 @@
             Use ILP-based optimisation (experimental)
           </label>
         </div>
+        <h3>Automation &amp; Email</h3>
+        <div class="form-group">
+          <label for="cron_schedule">Optimisation Schedule (Cron)</label>
+          <input type="text" name="cron_schedule" id="cron_schedule" value="{{ settings.cron_schedule }}">
+        </div>
+        <div class="form-group">
+          <label for="smtp_host">SMTP Host</label>
+          <input type="text" name="smtp_host" id="smtp_host" value="{{ settings.smtp_host }}">
+        </div>
+        <div class="form-group">
+          <label for="smtp_port">SMTP Port</label>
+          <input type="number" name="smtp_port" id="smtp_port" value="{{ settings.smtp_port }}">
+        </div>
+        <div class="form-group">
+          <label for="smtp_username">SMTP Username</label>
+          <input type="text" name="smtp_username" id="smtp_username" value="{{ settings.smtp_username }}">
+        </div>
+        <div class="form-group">
+          <label for="smtp_from">Sender Address</label>
+          <input type="text" name="smtp_from" id="smtp_from" value="{{ settings.smtp_from }}">
+        </div>
+        <div class="form-group">
+          <label for="smtp_password">SMTP Password</label>
+          <input type="password" name="smtp_password" id="smtp_password" value="{{ settings.smtp_password }}">
+        </div>
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" name="smtp_tls" id="smtp_tls" {% if settings.smtp_tls %}checked{% endif %}>
+            Use TLS
+          </label>
+        </div>
         <div class="button-group">
           <button class="button" type="submit">Save Settings</button>
+          <button type="button" class="button-secondary" onclick="sendTestEmail()">Send Test Email</button>
         </div>
       </form>
     </div>
@@ -251,6 +284,20 @@
 
     function prepareMappingCsv() {
       document.getElementById('mapping-data-hidden').value = tableToCSV('mapping-table');
+    }
+
+    async function sendTestEmail() {
+      try {
+        const resp = await fetch('/send_test_email', { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+          alert('Test email sent. Check your inbox.');
+        } else {
+          alert('Failed to send test email: ' + (data.message || 'unknown error'));
+        }
+      } catch (err) {
+        alert('Failed to send test email: ' + err.message);
+      }
     }
 
     document.addEventListener('DOMContentLoaded', () => {

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; background:#f5f5f5; color:#333; }
+    .result-card { background:#fff; border-left:4px solid #e10600; padding:20px; margin-bottom:20px; border-radius:4px; }
+    .swap-item { background:#f9f9f9; padding:10px; margin:5px 0; border-radius:4px; }
+    .team-display { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; }
+    .team-member { background:#f1f1f1; padding:8px; border-radius:4px; text-align:center; }
+    .improvement { color:#28a745; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <h2>F1 Fantasy Optimisation Results</h2>
+  {% if opt.fp2_info and opt.fp2_info.applied %}
+  <div class="result-card" style="border-left-color:#17a2b8;">
+    <h3>Race Pace Estimation</h3>
+    <p><strong>Pace Weight:</strong> {{ (opt.fp2_info.pace_weight*100)|round(0) }}% current</p>
+    <p><strong>Modifier Type:</strong> {{ opt.fp2_info.modifier_type }}</p>
+  </div>
+  {% endif %}
+  <div class="result-card">
+    <h3>Next Race: {{ opt.step1.circuit }}</h3>
+    {% if opt.step1.swaps %}
+      <h4>Recommended Swaps:</h4>
+      {% for s in opt.step1.swaps %}<div class="swap-item">{{ s[0] }}: {{ s[1] }} → {{ s[2] }}</div>{% endfor %}
+    {% else %}<p>No swaps recommended.</p>{% endif %}
+    <p><strong>Expected Points:</strong> {{ opt.step1.expected_points }} <span class="improvement">(+{{ opt.step1.improvement }})</span></p>
+    <p><strong>Boost Driver:</strong> {{ opt.step1.boost_driver }}</p>
+  </div>
+  <div class="result-card">
+    <h3>Following Race: {{ opt.step2.circuit }}</h3>
+    {% if opt.step2.swaps %}
+      <h4>Additional Swaps:</h4>
+      {% for s in opt.step2.swaps %}<div class="swap-item">{{ s[0] }}: {{ s[1] }} → {{ s[2] }}</div>{% endfor %}
+    {% else %}<p>No additional swaps.</p>{% endif %}
+    <p><strong>Expected Points:</strong> {{ opt.step2.expected_points }} <span class="improvement">(+{{ opt.step2.improvement }})</span></p>
+    <p><strong>Boost Driver:</strong> {{ opt.step2.boost_driver }}</p>
+    <p><strong>Budget:</strong> {{ opt.step2.budget_used }}M used, {{ opt.step2.budget_remaining }}M remaining</p>
+  </div>
+  <div class="result-card">
+    <h3>Final Team</h3>
+    <h4>Drivers:</h4>
+    <div class="team-display">{% for d in opt.step2.team.drivers %}<div class="team-member">{{ d }}</div>{% endfor %}</div>
+    <h4>Constructors:</h4>
+    <div class="team-display">{% for c in opt.step2.team.constructors %}<div class="team-member">{{ c }}</div>{% endfor %}</div>
+  </div>
+  <div class="result-card">
+    <h3>Summary</h3>
+    <p><strong>Total Improvement:</strong> <span class="improvement">+{{ opt.summary.total_improvement }} points</span></p>
+    <p><strong>Patterns Evaluated:</strong> {{ opt.summary.patterns_evaluated }}</p>
+    <p><strong>Optimization Time:</strong> {{ opt.summary.optimization_time }}s</p>
+  </div>
+</body>
+</html>

@@ -8,6 +8,19 @@ import numpy as np
 import re
 import io
 from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+import pytz
+
+# Timezone used for scheduled jobs
+LOCAL_TIMEZONE = os.environ.get("TIMEZONE", "UTC")
+try:
+    CRON_TZ = pytz.timezone(LOCAL_TIMEZONE)
+except Exception:
+    CRON_TZ = pytz.utc
+    LOCAL_TIMEZONE = "UTC"
 from flask import (
     Flask,
     render_template,
@@ -97,6 +110,15 @@ class User(db.Model, UserMixin):
     admin = db.Column(db.Boolean, default=False)
     config_json = db.Column(db.Text, default="{}")
 
+class OptimizationTask(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    config_json = db.Column(db.Text, nullable=False)
+    notify = db.Column(db.Boolean, default=False)
+    status = db.Column(db.String(20), default='pending')
+    result_json = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -143,6 +165,13 @@ def load_settings():
         "interaction_weight": 0.5,
         "top_n_candidates": 10,
         "use_ilp": False,
+        "cron_schedule": "0 18 * * 6",
+        "smtp_host": "",
+        "smtp_port": 587,
+        "smtp_username": "",
+        "smtp_password": "",
+        "smtp_tls": True,
+        "smtp_from": "",
     }
     if os.path.exists(settings_path):
         try:
@@ -151,8 +180,12 @@ def load_settings():
             for k, v in data.items():
                 if k == "use_ilp":
                     defaults[k] = bool(v)
-                elif k == "top_n_candidates":
+                elif k in ("top_n_candidates", "smtp_port"):
                     defaults[k] = int(v)
+                elif k in ("cron_schedule", "smtp_host", "smtp_username", "smtp_password", "smtp_from"):
+                    defaults[k] = str(v)
+                elif k == "smtp_tls":
+                    defaults[k] = bool(v)
                 else:
                     defaults[k] = float(v)
         except Exception:
@@ -192,6 +225,244 @@ def load_default_data():
         }
     except Exception:
         return None
+
+
+scheduler = BackgroundScheduler(timezone=CRON_TZ)
+
+def send_email(to_email, subject, html_body, settings):
+    if not settings.get("smtp_host"):
+        print("SMTP host not configured; skipping email")
+        return False
+    msg = MIMEText(html_body, "html")
+    msg["Subject"] = subject
+    msg["From"] = settings.get("smtp_from") or settings.get("smtp_username") or settings.get("smtp_host")
+    msg["To"] = to_email
+    try:
+        server = smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port"))
+        if settings.get("smtp_tls", True):
+            server.starttls()
+        if settings.get("smtp_username"):
+            server.login(settings.get("smtp_username"), settings.get("smtp_password"))
+        server.sendmail(msg["From"], [to_email], msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print("Failed to send email", e)
+        return False
+
+
+def perform_optimization(data, user=None):
+    session_id = data.get("session_id", "default")
+    if session_id == "default":
+        if not has_default_data():
+            raise ValueError("No default data; upload files first.")
+        data_folder = get_data_folder("default")
+        default_info = load_default_data()
+        races_completed = default_info["races_completed"]
+    else:
+        if session_id not in sessions:
+            raise ValueError("Session not found; upload files first.")
+        data_folder = get_data_folder(session_id)
+        races_completed = sessions[session_id]["races_completed"]
+
+    use_fp2 = bool(data.get("use_fp2_pace", False))
+    raw_pw = data.get("pace_weight", None)
+    pace_weight = float(raw_pw) if raw_pw is not None else 0.25
+    pace_modifier_type = data.get("pace_modifier_type") or "conservative"
+
+    cal_path = os.path.join(data_folder, "calendar.csv")
+    cal_df = pd.read_csv(cal_path, skipinitialspace=True)
+    next_race = f"Race{races_completed + 1}"
+    row = cal_df[cal_df["Race"] == next_race]
+    if use_fp2:
+        if row.empty or "meeting_key" not in cal_df.columns or pd.isna(row.iloc[0]["meeting_key"]):
+            use_fp2 = False
+            meeting_key = None
+            race_year = None
+        else:
+            meeting_key = int(row.iloc[0]["meeting_key"])
+            race_year = int(row.iloc[0]["year"])
+    else:
+        meeting_key = None
+        race_year = None
+
+    config = {
+        "base_path":            data_folder,
+        "races_completed":      races_completed,
+        "current_drivers":      data.get("current_drivers", []),
+        "current_constructors": data.get("current_constructors", []),
+        "remaining_budget":     float(data.get("remaining_budget", 0.0)),
+        "step1_swaps":          int(data.get("step1_swaps", 0)),
+        "step2_swaps":          int(data.get("step2_swaps", 0)),
+        "weighting_scheme":     data.get("weighting_scheme", "trend_based"),
+        "risk_tolerance":       data.get("risk_tolerance", "medium"),
+        "multiplier":           int(data.get("multiplier", 1)),
+        "use_parallel":         False,
+        "use_fp2_pace":         use_fp2,
+        "pace_weight":          pace_weight,
+        "pace_modifier_type":   pace_modifier_type,
+        "next_meeting_key":     meeting_key,
+        "next_race_year":       race_year,
+    }
+
+    settings = load_settings()
+    config.update(settings)
+
+    if user is not None:
+        try:
+            user.config_json = json.dumps(config)
+            db.session.commit()
+        except Exception:
+            pass
+
+    results = {"status": "running", "progress": []}
+
+    if config["use_fp2_pace"]:
+        results["progress"].append(f"Fetching FP2 pace data for meeting_key {meeting_key}...")
+    results["progress"].append("Calculating VFM scores...")
+    vfm_calc = F1VFMCalculator(config)
+    driver_vfm_df, constructor_vfm_df = vfm_calc.run()
+    results["progress"].append("VFM calculation complete")
+
+    actual_fp2_applied = False
+    if config["use_fp2_pace"] and "Pace_Score" in driver_vfm_df.columns:
+        if driver_vfm_df["Pace_Score"].sum() > 0:
+            actual_fp2_applied = True
+
+    results["progress"].append("Calculating track affinities...")
+    affinity_calc = F1TrackAffinityCalculator(config)
+    driver_aff_df, constructor_aff_df = affinity_calc.run()
+    results["progress"].append("Track affinity calculation complete")
+
+    results["progress"].append("Optimizing team selection...")
+    optimizer = F1TeamOptimizer(config)
+    if not optimizer.load_data():
+        raise ValueError("Error loading data for optimization")
+    best_dict, base_s1, base_s2 = optimizer.run_dual_step_optimization()
+
+    step1 = best_dict.get("step1_result")
+    step2 = best_dict.get("step2_result")
+
+    resp = {
+        "status": "complete",
+        "success": True,
+        "optimization": {
+            "step1": {
+                "race":             optimizer.step1_race,
+                "circuit":          optimizer.step1_circuit,
+                "swaps":            step1["swaps"] if step1 else [],
+                "expected_points":  step1["points"] if step1 else base_s1[0],
+                "improvement":      (step1["points"] - base_s1[0]) if step1 else 0.0,
+                "boost_driver":     step1["boost_driver"] if step1 else base_s1[3],
+                "team": {
+                    "drivers":      step1["drivers"] if step1 else config["current_drivers"],
+                    "constructors": step1["constructors"] if step1 else config["current_constructors"],
+                },
+            },
+            "step2": {
+                "race":             optimizer.step2_race,
+                "circuit":          optimizer.step2_circuit,
+                "swaps":            step2["swaps"] if step2 else [],
+                "expected_points":  step2["points"] if step2 else base_s2[0],
+                "improvement":      (step2["points"] - base_s2[0]) if step2 else 0.0,
+                "boost_driver":     step2["boost_driver"] if step2 else base_s2[3],
+                "team": {
+                    "drivers":      step2["drivers"] if step2 else config["current_drivers"],
+                    "constructors": step2["constructors"] if step2 else config["current_constructors"],
+                },
+                "budget_used":      step2["cost"] if step2 else base_s2[2],
+                "budget_remaining": round(optimizer.max_budget - (step2["cost"] if step2 else base_s2[2]), 2),
+            },
+            "summary": {
+                "total_improvement":  round(best_dict["final_points"] - base_s2[0], 2),
+                "patterns_evaluated": optimizer.performance_stats["patterns_evaluated"],
+                "optimization_time":  round(optimizer.performance_stats["optimization_time"], 2),
+                "step1_time":        round(optimizer.performance_stats["step1_time"], 2),
+                "step2_time":        round(optimizer.performance_stats["step2_time"], 2),
+            },
+        },
+        "progress": results["progress"],
+    }
+
+    if actual_fp2_applied:
+        pace_info = {
+            "meeting_key":       meeting_key,
+            "year":              race_year,
+            "pace_weight":       config["pace_weight"],
+            "modifier_type":     config["pace_modifier_type"],
+            "applied":           True,
+            "pace_adjustments":  [],
+        }
+        for drv in config["current_drivers"]:
+            row = optimizer.drivers_df[optimizer.drivers_df["Driver"] == drv]
+            if not row.empty:
+                ps = row.iloc[0].get("Pace_Score", 0.0)
+                pm = row.iloc[0].get("Pace_Modifier", 1.0)
+                vfm_pre = row.iloc[0].get("VFM_Pre_Pace", row.iloc[0].get("VFM", 0.0))
+                vfm_post = row.iloc[0].get("VFM", 0.0)
+                if ps > 0:
+                    pace_info["pace_adjustments"].append(
+                        {
+                            "driver":        drv,
+                            "pace_score":    round(ps, 1),
+                            "pace_modifier": round(pm, 3),
+                            "vfm_original":  round(vfm_pre, 2),
+                            "vfm_adjusted":  round(vfm_post, 2),
+                        }
+                    )
+        resp["optimization"]["fp2_info"] = pace_info
+
+    return resp
+
+
+def process_queue(email_only=False, task_id=None):
+    with app.app_context():
+        query = OptimizationTask.query.filter_by(status='pending')
+        if email_only:
+            query = query.filter_by(notify=True)
+        if task_id:
+            query = query.filter_by(id=task_id)
+        tasks = query.all()
+        if not tasks:
+            return []
+        settings = load_settings()
+        results = []
+        for task in tasks:
+            user = User.query.get(task.user_id)
+            if not user:
+                task.status = 'failed'
+                task.result_json = json.dumps({'error': 'user not found'})
+                continue
+            try:
+                config = json.loads(task.config_json)
+                result = perform_optimization(config, user)
+                if task.notify:
+                    html = render_template('email_results.html', opt=result['optimization'])
+                    send_email(user.email, 'F1 Optimisation Results', html, settings)
+                task.status = 'completed'
+                task.result_json = json.dumps(result)
+                results.append((task.id, result))
+            except Exception as e:
+                traceback.print_exc()
+                task.status = 'failed'
+                task.result_json = json.dumps({'error': str(e)})
+        db.session.commit()
+        return results
+
+
+def schedule_job():
+    cron_expr = load_settings().get('cron_schedule', '0 18 * * 6')
+    try:
+        scheduler.remove_all_jobs()
+    except Exception:
+        pass
+    try:
+        trigger = CronTrigger.from_crontab(cron_expr, timezone=CRON_TZ)
+    except ValueError:
+        print(f"Invalid cron expression: {cron_expr}, using default")
+        trigger = CronTrigger.from_crontab('0 18 * * 6', timezone=CRON_TZ)
+    scheduler.add_job(process_queue, trigger, id='opt_job', replace_existing=True, kwargs={'email_only': True})
+    print(f"Scheduled job with cron '{cron_expr}' in timezone {LOCAL_TIMEZONE}")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -454,183 +725,42 @@ def upload_driver_mapping():
 def optimize():
     try:
         data = request.get_json() or {}
-        session_id = data.get("session_id", "default")
-
-        if session_id == "default":
-            if not has_default_data():
-                return jsonify({"success": False, "message": "No default data; upload files first."})
-            data_folder = get_data_folder("default")
-            default_info = load_default_data()
-            races_completed = default_info["races_completed"]
-        else:
-            if session_id not in sessions:
-                return jsonify({"success": False, "message": "Session not found; upload files first."})
-            data_folder = get_data_folder(session_id)
-            races_completed = sessions[session_id]["races_completed"]
-
-        use_fp2 = bool(data.get("use_fp2_pace", False))
-        raw_pw = data.get("pace_weight", None)
-        try:
-            pace_weight = float(raw_pw) if raw_pw is not None else 0.25
-        except (TypeError, ValueError):
-            return jsonify({"success": False, "message": "pace_weight must be a number if provided"})
-
-        pace_modifier_type = data.get("pace_modifier_type") or "conservative"
-
-        # Read calendar.csv and find the next race
-        cal_path = os.path.join(data_folder, "calendar.csv")
-        cal_df = pd.read_csv(cal_path, skipinitialspace=True)
-        next_race = f"Race{races_completed + 1}"
-        row = cal_df[cal_df["Race"] == next_race]
-
-        # If user asked for FP2 but meeting_key is missing or invalid, disable FP2
-        if use_fp2:
-            if row.empty or "meeting_key" not in cal_df.columns or pd.isna(row.iloc[0]["meeting_key"]):
-                use_fp2 = False
-                meeting_key = None
-                race_year = None
-            else:
-                meeting_key = int(row.iloc[0]["meeting_key"])
-                race_year = int(row.iloc[0]["year"])
-        else:
-            meeting_key = None
-            race_year = None
-
-        config = {
-            "base_path":            data_folder,
-            "races_completed":      races_completed,
-            "current_drivers":      data.get("current_drivers", []),
-            "current_constructors": data.get("current_constructors", []),
-            "remaining_budget":     float(data.get("remaining_budget", 0.0)),
-            "step1_swaps":          int(data.get("step1_swaps", 0)),
-            "step2_swaps":          int(data.get("step2_swaps", 0)),
-            "weighting_scheme":     data.get("weighting_scheme", "trend_based"),
-            "risk_tolerance":       data.get("risk_tolerance", "medium"),
-            "multiplier":           int(data.get("multiplier", 1)),
-            "use_parallel":         False,
-            "use_fp2_pace":         use_fp2,
-            "pace_weight":          pace_weight,
-            "pace_modifier_type":   pace_modifier_type,
-            "next_meeting_key":     meeting_key,
-            "next_race_year":       race_year,
-        }
-
-        # Load tuning parameters from settings.json
-        settings = load_settings()
-        config.update(settings)
-
-        try:
-            current_user.config_json = json.dumps(config)
-            db.session.commit()
-        except Exception:
-            pass
-
-        results = {"status": "running", "progress": []}
-
-        if config["use_fp2_pace"]:
-            results["progress"].append(f"Fetching FP2 pace data for meeting_key {meeting_key}...")
-        results["progress"].append("Calculating VFM scores...")
-        vfm_calc = F1VFMCalculator(config)
-        driver_vfm_df, constructor_vfm_df = vfm_calc.run()
-        results["progress"].append("VFM calculation complete")
-
-        # Check whether any Pace_Score column was actually set
-        actual_fp2_applied = False
-        if config["use_fp2_pace"] and "Pace_Score" in driver_vfm_df.columns:
-            if driver_vfm_df["Pace_Score"].sum() > 0:
-                actual_fp2_applied = True
-
-        results["progress"].append("Calculating track affinities...")
-        affinity_calc = F1TrackAffinityCalculator(config)
-        driver_aff_df, constructor_aff_df = affinity_calc.run()
-        results["progress"].append("Track affinity calculation complete")
-
-        results["progress"].append("Optimizing team selection...")
-        optimizer = F1TeamOptimizer(config)
-        if not optimizer.load_data():
-            return jsonify({"success": False, "message": "Error loading data for optimization"})
-        best_dict, base_s1, base_s2 = optimizer.run_dual_step_optimization()
-
-        step1 = best_dict.get("step1_result")
-        step2 = best_dict.get("step2_result")
-
-        resp = {
-            "status": "complete",
-            "success": True,
-            "optimization": {
-                "step1": {
-                    "race":             optimizer.step1_race,
-                    "circuit":          optimizer.step1_circuit,
-                    "swaps":            step1["swaps"] if step1 else [],
-                    "expected_points":  step1["points"] if step1 else base_s1[0],
-                    "improvement":      (step1["points"] - base_s1[0]) if step1 else 0.0,
-                    "boost_driver":     step1["boost_driver"] if step1 else base_s1[3],
-                    "team": {
-                        "drivers":      step1["drivers"] if step1 else config["current_drivers"],
-                        "constructors": step1["constructors"] if step1 else config["current_constructors"],
-                    },
-                },
-                "step2": {
-                    "race":             optimizer.step2_race,
-                    "circuit":          optimizer.step2_circuit,
-                    "swaps":            step2["swaps"] if step2 else [],
-                    "expected_points":  step2["points"] if step2 else base_s2[0],
-                    "improvement":      (step2["points"] - base_s2[0]) if step2 else 0.0,
-                    "boost_driver":     step2["boost_driver"] if step2 else base_s2[3],
-                    "team": {
-                        "drivers":      step2["drivers"] if step2 else config["current_drivers"],
-                        "constructors": step2["constructors"] if step2 else config["current_constructors"],
-                    },
-                    "budget_used":      step2["cost"] if step2 else base_s2[2],
-                    "budget_remaining": round(
-                        optimizer.max_budget - (step2["cost"] if step2 else base_s2[2]), 2
-                    ),
-                },
-                "summary": {
-                    "total_improvement":  round(best_dict["final_points"] - base_s2[0], 2),
-                    "patterns_evaluated": optimizer.performance_stats["patterns_evaluated"],
-                    "optimization_time":  round(optimizer.performance_stats["optimization_time"], 2),
-                    "step1_time":        round(optimizer.performance_stats["step1_time"], 2),
-                    "step2_time":        round(optimizer.performance_stats["step2_time"], 2),
-                },
-            },
-            "progress": results["progress"],
-        }
-
-        # Only include pace block if FP2 was actually applied
-        if actual_fp2_applied:
-            pace_info = {
-                "meeting_key":       meeting_key,
-                "year":              race_year,
-                "pace_weight":       config["pace_weight"],
-                "modifier_type":     config["pace_modifier_type"],
-                "applied":           True,
-                "pace_adjustments":  [],
-            }
-            for drv in config["current_drivers"]:
-                row = optimizer.drivers_df[optimizer.drivers_df["Driver"] == drv]
-                if not row.empty:
-                    ps = row.iloc[0].get("Pace_Score", 0.0)
-                    pm = row.iloc[0].get("Pace_Modifier", 1.0)
-                    vfm_pre = row.iloc[0].get("VFM_Pre_Pace", row.iloc[0].get("VFM", 0.0))
-                    vfm_post = row.iloc[0].get("VFM", 0.0)
-                    if ps > 0:
-                        pace_info["pace_adjustments"].append(
-                            {
-                                "driver":        drv,
-                                "pace_score":    round(ps, 1),
-                                "pace_modifier": round(pm, 3),
-                                "vfm_original":  round(vfm_pre, 2),
-                                "vfm_adjusted":  round(vfm_post, 2),
-                            }
-                        )
-            resp["optimization"]["fp2_info"] = pace_info
-
-        return jsonify(resp)
-
+        task = OptimizationTask(
+            user_id=current_user.id,
+            config_json=json.dumps(data),
+            notify=False,
+            status='pending',
+        )
+        db.session.add(task)
+        db.session.commit()
+        results = process_queue(task_id=task.id)
+        if results:
+            return jsonify(results[0][1])
+        return jsonify({"success": False, "message": "Queue processing failed"})
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)})
     except Exception:
         traceback.print_exc()
         return jsonify({"success": False, "message": "Error during optimization"})
+
+
+@app.route("/schedule_optimization", methods=["POST"])
+@login_required
+def schedule_optimization_route():
+    data = request.get_json() or {}
+    task = OptimizationTask(
+        user_id=current_user.id,
+        config_json=json.dumps(data),
+        notify=True,
+        status='pending',
+    )
+    db.session.add(task)
+    db.session.commit()
+    try:
+        schedule_job()
+    except Exception:
+        pass
+    return jsonify({"success": True})
 
 
 @app.route("/statistics")
@@ -781,10 +911,35 @@ def save_settings_route():
         "interaction_weight": request.form.get("interaction_weight", type=float),
         "top_n_candidates": request.form.get("top_n_candidates", type=int),
         "use_ilp": bool(request.form.get("use_ilp")),
+        "cron_schedule": request.form.get("cron_schedule", "0 18 * * 6"),
+        "smtp_host": request.form.get("smtp_host", ""),
+        "smtp_port": request.form.get("smtp_port", type=int, default=587),
+        "smtp_username": request.form.get("smtp_username", ""),
+        "smtp_password": request.form.get("smtp_password", ""),
+        "smtp_tls": bool(request.form.get("smtp_tls")),
+        "smtp_from": request.form.get("smtp_from", ""),
     }
     success = save_settings(data)
+    if success:
+        try:
+            schedule_job()
+        except Exception:
+            pass
     msg = "Settings saved." if success else "Failed to save settings."
     return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/send_test_email", methods=["POST"])
+@login_required
+def send_test_email_route():
+    if not current_user.admin:
+        return jsonify({"success": False, "message": "Unauthorized"})
+    settings = load_settings()
+    html = "<p>This is a test email from the F1 Fantasy optimiser.</p>"
+    ok = send_email(current_user.email, "SMTP Test", html, settings)
+    if ok:
+        return jsonify({"success": True})
+    return jsonify({"success": False, "message": "Failed to send email"})
 
 
 @app.route("/api/statistics")
@@ -1109,6 +1264,11 @@ def export_statistics():
         return jsonify({"success": False, "message": "Error exporting statistics"})
 with app.app_context():
     db.create_all()
+    schedule_job()
+    # Start the scheduler only in the main process
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
+        if not scheduler.running:
+            scheduler.start()
 
 
 
