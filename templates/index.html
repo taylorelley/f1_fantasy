@@ -309,6 +309,7 @@
           drivers.forEach(driver => {
             select.innerHTML += `<option value="${driver}">${driver}</option>`;
           });
+          select.addEventListener('change', validateUniqueSelections);
           driverContainer.appendChild(select);
         }
       }
@@ -323,9 +324,38 @@
           constructors.forEach(cons => {
             select.innerHTML += `<option value="${cons}">${cons}</option>`;
           });
+          select.addEventListener('change', validateUniqueSelections);
           constructorContainer.appendChild(select);
         }
       }
+
+      validateUniqueSelections();
+    }
+
+    function validateUniqueSelections() {
+      const drivers = [];
+      document.querySelectorAll('.driver-select').forEach(sel => drivers.push(sel.value));
+      const driverDuplicates = drivers.filter((val, idx, arr) => val && arr.indexOf(val) !== idx);
+      document.querySelectorAll('.driver-select').forEach(sel => {
+        if (driverDuplicates.includes(sel.value) && sel.value) {
+          sel.classList.add('duplicate-selection');
+        } else {
+          sel.classList.remove('duplicate-selection');
+        }
+      });
+
+      const constructors = [];
+      document.querySelectorAll('.constructor-select').forEach(sel => constructors.push(sel.value));
+      const consDuplicates = constructors.filter((val, idx, arr) => val && arr.indexOf(val) !== idx);
+      document.querySelectorAll('.constructor-select').forEach(sel => {
+        if (consDuplicates.includes(sel.value) && sel.value) {
+          sel.classList.add('duplicate-selection');
+        } else {
+          sel.classList.remove('duplicate-selection');
+        }
+      });
+
+      return driverDuplicates.length === 0 && consDuplicates.length === 0;
     }
 
     function setCookie(name, value, days = 30) {
@@ -423,6 +453,8 @@
       }
       if (config.pace_weight)        document.getElementById('pace-weight').value       = config.pace_weight;
       if (config.pace_modifier_type) document.getElementById('pace-modifier-type').value = config.pace_modifier_type;
+
+      validateUniqueSelections();
     }
 
     async function uploadFiles() {
@@ -512,6 +544,7 @@
     }
 
     async function runOptimization() {
+      validateUniqueSelections();
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => {
         if (sel.value) drivers.push(sel.value);
@@ -588,6 +621,7 @@
     }
 
     async function scheduleOptimization() {
+      validateUniqueSelections();
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => { if (sel.value) drivers.push(sel.value); });
       if (drivers.length !== 5) { alert('Please select exactly 5 drivers'); return; }
