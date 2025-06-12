@@ -520,6 +520,10 @@
         alert('Please select exactly 5 drivers');
         return;
       }
+      if (new Set(drivers).size !== drivers.length) {
+        alert('Each driver must be unique');
+        return;
+      }
 
       const constructors = [];
       document.querySelectorAll('.constructor-select').forEach(sel => {
@@ -527,6 +531,10 @@
       });
       if (constructors.length !== 2) {
         alert('Please select exactly 2 constructors');
+        return;
+      }
+      if (new Set(constructors).size !== constructors.length) {
+        alert('Each constructor must be unique');
         return;
       }
 
@@ -583,9 +591,11 @@
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => { if (sel.value) drivers.push(sel.value); });
       if (drivers.length !== 5) { alert('Please select exactly 5 drivers'); return; }
+      if (new Set(drivers).size !== drivers.length) { alert('Each driver must be unique'); return; }
       const constructors = [];
       document.querySelectorAll('.constructor-select').forEach(sel => { if (sel.value) constructors.push(sel.value); });
       if (constructors.length !== 2) { alert('Please select exactly 2 constructors'); return; }
+      if (new Set(constructors).size !== constructors.length) { alert('Each constructor must be unique'); return; }
       const useFP2 = document.getElementById('use-fp2-pace')?.checked;
       const config = {
         session_id: sessionId,
