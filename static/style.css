@@ -164,7 +164,8 @@ textarea {
       background: #e0a800;
     }
 
-    .progress {
+    /* Style for the optimisation progress box */
+    #progress-section {
       display: none;
       margin-top: 20px;
       padding: 20px;
