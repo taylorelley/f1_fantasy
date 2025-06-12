@@ -309,6 +309,7 @@
           drivers.forEach(driver => {
             select.innerHTML += `<option value="${driver}">${driver}</option>`;
           });
+          select.addEventListener('change', validateUniqueSelections);
           driverContainer.appendChild(select);
         }
       }
@@ -323,9 +324,38 @@
           constructors.forEach(cons => {
             select.innerHTML += `<option value="${cons}">${cons}</option>`;
           });
+          select.addEventListener('change', validateUniqueSelections);
           constructorContainer.appendChild(select);
         }
       }
+
+      validateUniqueSelections();
+    }
+
+    function validateUniqueSelections() {
+      const drivers = [];
+      document.querySelectorAll('.driver-select').forEach(sel => drivers.push(sel.value));
+      const driverDuplicates = drivers.filter((val, idx, arr) => val && arr.indexOf(val) !== idx);
+      document.querySelectorAll('.driver-select').forEach(sel => {
+        if (driverDuplicates.includes(sel.value) && sel.value) {
+          sel.classList.add('duplicate-selection');
+        } else {
+          sel.classList.remove('duplicate-selection');
+        }
+      });
+
+      const constructors = [];
+      document.querySelectorAll('.constructor-select').forEach(sel => constructors.push(sel.value));
+      const consDuplicates = constructors.filter((val, idx, arr) => val && arr.indexOf(val) !== idx);
+      document.querySelectorAll('.constructor-select').forEach(sel => {
+        if (consDuplicates.includes(sel.value) && sel.value) {
+          sel.classList.add('duplicate-selection');
+        } else {
+          sel.classList.remove('duplicate-selection');
+        }
+      });
+
+      return driverDuplicates.length === 0 && consDuplicates.length === 0;
     }
 
     function setCookie(name, value, days = 30) {
@@ -423,6 +453,8 @@
       }
       if (config.pace_weight)        document.getElementById('pace-weight').value       = config.pace_weight;
       if (config.pace_modifier_type) document.getElementById('pace-modifier-type').value = config.pace_modifier_type;
+
+      validateUniqueSelections();
     }
 
     async function uploadFiles() {
@@ -512,12 +544,17 @@
     }
 
     async function runOptimization() {
+      validateUniqueSelections();
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => {
         if (sel.value) drivers.push(sel.value);
       });
       if (drivers.length !== 5) {
         alert('Please select exactly 5 drivers');
+        return;
+      }
+      if (new Set(drivers).size !== drivers.length) {
+        alert('Each driver must be unique');
         return;
       }
 
@@ -527,6 +564,10 @@
       });
       if (constructors.length !== 2) {
         alert('Please select exactly 2 constructors');
+        return;
+      }
+      if (new Set(constructors).size !== constructors.length) {
+        alert('Each constructor must be unique');
         return;
       }
 
@@ -580,12 +621,15 @@
     }
 
     async function scheduleOptimization() {
+      validateUniqueSelections();
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => { if (sel.value) drivers.push(sel.value); });
       if (drivers.length !== 5) { alert('Please select exactly 5 drivers'); return; }
+      if (new Set(drivers).size !== drivers.length) { alert('Each driver must be unique'); return; }
       const constructors = [];
       document.querySelectorAll('.constructor-select').forEach(sel => { if (sel.value) constructors.push(sel.value); });
       if (constructors.length !== 2) { alert('Please select exactly 2 constructors'); return; }
+      if (new Set(constructors).size !== constructors.length) { alert('Each constructor must be unique'); return; }
       const useFP2 = document.getElementById('use-fp2-pace')?.checked;
       const config = {
         session_id: sessionId,

@@ -308,6 +308,11 @@ def perform_optimization(data, user=None):
     settings = load_settings()
     config.update(settings)
 
+    if len(config["current_drivers"]) != len(set(config["current_drivers"])):
+        raise ValueError("Duplicate drivers selected")
+    if len(config["current_constructors"]) != len(set(config["current_constructors"])):
+        raise ValueError("Duplicate constructors selected")
+
     if user is not None:
         try:
             user.config_json = json.dumps(config)
