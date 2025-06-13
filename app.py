@@ -184,13 +184,7 @@ def load_settings():
                     defaults[k] = bool(v)
                 elif isinstance(defaults[k], int):
                     defaults[k] = int(v)
-                elif k in ("smtp_host", "smtp_username", "smtp_password", "smtp_from"):
-                    defaults[k] = str(v)
-                elif k in ("poll_interval_minutes",):
-                    defaults[k] = int(v)
-                elif k == "smtp_tls":
-                    defaults[k] = bool(v)
-                else:
+                elif isinstance(defaults[k], float):
                     defaults[k] = float(v)
                 else:
                     defaults[k] = str(v)
@@ -241,20 +235,28 @@ def send_email(to_email, subject, html_body, settings):
         return False
     msg = MIMEText(html_body, "html")
     msg["Subject"] = subject
-    msg["From"] = settings.get("smtp_from") or settings.get("smtp_username") or settings.get("smtp_host")
+    msg["From"] = (
+        settings.get("smtp_from")
+        or settings.get("smtp_username")
+        or settings.get("smtp_host")
+    )
     msg["To"] = to_email
+    server = smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port"))
     try:
-        server = smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port"))
         if settings.get("smtp_tls", True):
             server.starttls()
         if settings.get("smtp_username"):
             server.login(settings.get("smtp_username"), settings.get("smtp_password"))
         server.sendmail(msg["From"], [to_email], msg.as_string())
-        server.quit()
         return True
     except Exception as e:
         print("Failed to send email", e)
         return False
+    finally:
+        try:
+            server.quit()
+        except Exception:
+            pass
 
 
 def perform_optimization(data, user=None):
