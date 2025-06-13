@@ -235,16 +235,19 @@ def send_email(to_email, subject, html_body, settings):
         return False
     msg = MIMEText(html_body, "html")
     msg["Subject"] = subject
-    msg["From"] = settings.get("smtp_from") or settings.get("smtp_username") or settings.get("smtp_host")
+    msg["From"] = (
+        settings.get("smtp_from")
+        or settings.get("smtp_username")
+        or settings.get("smtp_host")
+    )
     msg["To"] = to_email
     try:
-        server = smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port"))
-        if settings.get("smtp_tls", True):
-            server.starttls()
-        if settings.get("smtp_username"):
-            server.login(settings.get("smtp_username"), settings.get("smtp_password"))
-        server.sendmail(msg["From"], [to_email], msg.as_string())
-        server.quit()
+        with smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port")) as server:
+            if settings.get("smtp_tls", True):
+                server.starttls()
+            if settings.get("smtp_username"):
+                server.login(settings.get("smtp_username"), settings.get("smtp_password"))
+            server.sendmail(msg["From"], [to_email], msg.as_string())
         return True
     except Exception as e:
         print("Failed to send email", e)
