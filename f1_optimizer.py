@@ -328,7 +328,7 @@ class F1VFMCalculator:
                 yr = self.config["next_race_year"]
                 sessions_url = (
                     f"https://api.openf1.org/v1/sessions"
-                    f"?meeting_key={mk}&session_name=Practice%202&year={yr}"
+                    f"?meeting_key={mk}&session_name=Race&year={yr}"
                 )
                 resp = requests.get(sessions_url)
                 if resp.status_code != 200:

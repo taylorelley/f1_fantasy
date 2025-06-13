@@ -497,7 +497,7 @@ def check_api_job():
                 db.session.commit()
             sess_url = (
                 "https://api.openf1.org/v1/sessions"
-                f"?meeting_key={mk}&session_name=Practice%202&year={yr}"
+                f"?meeting_key={mk}&session_name=Race&year={yr}"
             )
             s_resp = requests.get(sess_url, timeout=10)
             if s_resp.status_code != 200:
