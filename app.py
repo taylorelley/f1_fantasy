@@ -241,17 +241,22 @@ def send_email(to_email, subject, html_body, settings):
         or settings.get("smtp_host")
     )
     msg["To"] = to_email
+    server = smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port"))
     try:
-        with smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port")) as server:
-            if settings.get("smtp_tls", True):
-                server.starttls()
-            if settings.get("smtp_username"):
-                server.login(settings.get("smtp_username"), settings.get("smtp_password"))
-            server.sendmail(msg["From"], [to_email], msg.as_string())
+        if settings.get("smtp_tls", True):
+            server.starttls()
+        if settings.get("smtp_username"):
+            server.login(settings.get("smtp_username"), settings.get("smtp_password"))
+        server.sendmail(msg["From"], [to_email], msg.as_string())
         return True
     except Exception as e:
         print("Failed to send email", e)
         return False
+    finally:
+        try:
+            server.quit()
+        except Exception:
+            pass
 
 
 def perform_optimization(data, user=None):
