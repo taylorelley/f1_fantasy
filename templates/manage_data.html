@@ -165,10 +165,18 @@
           </label>
         </div>
         <div class="button-group">
-          <button class="button" type="submit">Save Settings</button>
-          <button type="button" class="button-secondary" onclick="sendTestEmail()">Send Test Email</button>
-        </div>
+      <button class="button" type="submit">Save Settings</button>
+      <button type="button" class="button-secondary" onclick="sendTestEmail()">Send Test Email</button>
+      </div>
       </form>
+    </div>
+
+    <div class="section">
+      <h2>Queued Email Optimisations</h2>
+      <div class="button-group" style="margin-bottom:10px;">
+        <button type="button" class="button-secondary" onclick="loadQueuedTasks()">Refresh List</button>
+      </div>
+      <table id="tasks-table" class="data-table"></table>
     </div>
   </div>
 
@@ -300,12 +308,53 @@
       }
     }
 
+    async function loadQueuedTasks() {
+      try {
+        const resp = await fetch('/queued_email_tasks');
+        const data = await resp.json();
+        const table = document.getElementById('tasks-table');
+        table.innerHTML = '';
+        if (!data.success) {
+          table.textContent = data.message || 'Failed to load tasks';
+          return;
+        }
+        if (!data.tasks.length) {
+          table.textContent = 'No tasks queued.';
+          return;
+        }
+        const thead = document.createElement('thead');
+        const hrow = document.createElement('tr');
+        ['ID','User','Created','Status'].forEach(h => {
+          const th = document.createElement('th');
+          th.textContent = h;
+          hrow.appendChild(th);
+        });
+        thead.appendChild(hrow);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        data.tasks.forEach(t => {
+          const tr = document.createElement('tr');
+          [t.id, t.user, t.created_at, t.status].forEach(val => {
+            const td = document.createElement('td');
+            td.textContent = val;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+      } catch (err) {
+        const table = document.getElementById('tasks-table');
+        table.textContent = 'Error loading tasks: ' + err.message;
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       buildTable(driverCSV, 'driver-table');
       buildTable(constructorCSV, 'constructor-table');
       buildTable(calendarCSV, 'calendar-table');
       buildTable(tracksCSV, 'tracks-table');
       buildTable(mappingCSV, 'mapping-table');
+      loadQueuedTasks();
     });
   </script>
 </body>
