@@ -184,7 +184,13 @@ def load_settings():
                     defaults[k] = bool(v)
                 elif isinstance(defaults[k], int):
                     defaults[k] = int(v)
-                elif isinstance(defaults[k], float):
+                elif k in ("smtp_host", "smtp_username", "smtp_password", "smtp_from"):
+                    defaults[k] = str(v)
+                elif k in ("poll_interval_minutes",):
+                    defaults[k] = int(v)
+                elif k == "smtp_tls":
+                    defaults[k] = bool(v)
+                else:
                     defaults[k] = float(v)
                 else:
                     defaults[k] = str(v)
@@ -1024,6 +1030,31 @@ def send_test_email_route():
     if ok:
         return jsonify({"success": True})
     return jsonify({"success": False, "message": "Failed to send email"})
+
+
+@app.route("/queued_email_tasks")
+@login_required
+def queued_email_tasks_route():
+    if not current_user.admin:
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    tasks = (
+        OptimizationTask.query
+        .filter_by(status="pending", notify=True)
+        .order_by(OptimizationTask.created_at)
+        .all()
+    )
+    results = []
+    for t in tasks:
+        user = User.query.get(t.user_id)
+        results.append(
+            {
+                "id": t.id,
+                "user": user.email if user else "Unknown",
+                "created_at": t.created_at.strftime("%Y-%m-%d %H:%M"),
+                "status": t.status,
+            }
+        )
+    return jsonify({"success": True, "tasks": results})
 
 
 @app.route("/api/statistics")

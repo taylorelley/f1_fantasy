@@ -315,6 +315,22 @@ f1-optimizer/
 └── README.md
 ```
 
+## Testing
+
+Install development requirements and run the tests using `pytest`:
+
+```bash
+pytest -q
+```
+
+To measure code coverage:
+
+```bash
+pytest --cov=f1_optimizer -q
+```
+
+The included tests currently achieve around **59%** coverage of `f1_optimizer.py`.
+
 ## Environment Variables
 
 - `FLASK_SECRET_KEY`: Secret key for Flask sessions (default: auto-generated)
