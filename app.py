@@ -473,7 +473,28 @@ def check_api_job():
             mk = cfg.get('next_meeting_key')
             yr = cfg.get('next_race_year')
             if not mk or not yr:
-                return
+                session_id = cfg.get('session_id', 'default')
+                if session_id == 'default':
+                    if not has_default_data():
+                        return
+                    base = app.config['DEFAULT_DATA_FOLDER']
+                    races_completed = load_default_data()['races_completed']
+                else:
+                    if session_id not in sessions:
+                        return
+                    base = get_data_folder(session_id)
+                    races_completed = sessions[session_id]['races_completed']
+                cal_df = pd.read_csv(os.path.join(base, 'calendar.csv'), skipinitialspace=True)
+                next_race = f"Race{races_completed + 1}"
+                row = cal_df[cal_df['Race'] == next_race]
+                if row.empty or 'meeting_key' not in cal_df.columns or pd.isna(row.iloc[0]['meeting_key']):
+                    return
+                mk = int(row.iloc[0]['meeting_key'])
+                yr = int(row.iloc[0]['year'])
+                cfg['next_meeting_key'] = mk
+                cfg['next_race_year'] = yr
+                task.config_json = json.dumps(cfg)
+                db.session.commit()
             sess_url = (
                 "https://api.openf1.org/v1/sessions"
                 f"?meeting_key={mk}&session_name=Practice%202&year={yr}"
