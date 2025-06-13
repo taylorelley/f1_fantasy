@@ -551,6 +551,10 @@ def check_api_job():
                     last_change_time = None
         except Exception:
             traceback.print_exc()
+            try:
+                process_queue(email_only=True)
+            except Exception:
+                traceback.print_exc()
 
 
 def schedule_job():
