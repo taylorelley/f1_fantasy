@@ -178,9 +178,11 @@ def load_settings():
             with open(settings_path, "r") as f:
                 data = json.load(f)
             for k, v in data.items():
-                if k == "use_ilp":
+                if k not in defaults:
+                    continue
+                if isinstance(defaults[k], bool):
                     defaults[k] = bool(v)
-                elif k in ("top_n_candidates", "smtp_port"):
+                elif isinstance(defaults[k], int):
                     defaults[k] = int(v)
                 elif k in ("smtp_host", "smtp_username", "smtp_password", "smtp_from"):
                     defaults[k] = str(v)
@@ -190,6 +192,8 @@ def load_settings():
                     defaults[k] = bool(v)
                 else:
                     defaults[k] = float(v)
+                else:
+                    defaults[k] = str(v)
         except Exception:
             pass
     return defaults
