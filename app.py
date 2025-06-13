@@ -507,20 +507,25 @@ def check_api_job():
             )
             s_resp = requests.get(sess_url, timeout=10)
             if s_resp.status_code != 200:
+                process_queue(email_only=True)
                 return
             s_data = s_resp.json()
             if not s_data:
+                process_queue(email_only=True)
                 return
             session_key = s_data[0].get('session_key') or s_data[0].get('session_id')
             if not session_key:
+                process_queue(email_only=True)
                 return
 
             laps_url = f"https://api.openf1.org/v1/laps?session_key={session_key}"
             l_resp = requests.get(laps_url, timeout=10)
             if l_resp.status_code != 200:
+                process_queue(email_only=True)
                 return
             laps = l_resp.json()
             if not laps:
+                process_queue(email_only=True)
                 return
 
             latest = 0
@@ -530,6 +535,7 @@ def check_api_job():
                     latest = n
 
             if latest == 0:
+                process_queue(email_only=True)
                 return
 
             now = datetime.utcnow()
