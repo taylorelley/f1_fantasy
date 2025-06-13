@@ -205,7 +205,7 @@ docker-compose up --build
    - Use "Export Stats" to download an Excel summary
 5. **Queued & Scheduled Runs**:
    - Optimisations are placed in a background queue
-   - Configure SMTP and a cron schedule on the Administration page to receive weekly results via email
+   - Configure SMTP and an API poll interval on the Administration page to receive results once lap data finishes uploading
 
 ## Data File Formats
 
@@ -270,7 +270,7 @@ adjusted on the Administration page.
   in the final optimization, while lowering it reduces that effect.
 - **top_n_candidates** – Limit on the number of swap candidates considered.
 - **use_ilp** – Use integer linear programming for exact optimisation.
-- **cron_schedule** – Cron expression for weekly queued optimisation.
+- **poll_interval_minutes** – How often to poll the OpenF1 laps API for new data.
 - **smtp_host**/**smtp_port**/**smtp_username**/**smtp_password**/**smtp_tls**/**smtp_from** – SMTP settings for email results.
 
 ## Data Persistence
@@ -314,6 +314,22 @@ f1-optimizer/
 ├── requirements.txt
 └── README.md
 ```
+
+## Testing
+
+Install development requirements and run the tests using `pytest`:
+
+```bash
+pytest -q
+```
+
+To measure code coverage:
+
+```bash
+pytest --cov=f1_optimizer -q
+```
+
+The included tests currently achieve around **59%** coverage of `f1_optimizer.py`.
 
 ## Environment Variables
 

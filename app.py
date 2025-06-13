@@ -7,11 +7,11 @@ import pandas as pd
 import numpy as np
 import re
 import io
+import requests
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 import pytz
 
 # Timezone used for scheduled jobs
@@ -165,7 +165,7 @@ def load_settings():
         "interaction_weight": 0.5,
         "top_n_candidates": 10,
         "use_ilp": False,
-        "cron_schedule": "0 18 * * 6",
+        "poll_interval_minutes": 15,
         "smtp_host": "",
         "smtp_port": 587,
         "smtp_username": "",
@@ -178,16 +178,22 @@ def load_settings():
             with open(settings_path, "r") as f:
                 data = json.load(f)
             for k, v in data.items():
-                if k == "use_ilp":
+                if k not in defaults:
+                    continue
+                if isinstance(defaults[k], bool):
                     defaults[k] = bool(v)
-                elif k in ("top_n_candidates", "smtp_port"):
+                elif isinstance(defaults[k], int):
                     defaults[k] = int(v)
-                elif k in ("cron_schedule", "smtp_host", "smtp_username", "smtp_password", "smtp_from"):
+                elif k in ("smtp_host", "smtp_username", "smtp_password", "smtp_from"):
                     defaults[k] = str(v)
+                elif k in ("poll_interval_minutes",):
+                    defaults[k] = int(v)
                 elif k == "smtp_tls":
                     defaults[k] = bool(v)
                 else:
                     defaults[k] = float(v)
+                else:
+                    defaults[k] = str(v)
         except Exception:
             pass
     return defaults
@@ -455,19 +461,98 @@ def process_queue(email_only=False, task_id=None):
         return results
 
 
+last_session_key = None
+last_lap_value = None
+last_change_time = None
+
+
+def check_api_job():
+    global last_session_key, last_lap_value, last_change_time
+    with app.app_context():
+        try:
+            task = OptimizationTask.query.filter_by(status='pending', notify=True).first()
+            if not task:
+                return
+            cfg = json.loads(task.config_json)
+            mk = cfg.get('next_meeting_key')
+            yr = cfg.get('next_race_year')
+            if not mk or not yr:
+                session_id = cfg.get('session_id', 'default')
+                if session_id == 'default':
+                    if not has_default_data():
+                        return
+                    base = app.config['DEFAULT_DATA_FOLDER']
+                    races_completed = load_default_data()['races_completed']
+                else:
+                    if session_id not in sessions:
+                        return
+                    base = get_data_folder(session_id)
+                    races_completed = sessions[session_id]['races_completed']
+                cal_df = pd.read_csv(os.path.join(base, 'calendar.csv'), skipinitialspace=True)
+                next_race = f"Race{races_completed + 1}"
+                row = cal_df[cal_df['Race'] == next_race]
+                if row.empty or 'meeting_key' not in cal_df.columns or pd.isna(row.iloc[0]['meeting_key']):
+                    return
+                mk = int(row.iloc[0]['meeting_key'])
+                yr = int(row.iloc[0]['year'])
+                cfg['next_meeting_key'] = mk
+                cfg['next_race_year'] = yr
+                task.config_json = json.dumps(cfg)
+                db.session.commit()
+            sess_url = (
+                "https://api.openf1.org/v1/sessions"
+                f"?meeting_key={mk}&session_name=Practice%202&year={yr}"
+            )
+            s_resp = requests.get(sess_url, timeout=10)
+            if s_resp.status_code != 200:
+                return
+            s_data = s_resp.json()
+            if not s_data:
+                return
+            session_key = s_data[0].get('session_key') or s_data[0].get('session_id')
+            if not session_key:
+                return
+
+            laps_url = f"https://api.openf1.org/v1/laps?session_key={session_key}"
+            l_resp = requests.get(laps_url, timeout=10)
+            if l_resp.status_code != 200:
+                return
+            laps = l_resp.json()
+            if not laps:
+                return
+
+            latest = 0
+            for lap in laps:
+                n = lap.get('lap_number')
+                if isinstance(n, int) and n > latest:
+                    latest = n
+
+            if latest == 0:
+                return
+
+            now = datetime.utcnow()
+            if last_session_key != session_key or last_lap_value != latest:
+                last_session_key = session_key
+                last_lap_value = latest
+                last_change_time = now
+            else:
+                if last_change_time and (now - last_change_time).total_seconds() >= 3600:
+                    process_queue(email_only=True)
+                    last_session_key = None
+                    last_lap_value = None
+                    last_change_time = None
+        except Exception:
+            traceback.print_exc()
+
+
 def schedule_job():
-    cron_expr = load_settings().get('cron_schedule', '0 18 * * 6')
+    interval = int(load_settings().get('poll_interval_minutes', 15))
     try:
         scheduler.remove_all_jobs()
     except Exception:
         pass
-    try:
-        trigger = CronTrigger.from_crontab(cron_expr, timezone=CRON_TZ)
-    except ValueError:
-        print(f"Invalid cron expression: {cron_expr}, using default")
-        trigger = CronTrigger.from_crontab('0 18 * * 6', timezone=CRON_TZ)
-    scheduler.add_job(process_queue, trigger, id='opt_job', replace_existing=True, kwargs={'email_only': True})
-    print(f"Scheduled job with cron '{cron_expr}' in timezone {LOCAL_TIMEZONE}")
+    scheduler.add_job(check_api_job, 'interval', minutes=interval, id='opt_job', replace_existing=True)
+    print(f"Scheduled API monitor every {interval} minutes")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -916,7 +1001,7 @@ def save_settings_route():
         "interaction_weight": request.form.get("interaction_weight", type=float),
         "top_n_candidates": request.form.get("top_n_candidates", type=int),
         "use_ilp": bool(request.form.get("use_ilp")),
-        "cron_schedule": request.form.get("cron_schedule", "0 18 * * 6"),
+        "poll_interval_minutes": request.form.get("poll_interval_minutes", type=int, default=15),
         "smtp_host": request.form.get("smtp_host", ""),
         "smtp_port": request.form.get("smtp_port", type=int, default=587),
         "smtp_username": request.form.get("smtp_username", ""),
@@ -945,6 +1030,31 @@ def send_test_email_route():
     if ok:
         return jsonify({"success": True})
     return jsonify({"success": False, "message": "Failed to send email"})
+
+
+@app.route("/queued_email_tasks")
+@login_required
+def queued_email_tasks_route():
+    if not current_user.admin:
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    tasks = (
+        OptimizationTask.query
+        .filter_by(status="pending", notify=True)
+        .order_by(OptimizationTask.created_at)
+        .all()
+    )
+    results = []
+    for t in tasks:
+        user = User.query.get(t.user_id)
+        results.append(
+            {
+                "id": t.id,
+                "user": user.email if user else "Unknown",
+                "created_at": t.created_at.strftime("%Y-%m-%d %H:%M"),
+                "status": t.status,
+            }
+        )
+    return jsonify({"success": True, "tasks": results})
 
 
 @app.route("/api/statistics")
