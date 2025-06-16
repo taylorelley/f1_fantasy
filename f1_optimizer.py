@@ -49,29 +49,41 @@ def get_expected_race_pace(session_key):
       pandas.DataFrame: A DataFrame containing driver_number and their average lap time.
     """
     url = f"https://api.openf1.org/v1/laps?session_key={session_key}"
-    response = requests.get(url)
+    response = requests.get(url, timeout=10)
     if response.status_code != 200:
-        raise Exception(f"API request failed with status code {response.status_code}")
+        raise Exception(
+            f"API request failed with status code {response.status_code}"
+        )
     lap_data = response.json()
 
     df = pd.DataFrame(lap_data)
     if df.empty:
         raise Exception("No lap data found for the given session_key.")
 
+    if "driver_number" not in df.columns:
+        raise Exception("Missing driver_number column in API response")
+    df["driver_number"] = pd.to_numeric(df["driver_number"], errors="coerce")
+    df = df[df["driver_number"].notnull()]
+    df = df[df["driver_number"] > 0]
+
     if "lap_duration" in df.columns:
         lap_time_col = "lap_duration"
-    elif all(col in df.columns for col in ["duration_sector_1", "duration_sector_2", "duration_sector_3"]):
+    elif all(
+        col in df.columns
+        for col in ["duration_sector_1", "duration_sector_2", "duration_sector_3"]
+    ):
         df["calculated_lap_time"] = (
-            df["duration_sector_1"] + df["duration_sector_2"] + df["duration_sector_3"]
+            df["duration_sector_1"]
+            + df["duration_sector_2"]
+            + df["duration_sector_3"]
         )
         lap_time_col = "calculated_lap_time"
     else:
         raise Exception(f"Could not find lap time data. Available columns: {df.columns.tolist()}")
 
-    df = df[df[lap_time_col].notnull()]
-    df = df[df[lap_time_col] > 0]
     df[lap_time_col] = pd.to_numeric(df[lap_time_col], errors="coerce")
     df = df[df[lap_time_col].notnull()]
+    df = df[df[lap_time_col] > 0]
     df = df[df[lap_time_col] < 200]
     if df.empty:
         raise Exception("No valid lap times found after filtering.")
@@ -390,6 +402,9 @@ class F1VFMCalculator:
     def _apply_pace_modifiers(self, race_df, pace_data, entity_type):
         """Apply FP2 pace-based VFM modifications"""
         pace_scores = self._calculate_pace_scores(pace_data)
+        if pace_scores.empty:
+            print("Warning: No valid FP2 pace data available.")
+            return race_df
         driver_mapping = self._load_driver_number_mapping()
         if driver_mapping is None:
             print("Warning: No driver mapping available. Skipping FP2 pace integration.")
@@ -422,8 +437,18 @@ class F1VFMCalculator:
     def _calculate_pace_scores(self, avg_lap_times_df):
         """Convert lap times to relative performance scores"""
         df = avg_lap_times_df.copy()
+        df["average_lap_time"] = pd.to_numeric(
+            df["average_lap_time"], errors="coerce"
+        )
+        df = df[df["average_lap_time"].notnull()]
+        df = df[df["average_lap_time"] > 0]
+        if df.empty:
+            return pd.DataFrame(columns=list(avg_lap_times_df.columns) + ["pace_score"])
+
         fastest_time = df["average_lap_time"].min()
-        df["gap_to_fastest"] = (df["average_lap_time"] - fastest_time) / fastest_time * 100
+        df["gap_to_fastest"] = (
+            (df["average_lap_time"] - fastest_time) / fastest_time * 100
+        )
 
         max_gap = df["gap_to_fastest"].max()
         if max_gap > 0:
@@ -457,7 +482,7 @@ class F1VFMCalculator:
         mapping_file = os.path.join(self.base_path, "driver_mapping.csv")
         if os.path.exists(mapping_file):
             try:
-                return pd.read_csv(mapping_file)
+                return pd.read_csv(mapping_file, dtype={"driver_number": int})
             except Exception as e:
                 print(f"Error loading driver mapping: {e}")
 
