@@ -12,15 +12,6 @@ from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from apscheduler.schedulers.background import BackgroundScheduler
-import pytz
-
-# Timezone used for scheduled jobs
-LOCAL_TIMEZONE = os.environ.get("TIMEZONE", "UTC")
-try:
-    CRON_TZ = pytz.timezone(LOCAL_TIMEZONE)
-except Exception:
-    CRON_TZ = pytz.utc
-    LOCAL_TIMEZONE = "UTC"
 from flask import (
     Flask,
     render_template,
@@ -166,6 +157,7 @@ def load_settings():
         "top_n_candidates": 10,
         "use_ilp": False,
         "poll_interval_minutes": 15,
+        "lap_stale_minutes": 60,
         "smtp_host": "",
         "smtp_port": 587,
         "smtp_username": "",
@@ -227,7 +219,7 @@ def load_default_data():
         return None
 
 
-scheduler = BackgroundScheduler(timezone=CRON_TZ)
+scheduler = BackgroundScheduler()
 
 def send_email(to_email, subject, html_body, settings):
     if not settings.get("smtp_host"):
@@ -530,7 +522,9 @@ def check_api_job():
                 last_lap_value = latest
                 last_change_time = now
             else:
-                if last_change_time and (now - last_change_time).total_seconds() >= 3600:
+                settings = load_settings()
+                timeout = int(settings.get("lap_stale_minutes", 60)) * 60
+                if last_change_time and (now - last_change_time).total_seconds() >= timeout:
                     process_queue(email_only=True)
                     last_session_key = None
                     last_lap_value = None
@@ -996,6 +990,7 @@ def save_settings_route():
         "top_n_candidates": request.form.get("top_n_candidates", type=int),
         "use_ilp": bool(request.form.get("use_ilp")),
         "poll_interval_minutes": request.form.get("poll_interval_minutes", type=int, default=15),
+        "lap_stale_minutes": request.form.get("lap_stale_minutes", type=int, default=60),
         "smtp_host": request.form.get("smtp_host", ""),
         "smtp_port": request.form.get("smtp_port", type=int, default=587),
         "smtp_username": request.form.get("smtp_username", ""),
