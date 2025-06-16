@@ -110,10 +110,10 @@
       </div>
     </details>
 
+    <form method="post" action="/save_settings">
     <details class="admin-section">
       <summary>Optimisation Parameters</summary>
       <div class="section">
-      <form method="post" action="/save_settings">
         <div class="form-group">
           <label for="outlier_stddev_factor">Outlier StdDev Factor</label>
           <input type="number" step="0.1" name="outlier_stddev_factor" id="outlier_stddev_factor" value="{{ settings.outlier_stddev_factor }}">
@@ -144,7 +144,12 @@
             Use ILP-based optimisation (experimental)
           </label>
         </div>
-        <h3>API Settings</h3>
+      </div>
+    </details>
+
+    <details class="admin-section">
+      <summary>API Settings</summary>
+      <div class="section">
         <div class="form-group">
           <label for="openf1_base_url">OpenF1 Base URL</label>
           <input type="text" name="openf1_base_url" id="openf1_base_url" value="{{ settings.openf1_base_url }}">
@@ -157,7 +162,12 @@
           <label for="lap_stale_minutes">Lap Stale Threshold (minutes)</label>
           <input type="number" name="lap_stale_minutes" id="lap_stale_minutes" value="{{ settings.lap_stale_minutes }}" min="1">
         </div>
-        <h3>SMTP Settings</h3>
+      </div>
+    </details>
+
+    <details class="admin-section">
+      <summary>SMTP Settings</summary>
+      <div class="section">
         <div class="form-group">
           <label for="smtp_host">SMTP Host</label>
           <input type="text" name="smtp_host" id="smtp_host" value="{{ settings.smtp_host }}">
@@ -184,13 +194,15 @@
             Use TLS
           </label>
         </div>
-        <div class="button-group">
-      <button class="button" type="submit">Save Settings</button>
-      <button type="button" class="button-secondary" onclick="sendTestEmail()">Send Test Email</button>
-      </div>
-      </form>
       </div>
     </details>
+
+    <div class="button-group">
+      <button class="button" type="submit">Save Settings</button>
+      <button type="button" class="button-secondary" onclick="sendTestEmail()">Send Test Email</button>
+    </div>
+    </form>
+
 
     <details class="admin-section">
       <summary>Queued Email Optimisations</summary>
