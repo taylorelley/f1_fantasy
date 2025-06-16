@@ -156,6 +156,7 @@ def load_settings():
         "interaction_weight": 0.5,
         "top_n_candidates": 10,
         "use_ilp": False,
+        "openf1_base_url": "https://api.openf1.org/v1",
         "poll_interval_minutes": 15,
         "lap_stale_minutes": 60,
         "smtp_host": "",
@@ -456,6 +457,8 @@ def check_api_job():
     global last_session_key, last_lap_value, last_change_time
     with app.app_context():
         try:
+            settings = load_settings()
+            base_url = settings.get("openf1_base_url", "https://api.openf1.org/v1")
             task = OptimizationTask.query.filter_by(status='pending', notify=True).first()
             if not task:
                 return
@@ -486,7 +489,7 @@ def check_api_job():
                 task.config_json = json.dumps(cfg)
                 db.session.commit()
             sess_url = (
-                "https://api.openf1.org/v1/sessions"
+                f"{base_url.rstrip('/')}/sessions"
                 f"?meeting_key={mk}&session_name=Practice%202&year={yr}"
             )
             s_resp = requests.get(sess_url, timeout=10)
@@ -499,7 +502,7 @@ def check_api_job():
             if not session_key:
                 return
 
-            laps_url = f"https://api.openf1.org/v1/laps?session_key={session_key}"
+            laps_url = f"{base_url.rstrip('/')}/laps?session_key={session_key}"
             l_resp = requests.get(laps_url, timeout=10)
             if l_resp.status_code != 200:
                 return
@@ -522,7 +525,6 @@ def check_api_job():
                 last_lap_value = latest
                 last_change_time = now
             else:
-                settings = load_settings()
                 timeout = int(settings.get("lap_stale_minutes", 60)) * 60
                 if last_change_time and (now - last_change_time).total_seconds() >= timeout:
                     process_queue(email_only=True)
@@ -989,6 +991,7 @@ def save_settings_route():
         "interaction_weight": request.form.get("interaction_weight", type=float),
         "top_n_candidates": request.form.get("top_n_candidates", type=int),
         "use_ilp": bool(request.form.get("use_ilp")),
+        "openf1_base_url": request.form.get("openf1_base_url", "https://api.openf1.org/v1"),
         "poll_interval_minutes": request.form.get("poll_interval_minutes", type=int, default=15),
         "lap_stale_minutes": request.form.get("lap_stale_minutes", type=int, default=60),
         "smtp_host": request.form.get("smtp_host", ""),
