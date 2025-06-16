@@ -184,13 +184,7 @@ def load_settings():
                     defaults[k] = bool(v)
                 elif isinstance(defaults[k], int):
                     defaults[k] = int(v)
-                elif k in ("smtp_host", "smtp_username", "smtp_password", "smtp_from"):
-                    defaults[k] = str(v)
-                elif k in ("poll_interval_minutes",):
-                    defaults[k] = int(v)
-                elif k == "smtp_tls":
-                    defaults[k] = bool(v)
-                else:
+                elif isinstance(defaults[k], float):
                     defaults[k] = float(v)
                 else:
                     defaults[k] = str(v)
@@ -241,20 +235,28 @@ def send_email(to_email, subject, html_body, settings):
         return False
     msg = MIMEText(html_body, "html")
     msg["Subject"] = subject
-    msg["From"] = settings.get("smtp_from") or settings.get("smtp_username") or settings.get("smtp_host")
+    msg["From"] = (
+        settings.get("smtp_from")
+        or settings.get("smtp_username")
+        or settings.get("smtp_host")
+    )
     msg["To"] = to_email
+    server = smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port"))
     try:
-        server = smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port"))
         if settings.get("smtp_tls", True):
             server.starttls()
         if settings.get("smtp_username"):
             server.login(settings.get("smtp_username"), settings.get("smtp_password"))
         server.sendmail(msg["From"], [to_email], msg.as_string())
-        server.quit()
         return True
     except Exception as e:
         print("Failed to send email", e)
         return False
+    finally:
+        try:
+            server.quit()
+        except Exception:
+            pass
 
 
 def perform_optimization(data, user=None):
@@ -505,20 +507,25 @@ def check_api_job():
             )
             s_resp = requests.get(sess_url, timeout=10)
             if s_resp.status_code != 200:
+                process_queue(email_only=True)
                 return
             s_data = s_resp.json()
             if not s_data:
+                process_queue(email_only=True)
                 return
             session_key = s_data[0].get('session_key') or s_data[0].get('session_id')
             if not session_key:
+                process_queue(email_only=True)
                 return
 
             laps_url = f"https://api.openf1.org/v1/laps?session_key={session_key}"
             l_resp = requests.get(laps_url, timeout=10)
             if l_resp.status_code != 200:
+                process_queue(email_only=True)
                 return
             laps = l_resp.json()
             if not laps:
+                process_queue(email_only=True)
                 return
 
             latest = 0
@@ -528,6 +535,7 @@ def check_api_job():
                     latest = n
 
             if latest == 0:
+                process_queue(email_only=True)
                 return
 
             now = datetime.utcnow()
@@ -543,6 +551,10 @@ def check_api_job():
                     last_change_time = None
         except Exception:
             traceback.print_exc()
+            try:
+                process_queue(email_only=True)
+            except Exception:
+                traceback.print_exc()
 
 
 def schedule_job():
