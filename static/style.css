@@ -60,7 +60,7 @@
       background: rgba(255,255,255,0.2);
     }
 
-    .section {
+.section {
       background: white;
       padding: 30px;
       margin-bottom: 20px;
@@ -92,6 +92,26 @@ select {
       border: 1px solid #ddd;
       border-radius: 4px;
       font-size: 16px;
+}
+
+details.admin-section {
+  margin-bottom: 20px;
+}
+details.admin-section summary {
+  background: #e10600;
+  color: #fff;
+  padding: 10px 15px;
+  cursor: pointer;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+details.admin-section[open] summary {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+details.admin-section > .section {
+  margin-top: 0;
 }
 
 textarea {

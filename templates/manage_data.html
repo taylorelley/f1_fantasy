@@ -30,8 +30,9 @@
     {% if message %}
     <div class="info">{{ message }}</div>
     {% endif %}
-    <div class="section">
-      <h2>Driver Race Data</h2>
+    <details class="admin-section">
+      <summary>Driver Race Data</summary>
+      <div class="section">
       <form method="post" action="/save_driver_data" onsubmit="prepareDriverCsv()">
         <input type="file" accept=".csv" onchange="loadCsv(event,'driver-table')" />
         <table id="driver-table" class="data-table"></table>
@@ -42,10 +43,12 @@
           <button class="button" type="submit">Save Drivers</button>
         </div>
       </form>
-    </div>
+      </div>
+    </details>
 
-    <div class="section">
-      <h2>Constructor Race Data</h2>
+    <details class="admin-section">
+      <summary>Constructor Race Data</summary>
+      <div class="section">
       <form method="post" action="/save_constructor_data" onsubmit="prepareConstructorCsv()">
         <input type="file" accept=".csv" onchange="loadCsv(event,'constructor-table')" />
         <table id="constructor-table" class="data-table"></table>
@@ -56,10 +59,12 @@
           <button class="button" type="submit">Save Constructors</button>
         </div>
       </form>
-    </div>
+      </div>
+    </details>
 
-    <div class="section">
-      <h2>Race Calendar</h2>
+    <details class="admin-section">
+      <summary>Race Calendar</summary>
+      <div class="section">
       <form method="post" action="/save_calendar_data" onsubmit="prepareCalendarCsv()">
         <input type="file" accept=".csv" onchange="loadCsv(event,'calendar-table')" />
         <table id="calendar-table" class="data-table"></table>
@@ -70,10 +75,12 @@
           <button class="button" type="submit">Save Calendar</button>
         </div>
       </form>
-    </div>
+      </div>
+    </details>
 
-    <div class="section">
-      <h2>Track Characteristics</h2>
+    <details class="admin-section">
+      <summary>Track Characteristics</summary>
+      <div class="section">
       <form method="post" action="/save_tracks_data" onsubmit="prepareTracksCsv()">
         <input type="file" accept=".csv" onchange="loadCsv(event,'tracks-table')" />
         <table id="tracks-table" class="data-table"></table>
@@ -84,10 +91,12 @@
           <button class="button" type="submit">Save Tracks</button>
         </div>
       </form>
-    </div>
+      </div>
+    </details>
 
-    <div class="section">
-      <h2>Driver Number Mapping</h2>
+    <details class="admin-section">
+      <summary>Driver Number Mapping</summary>
+      <div class="section">
       <form method="post" action="/save_mapping_data" onsubmit="prepareMappingCsv()">
         <input type="file" accept=".csv" onchange="loadCsv(event,'mapping-table')" />
         <table id="mapping-table" class="data-table"></table>
@@ -98,11 +107,13 @@
           <button class="button" type="submit">Save Mapping</button>
         </div>
       </form>
-    </div>
+      </div>
+    </details>
 
-    <div class="section">
-      <h2>Optimisation Parameters</h2>
-      <form method="post" action="/save_settings">
+    <form method="post" action="/save_settings">
+    <details class="admin-section">
+      <summary>Optimisation Parameters</summary>
+      <div class="section">
         <div class="form-group">
           <label for="outlier_stddev_factor">Outlier StdDev Factor</label>
           <input type="number" step="0.1" name="outlier_stddev_factor" id="outlier_stddev_factor" value="{{ settings.outlier_stddev_factor }}">
@@ -133,11 +144,30 @@
             Use ILP-based optimisation (experimental)
           </label>
         </div>
-        <h3>Automation &amp; Email</h3>
+      </div>
+    </details>
+
+    <details class="admin-section">
+      <summary>API Settings</summary>
+      <div class="section">
         <div class="form-group">
-          <label for="cron_schedule">Optimisation Schedule (Cron)</label>
-          <input type="text" name="cron_schedule" id="cron_schedule" value="{{ settings.cron_schedule }}">
+          <label for="openf1_base_url">OpenF1 Base URL</label>
+          <input type="text" name="openf1_base_url" id="openf1_base_url" value="{{ settings.openf1_base_url }}">
         </div>
+        <div class="form-group">
+          <label for="poll_interval_minutes">API Poll Interval (minutes)</label>
+          <input type="number" name="poll_interval_minutes" id="poll_interval_minutes" value="{{ settings.poll_interval_minutes }}" min="1">
+        </div>
+        <div class="form-group">
+          <label for="lap_stale_minutes">Lap Stale Threshold (minutes)</label>
+          <input type="number" name="lap_stale_minutes" id="lap_stale_minutes" value="{{ settings.lap_stale_minutes }}" min="1">
+        </div>
+      </div>
+    </details>
+
+    <details class="admin-section">
+      <summary>SMTP Settings</summary>
+      <div class="section">
         <div class="form-group">
           <label for="smtp_host">SMTP Host</label>
           <input type="text" name="smtp_host" id="smtp_host" value="{{ settings.smtp_host }}">
@@ -168,8 +198,20 @@
           <button class="button" type="submit">Save Settings</button>
           <button type="button" class="button-secondary" onclick="sendTestEmail()">Send Test Email</button>
         </div>
-      </form>
-    </div>
+      </div>
+    </details>
+    </form>
+
+
+    <details class="admin-section">
+      <summary>Queued Email Optimisations</summary>
+      <div class="section">
+      <div class="button-group" style="margin-bottom:10px;">
+        <button type="button" class="button-secondary" onclick="loadQueuedTasks()">Refresh List</button>
+      </div>
+      <table id="tasks-table" class="data-table"></table>
+      </div>
+    </details>
   </div>
 
   <script>
@@ -300,12 +342,53 @@
       }
     }
 
+    async function loadQueuedTasks() {
+      try {
+        const resp = await fetch('/queued_email_tasks');
+        const data = await resp.json();
+        const table = document.getElementById('tasks-table');
+        table.innerHTML = '';
+        if (!data.success) {
+          table.textContent = data.message || 'Failed to load tasks';
+          return;
+        }
+        if (!data.tasks.length) {
+          table.textContent = 'No tasks queued.';
+          return;
+        }
+        const thead = document.createElement('thead');
+        const hrow = document.createElement('tr');
+        ['ID','User','Created','Status'].forEach(h => {
+          const th = document.createElement('th');
+          th.textContent = h;
+          hrow.appendChild(th);
+        });
+        thead.appendChild(hrow);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        data.tasks.forEach(t => {
+          const tr = document.createElement('tr');
+          [t.id, t.user, t.created_at, t.status].forEach(val => {
+            const td = document.createElement('td');
+            td.textContent = val;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+      } catch (err) {
+        const table = document.getElementById('tasks-table');
+        table.textContent = 'Error loading tasks: ' + err.message;
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       buildTable(driverCSV, 'driver-table');
       buildTable(constructorCSV, 'constructor-table');
       buildTable(calendarCSV, 'calendar-table');
       buildTable(tracksCSV, 'tracks-table');
       buildTable(mappingCSV, 'mapping-table');
+      loadQueuedTasks();
     });
   </script>
 </body>
