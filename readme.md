@@ -33,7 +33,8 @@ exponential weights while declining trends receive heavier decay. Other schemes
 races.
 
 If FP2 lap data is available the optimizer queries the OpenF1 API, converts lap
-times into pace scores and scales VFM values accordingly.
+times into pace scores and scales VFM values accordingly. When adjusting
+constructors, the pace score is taken as the average of all drivers on the team.
 
 ### 2. Track Affinity Analysis
 
