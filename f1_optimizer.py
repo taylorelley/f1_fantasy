@@ -388,7 +388,11 @@ class F1VFMCalculator:
         return result_df
 
     def _apply_pace_modifiers(self, race_df, pace_data, entity_type):
-        """Apply FP2 pace-based VFM modifications"""
+        """Apply FP2 pace-based VFM modifications
+
+        When applying to constructors the pace score is averaged across all
+        drivers on that team before converting to a modifier.
+        """
         pace_scores = self._calculate_pace_scores(pace_data)
         driver_mapping = self._load_driver_number_mapping()
         if driver_mapping is None:
@@ -396,6 +400,14 @@ class F1VFMCalculator:
             return race_df
 
         pace_scores = pace_scores.merge(driver_mapping, on="driver_number", how="left")
+
+        if entity_type.lower() == "constructor":
+            pace_scores = (
+                pace_scores.dropna(subset=["team_name"])
+                .groupby("team_name", as_index=False)["pace_score"]
+                .mean()
+            )
+
         entity_col = "Driver" if entity_type.lower() == "driver" else "Constructor"
 
         race_df["VFM_Pre_Pace"] = race_df["VFM"].copy()
