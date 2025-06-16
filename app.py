@@ -48,7 +48,17 @@ app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["RESULTS_FOLDER"] = "results"
 app.config["DEFAULT_DATA_FOLDER"] = "default_data"
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "replace-me")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///users.db"
+db_host = os.environ.get("POSTGRES_HOST")
+if db_host:
+    db_user = os.environ.get("POSTGRES_USER", "f1user")
+    db_pass = os.environ.get("POSTGRES_PASSWORD", "f1pass")
+    db_name = os.environ.get("POSTGRES_DB", "f1db")
+    db_port = os.environ.get("POSTGRES_PORT", "5432")
+    app.config["SQLALCHEMY_DATABASE_URI"] = (
+        f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    )
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///users.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
