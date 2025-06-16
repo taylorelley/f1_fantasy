@@ -40,7 +40,7 @@ def get_races_completed(base_path):
         return None
 
 
-def get_expected_race_pace(session_key):
+def get_expected_race_pace(session_key, base_url="https://api.openf1.org/v1"):
     """
     Calculate the expected race pace for each driver after a given practice session.
     Parameters:
@@ -48,7 +48,7 @@ def get_expected_race_pace(session_key):
     Returns:
       pandas.DataFrame: A DataFrame containing driver_number and their average lap time.
     """
-    url = f"https://api.openf1.org/v1/laps?session_key={session_key}"
+    url = f"{base_url.rstrip('/')}/laps?session_key={session_key}"
     response = requests.get(url, timeout=10)
     if response.status_code != 200:
         raise Exception(
@@ -329,6 +329,7 @@ class F1VFMCalculator:
         self.pace_modifier_type = config.get("pace_modifier_type", "conservative")
         self.outlier_std = config.get("outlier_stddev_factor", 2.0)
         self.trend_threshold = config.get("trend_slope_threshold", 1.7)
+        self.api_base = config.get("openf1_base_url", "https://api.openf1.org/v1")
 
     def calculate_vfm(self, race_data_file, vfm_data_file, entity_type="driver", weights=None):
         """Calculate VFM scores with outlier removal and optional FP2 pace integration"""
@@ -339,7 +340,7 @@ class F1VFMCalculator:
                 mk = self.config["next_meeting_key"]
                 yr = self.config["next_race_year"]
                 sessions_url = (
-                    f"https://api.openf1.org/v1/sessions"
+                    f"{self.api_base.rstrip('/')}/sessions"
                     f"?meeting_key={mk}&session_name=Practice%202&year={yr}"
                 )
                 resp = requests.get(sessions_url)
@@ -351,7 +352,7 @@ class F1VFMCalculator:
                         f"No sessions found for meeting_key={mk}, year={yr}, session_name='Practice 2'"
                     )
                 session_key = int(sessions_list[0]["session_key"])
-                pace_data = get_expected_race_pace(session_key)
+                pace_data = get_expected_race_pace(session_key, self.api_base)
                 race_df = self._apply_pace_modifiers(race_df, pace_data, entity_type)
                 print(f"Applied FP2 pace modifiers (session_key={session_key})")
             except Exception as e:
