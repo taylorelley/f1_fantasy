@@ -184,13 +184,7 @@ def load_settings():
                     defaults[k] = bool(v)
                 elif isinstance(defaults[k], int):
                     defaults[k] = int(v)
-                elif k in ("smtp_host", "smtp_username", "smtp_password", "smtp_from"):
-                    defaults[k] = str(v)
-                elif k in ("poll_interval_minutes",):
-                    defaults[k] = int(v)
-                elif k == "smtp_tls":
-                    defaults[k] = bool(v)
-                else:
+                elif isinstance(defaults[k], float):
                     defaults[k] = float(v)
                 else:
                     defaults[k] = str(v)
