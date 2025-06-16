@@ -13,8 +13,8 @@ A Dockerized Flask application for building the optimal F1 Fantasy team. It calc
 - **Configuration Memory**: Each user's last team configuration is saved and reloaded on login
 - **Docker Support**: Fully containerized for easy deployment
 - **User Authentication**: Login via Google, Facebook, GitHub or a local account
-- **Administration Panel**: Manage data files, adjust settings and schedule optimisations
-- **Queued & Scheduled Jobs**: Optimisations run in the background and can email results
+- **Administration Panel**: Manage data files and configure automated email optimisation
+- **Queued Jobs & Automated Emails**: Optimisations run in the background and emailed results
 - **Statistics Dashboard**: Visualise data and export statistics to Excel
 
 ## Optimization Process
@@ -271,6 +271,7 @@ adjusted on the Administration page.
 - **top_n_candidates** – Limit on the number of swap candidates considered.
 - **use_ilp** – Use integer linear programming for exact optimisation.
 - **poll_interval_minutes** – How often to poll the OpenF1 laps API for new data.
+- **lap_stale_minutes** – How long the latest lap must remain unchanged before queued optimisations run.
 - **smtp_host**/**smtp_port**/**smtp_username**/**smtp_password**/**smtp_tls**/**smtp_from** – SMTP settings for email results.
 
 ## Data Persistence
@@ -342,7 +343,6 @@ The included tests currently achieve around **59%** coverage of `f1_optimizer.py
 - `GITHUB_CLIENT_ID`: Github OAuth client ID
 - `GITHUB_CLIENT_SECRET`: Github OAuth client secret
 - `ADMIN_EMAILS`: Comma separated list of administrator emails
-- `TIMEZONE`: Timezone for scheduled optimisations (default: UTC)
 
 Create a `.env` file (or copy `.env.example`) with the variables above set to
 your provider credentials. Docker Compose will automatically load this file.
