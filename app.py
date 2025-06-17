@@ -641,7 +641,7 @@ def schedule_job():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("index"))
+        return redirect(url_for("optimizer"))
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
@@ -654,7 +654,7 @@ def login():
                     user.admin = new_admin
                     db.session.commit()
                 login_user(user)
-                return redirect(url_for("index"))
+                return redirect(url_for("optimizer"))
             return render_template("login.html", message="Invalid credentials")
     return render_template("login.html")
 
@@ -662,7 +662,7 @@ def login():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for("index"))
+        return redirect(url_for("optimizer"))
     if request.method == "POST":
         username = request.form.get("username")
         email = request.form.get("email")
@@ -684,7 +684,7 @@ def register():
         db.session.add(user)
         db.session.commit()
         login_user(user)
-        return redirect(url_for("index"))
+        return redirect(url_for("optimizer"))
     return render_template("register.html")
 
 
@@ -734,7 +734,7 @@ def authorize(provider):
         db.session.commit()
 
     login_user(user)
-    return redirect(url_for("index"))
+    return redirect(url_for("optimizer"))
 
 
 @app.route("/logout")
@@ -785,8 +785,13 @@ def account():
     return render_template("account.html", message=message, error=error)
 
 @app.route("/")
+def home():
+    return render_template("home.html", year=datetime.now().year)
+
+
+@app.route("/optimizer")
 @login_required
-def index():
+def optimizer():
     cfg = None
     if current_user.config_json:
         try:
@@ -988,7 +993,7 @@ def statistics():
 @login_required
 def manage_data_page():
     if not current_user.admin:
-        return redirect(url_for("index"))
+        return redirect(url_for("optimizer"))
     base = app.config["DEFAULT_DATA_FOLDER"]
     driver_path = os.path.join(base, "driver_race_data.csv")
     constructor_path = os.path.join(base, "constructor_race_data.csv")
