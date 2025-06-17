@@ -110,6 +110,22 @@
       </div>
     </details>
 
+    <details class="admin-section">
+      <summary>Simple Configuration Matrix</summary>
+      <div class="section">
+      <form method="post" action="/save_simple_config_matrix" onsubmit="prepareSimpleMatrixCsv()">
+        <input type="file" accept=".csv" onchange="loadCsv(event,'simple-matrix-table')" />
+        <table id="simple-matrix-table" class="data-table"></table>
+        <input type="hidden" name="simple_matrix_data" id="simple-matrix-data-hidden">
+        <div class="button-group">
+          <button type="button" class="button-secondary" onclick="addRow('simple-matrix-table')">Add Row</button>
+          <button type="button" class="button-secondary" onclick="addColumn('simple-matrix-table')">Add Column</button>
+          <button class="button" type="submit">Save Matrix</button>
+        </div>
+      </form>
+      </div>
+    </details>
+
     <form method="post" action="/save_settings">
     <details class="admin-section">
       <summary>Optimisation Parameters</summary>
@@ -220,6 +236,7 @@
     const calendarCSV = {{ calendar_csv|tojson|safe }};
     const tracksCSV = {{ tracks_csv|tojson|safe }};
     const mappingCSV = {{ mapping_csv|tojson|safe }};
+    const simpleMatrixCSV = {{ simple_matrix_csv|tojson|safe }};
 
     function parseCSV(text) {
       return text.trim().split(/\r?\n/).map(r => r.split(','));
@@ -328,6 +345,10 @@
       document.getElementById('mapping-data-hidden').value = tableToCSV('mapping-table');
     }
 
+    function prepareSimpleMatrixCsv() {
+      document.getElementById('simple-matrix-data-hidden').value = tableToCSV('simple-matrix-table');
+    }
+
     async function sendTestEmail() {
       try {
         const resp = await fetch('/send_test_email', { method: 'POST' });
@@ -388,6 +409,7 @@
       buildTable(calendarCSV, 'calendar-table');
       buildTable(tracksCSV, 'tracks-table');
       buildTable(mappingCSV, 'mapping-table');
+      buildTable(simpleMatrixCSV, 'simple-matrix-table');
       loadQueuedTasks();
     });
   </script>

@@ -207,6 +207,49 @@ def save_settings(data):
         return False
 
 
+def load_simple_matrix():
+    """Load simple configuration slider matrix from CSV."""
+    path = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "simple_config_matrix.csv")
+    if not os.path.exists(path):
+        return [
+            {
+                "pace_weight": 0.20,
+                "pace_modifier_type": "conservative",
+                "weighting_scheme": "exp_decay",
+                "risk_tolerance": "low",
+            },
+            {
+                "pace_weight": 0.25,
+                "pace_modifier_type": "conservative",
+                "weighting_scheme": "exp_decay",
+                "risk_tolerance": "medium",
+            },
+            {
+                "pace_weight": 0.30,
+                "pace_modifier_type": "conservative",
+                "weighting_scheme": "exp_decay",
+                "risk_tolerance": "medium",
+            },
+            {
+                "pace_weight": 0.35,
+                "pace_modifier_type": "aggressive",
+                "weighting_scheme": "trend_based",
+                "risk_tolerance": "medium",
+            },
+            {
+                "pace_weight": 0.40,
+                "pace_modifier_type": "aggressive",
+                "weighting_scheme": "trend_based",
+                "risk_tolerance": "high",
+            },
+        ]
+    try:
+        df = pd.read_csv(path)
+        return df.to_dict(orient="records")
+    except Exception:
+        return []
+
+
 def load_default_data():
     if not has_default_data():
         return None
@@ -669,7 +712,8 @@ def index():
             cfg = json.loads(current_user.config_json)
         except Exception:
             cfg = None
-    return render_template("index.html", user_config=cfg)
+    matrix = load_simple_matrix()
+    return render_template("index.html", user_config=cfg, simple_matrix=matrix)
 
 
 @app.route("/check_default_data")
@@ -870,12 +914,14 @@ def manage_data_page():
     calendar_path = os.path.join(base, "calendar.csv")
     tracks_path = os.path.join(base, "tracks.csv")
     mapping_path = os.path.join(base, "driver_mapping.csv")
+    matrix_path = os.path.join(base, "simple_config_matrix.csv")
 
     driver_csv = ""
     constructor_csv = ""
     calendar_csv = ""
     tracks_csv = ""
     mapping_csv = ""
+    simple_matrix_csv = ""
     if os.path.exists(driver_path):
         with open(driver_path, "r") as f:
             driver_csv = f.read()
@@ -891,6 +937,9 @@ def manage_data_page():
     if os.path.exists(mapping_path):
         with open(mapping_path, "r") as f:
             mapping_csv = f.read()
+    if os.path.exists(matrix_path):
+        with open(matrix_path, "r") as f:
+            simple_matrix_csv = f.read()
 
     settings = load_settings()
 
@@ -902,6 +951,7 @@ def manage_data_page():
         calendar_csv=calendar_csv,
         tracks_csv=tracks_csv,
         mapping_csv=mapping_csv,
+        simple_matrix_csv=simple_matrix_csv,
         message=message,
         settings=settings,
     )
@@ -987,6 +1037,21 @@ def save_mapping_data():
         msg = "Driver mapping saved successfully."
     except Exception as e:
         msg = f"Failed to save driver mapping: {e}"
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_simple_config_matrix", methods=["POST"])
+@login_required
+def save_simple_config_matrix():
+    csv_text = request.form.get("simple_matrix_data", "")
+    dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "simple_config_matrix.csv")
+    try:
+        pd.read_csv(io.StringIO(csv_text))
+        with open(dest, "w") as f:
+            f.write(csv_text)
+        msg = "Simple config matrix saved successfully."
+    except Exception as e:
+        msg = f"Failed to save simple config matrix: {e}"
     return redirect(url_for("manage_data_page", message=msg))
 
 
