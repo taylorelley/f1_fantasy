@@ -20,8 +20,5 @@ coverage.xml
 .mypy_cache
 .pytest_cache
 .hypothesis
-uploads/
-results/
-*.csv
 README.md
 setup.sh
