@@ -104,14 +104,7 @@
       </div>
 
       <!-- FP2 Race Pace Configuration -->
-      <div class="checkbox-group">
-        <label>
-          <input type="checkbox" id="use-fp2-pace">
-          Include Race Pace Estimation using FP2 Lap Data (if available)
-        </label>
-      </div>
-
-      <div class="fp2-config" id="fp2-config" style="display: none;">
+      <div class="fp2-config" id="fp2-config">
         <h3>Race Pace Settings</h3>
         <div class="fp2-grid">
           <div class="form-group">
@@ -172,18 +165,6 @@
           document.getElementById('config-section').style.display = 'none';
         }
 
-        const fp2Checkbox = document.getElementById('use-fp2-pace');
-        const fp2Config = document.getElementById('fp2-config');
-        if (fp2Checkbox) {
-          fp2Checkbox.addEventListener('change', function() {
-            if (fp2Config) {
-              fp2Config.style.display = this.checked ? 'block' : 'none';
-            }
-            if (this.checked) {
-              checkDriverMapping();
-            }
-          });
-        }
       } catch (error) {
         console.error('Error during page initialization:', error);
       }
@@ -280,11 +261,6 @@
           const uploadSection = document.getElementById('upload-section');
           if (uploadSection) {
             uploadSection.style.display = 'none';
-          }
-
-          const fp2Checkbox = document.getElementById('use-fp2-pace');
-          if (fp2Checkbox) {
-            fp2Checkbox.disabled = false;
           }
 
           checkDriverMapping();
@@ -394,7 +370,7 @@
         weighting_scheme:      document.getElementById('weighting-scheme')?.value,
         risk_tolerance:        document.getElementById('risk-tolerance')?.value,
         multiplier:            document.getElementById('multiplier')?.value,
-        use_fp2_pace:          document.getElementById('use-fp2-pace')?.checked,
+        use_fp2_pace:          true,
         pace_weight:           document.getElementById('pace-weight')?.value,
         pace_modifier_type:    document.getElementById('pace-modifier-type')?.value
       };
@@ -434,17 +410,6 @@
       if (config.risk_tolerance)    document.getElementById('risk-tolerance').value    = config.risk_tolerance;
       if (config.multiplier)        document.getElementById('multiplier').value        = config.multiplier;
 
-      if (config.use_fp2_pace !== undefined) {
-        const fp2Checkbox = document.getElementById('use-fp2-pace');
-        const fp2ConfigEl  = document.getElementById('fp2-config');
-        if (fp2Checkbox) {
-          fp2Checkbox.checked = config.use_fp2_pace;
-          if (fp2ConfigEl) {
-            fp2ConfigEl.style.display = config.use_fp2_pace ? 'block' : 'none';
-          }
-          if (config.use_fp2_pace) showDriverMapping();
-        }
-      }
       if (config.pace_weight)        document.getElementById('pace-weight').value       = config.pace_weight;
       if (config.pace_modifier_type) document.getElementById('pace-modifier-type').value = config.pace_modifier_type;
 
@@ -527,7 +492,6 @@
         const statusDiv = document.getElementById('mapping-status');
         if (data.success) {
           statusDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
-          document.getElementById('use-fp2-pace').disabled = false;
         } else {
           statusDiv.innerHTML = `<div class="error">❌ ${data.message}</div>`;
         }
@@ -565,14 +529,12 @@
         return;
       }
 
-      const useFP2 = document.getElementById('use-fp2-pace')?.checked;
-      if (useFP2) {
-        const mappingCheck = await fetch('/check_driver_mapping');
-        const mappingData  = await mappingCheck.json();
-        if (!mappingData.exists) {
-          alert('Driver mapping file is required for Race Pace Estimation. Please upload it first.');
-          return;
-        }
+      const useFP2 = true;
+      const mappingCheck = await fetch('/check_driver_mapping');
+      const mappingData  = await mappingCheck.json();
+      if (!mappingData.exists) {
+        alert('Driver mapping file is required for Race Pace Estimation. Please upload it first.');
+        return;
       }
 
       const config = {
@@ -585,8 +547,8 @@
         risk_tolerance:      document.getElementById('risk-tolerance')?.value,
         multiplier:          document.getElementById('multiplier')?.value,
         use_fp2_pace:        useFP2,
-        pace_weight:         useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
-        pace_modifier_type:  useFP2 ? document.getElementById('pace-modifier-type')?.value : null
+        pace_weight:         parseFloat(document.getElementById('pace-weight')?.value),
+        pace_modifier_type:  document.getElementById('pace-modifier-type')?.value
       };
 
       saveConfigToCookie();
@@ -623,7 +585,7 @@
       document.querySelectorAll('.constructor-select').forEach(sel => { if (sel.value) constructors.push(sel.value); });
       if (constructors.length !== 2) { alert('Please select exactly 2 constructors'); return; }
       if (new Set(constructors).size !== constructors.length) { alert('Each constructor must be unique'); return; }
-      const useFP2 = document.getElementById('use-fp2-pace')?.checked;
+      const useFP2 = true;
       const config = {
         session_id: sessionId,
         current_drivers: drivers,
@@ -634,8 +596,8 @@
         risk_tolerance: document.getElementById('risk-tolerance')?.value,
         multiplier: document.getElementById('multiplier')?.value,
         use_fp2_pace: useFP2,
-        pace_weight: useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
-        pace_modifier_type: useFP2 ? document.getElementById('pace-modifier-type')?.value : null
+        pace_weight: parseFloat(document.getElementById('pace-weight')?.value),
+        pace_modifier_type: document.getElementById('pace-modifier-type')?.value
       };
       saveConfigToCookie();
       try {
