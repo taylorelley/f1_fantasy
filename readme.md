@@ -333,7 +333,7 @@ To measure code coverage:
 pytest --cov=f1_optimizer -q
 ```
 
-The included tests currently achieve around **59%** coverage of `f1_optimizer.py`.
+The included tests currently achieve around **64%** coverage of `f1_optimizer.py`.
 
 ## Environment Variables
 
