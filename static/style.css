@@ -23,6 +23,7 @@
       padding: 20px 0;
       margin-bottom: 30px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      position: relative;
     }
 
     .header-content {
@@ -37,6 +38,19 @@
     h1 {
       font-size: 2.5em;
       font-weight: 300;
+    }
+
+    /* Hamburger menu button, hidden on desktop */
+    .nav-toggle {
+      display: none;
+      background: none;
+      border: none;
+      color: white;
+      font-size: 2em;
+      cursor: pointer;
+      position: absolute;
+      right: 20px;
+      top: 20px;
     }
 
     .nav-links {
@@ -401,10 +415,22 @@ table.data-table input[type="text"] {
         align-items: flex-start;
       }
 
+        .nav-toggle {
+          display: block;
+          position: absolute;
+          right: 20px;
+          top: 20px;
+        }
+
       .nav-links {
+        display: none;
         flex-direction: column;
         width: 100%;
         margin-top: 10px;
+      }
+
+      .nav-links.open {
+        display: flex;
       }
 
       h1 {
@@ -454,6 +480,7 @@ table.data-table input[type="text"] {
             padding: 20px 0;
             margin-bottom: 30px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
         }
         
         .header-content {
@@ -829,10 +856,22 @@ table.data-table input[type="text"] {
                 align-items: flex-start;
             }
 
+            .nav-toggle {
+                display: block;
+                position: absolute;
+                right: 20px;
+                top: 20px;
+            }
+
             .nav-links {
+                display: none;
                 flex-direction: column;
                 width: 100%;
                 margin-top: 10px;
+            }
+
+            .nav-links.open {
+                display: flex;
             }
 
             .control-group {
