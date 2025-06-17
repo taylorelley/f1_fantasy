@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script>
     const serverConfig = {{ user_config|tojson|safe }};
+    const simpleMatrix = {{ simple_matrix|tojson|safe }};
   </script>
 </head>
 <body>
@@ -82,10 +83,26 @@
           <input type="number" id="multiplier" value="2" min="2" max="3">
         </div>
 
+        <div class="form-group">
+          <label for="config-mode">Configuration Mode</label>
+          <select id="config-mode" onchange="toggleConfigMode()">
+            <option value="simple">Simple</option>
+            <option value="advanced" selected>Advanced</option>
+          </select>
+        </div>
+
+      </div>
+
+      <div id="simple-config" style="display:none; margin-top:20px;">
+        <label for="simple-slider">Risk Level: <span id="simple-slider-label"></span></label>
+        <input type="range" id="simple-slider" min="1" max="5" step="1" value="3" oninput="updateSimpleLabel(this.value)" onchange="applySimpleConfig(this.value)">
+        <div class="slider-labels" style="display:flex; justify-content:space-between; font-size:0.9em;">
+          <span>Low Risk</span><span>High Risk</span>
+        </div>
       </div>
 
       <!-- FP2 Race Pace Configuration -->
-        <div class="fp2-config" id="fp2-config">
+        <div class="fp2-config" id="advanced-config">
           <h3>Advanced Configuration</h3>
           <div class="fp2-grid">
             <div class="form-group">
@@ -303,6 +320,7 @@
       }
 
       validateUniqueSelections();
+      toggleConfigMode();
     }
 
     function validateUniqueSelections() {
@@ -352,6 +370,29 @@
         }
       }
       return null;
+    }
+
+    function updateSimpleLabel(val) {
+      const labels = ['Low Risk','Low-Med','Medium','Med-High','High Risk'];
+      document.getElementById('simple-slider-label').textContent = labels[val-1] || '';
+    }
+
+    function applySimpleConfig(val) {
+      const idx = parseInt(val) - 1;
+      if (!simpleMatrix || !simpleMatrix[idx]) return;
+      const m = simpleMatrix[idx];
+      if (m.pace_weight)        document.getElementById('pace-weight').value = m.pace_weight;
+      if (m.pace_modifier_type) document.getElementById('pace-modifier-type').value = m.pace_modifier_type;
+      if (m.weighting_scheme)   document.getElementById('weighting-scheme').value = m.weighting_scheme;
+      if (m.risk_tolerance)     document.getElementById('risk-tolerance').value = m.risk_tolerance;
+      saveConfigToCookie();
+    }
+
+    function toggleConfigMode() {
+      const mode = document.getElementById('config-mode').value;
+      document.getElementById('simple-config').style.display = mode === 'simple' ? 'block' : 'none';
+      document.getElementById('advanced-config').style.display = mode === 'advanced' ? 'block' : 'none';
+      if (mode === 'simple') applySimpleConfig(document.getElementById('simple-slider').value);
     }
 
     function saveConfigToCookie() {
@@ -410,11 +451,17 @@
       if (config.weighting_scheme)  document.getElementById('weighting-scheme').value  = config.weighting_scheme;
       if (config.risk_tolerance)    document.getElementById('risk-tolerance').value    = config.risk_tolerance;
       if (config.multiplier)        document.getElementById('multiplier').value        = config.multiplier;
+        if (config.config_mode) document.getElementById("config-mode").value = config.config_mode;
+        if (config.simple_slider) {
+          document.getElementById("simple-slider").value = config.simple_slider;
+          updateSimpleLabel(config.simple_slider);
+        }
 
       if (config.pace_weight)        document.getElementById('pace-weight').value       = config.pace_weight;
       if (config.pace_modifier_type) document.getElementById('pace-modifier-type').value = config.pace_modifier_type;
 
       validateUniqueSelections();
+      toggleConfigMode();
     }
 
     async function uploadFiles() {
@@ -504,6 +551,7 @@
 
     async function runOptimization() {
       validateUniqueSelections();
+      toggleConfigMode();
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => {
         if (sel.value) drivers.push(sel.value);
@@ -578,6 +626,7 @@
 
     async function scheduleOptimization() {
       validateUniqueSelections();
+      toggleConfigMode();
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => { if (sel.value) drivers.push(sel.value); });
       if (drivers.length !== 5) { alert('Please select exactly 5 drivers'); return; }
