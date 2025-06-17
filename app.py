@@ -268,7 +268,7 @@ def perform_optimization(data, user=None):
         data_folder = get_data_folder(session_id)
         races_completed = sessions[session_id]["races_completed"]
 
-    use_fp2 = bool(data.get("use_fp2_pace", False))
+    use_fp2 = bool(data.get("use_fp2_pace", True))
     raw_pw = data.get("pace_weight", None)
     pace_weight = float(raw_pw) if raw_pw is not None else 0.25
     pace_modifier_type = data.get("pace_modifier_type") or "conservative"
@@ -1082,7 +1082,7 @@ def get_statistics():
                 "base_path":         data_folder,
                 "races_completed":   get_races_completed(data_folder),
                 "weighting_scheme":  "trend_based",
-                "use_fp2_pace":      False,
+                "use_fp2_pace":      True,
             }
             vfm_calc = F1VFMCalculator(cfg)
             vfm_calc.run()

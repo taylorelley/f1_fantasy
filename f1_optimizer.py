@@ -315,7 +315,7 @@ class F1VFMCalculator:
         self.long_weight = config.get("long_term_weight", 0.7)
         self.interaction_weight = config.get("interaction_weight", 0.5)
         self.scheme = config["weighting_scheme"]
-        self.use_fp2_pace = config.get("use_fp2_pace", False)
+        self.use_fp2_pace = config.get("use_fp2_pace", True)
         self.pace_weight = config.get("pace_weight", 0.25)
         self.pace_modifier_type = config.get("pace_modifier_type", "conservative")
         self.outlier_std = config.get("outlier_stddev_factor", 2.0)
@@ -1502,7 +1502,7 @@ class F1TeamOptimizer:
         print(f"Time taken: {self.performance_stats['optimization_time']:.1f}s")
         print(f"Step1 time: {self.performance_stats['step1_time']:.2f}s, Step2 time: {self.performance_stats['step2_time']:.2f}s")
 
-        if self.config.get("use_fp2_pace", False):
+        if self.config.get("use_fp2_pace", True):
             print("\n" + "-"*80)
             print("FP2 PACE INTEGRATION")
             print("-"*80)
