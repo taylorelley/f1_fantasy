@@ -84,11 +84,15 @@
         </div>
 
         <div class="form-group">
-          <label for="config-mode">Configuration Mode</label>
-          <select id="config-mode" onchange="toggleConfigMode()">
-            <option value="simple">Simple</option>
-            <option value="advanced" selected>Advanced</option>
-          </select>
+          <label for="config-toggle">Configuration Mode</label>
+          <div class="toggle-wrapper">
+            <span>Simple</span>
+            <label class="switch">
+              <input type="checkbox" id="config-toggle" onchange="toggleConfigMode()">
+              <span class="slider round"></span>
+            </label>
+            <span>Advanced</span>
+          </div>
         </div>
 
       </div>
@@ -389,10 +393,11 @@
     }
 
     function toggleConfigMode() {
-      const mode = document.getElementById('config-mode').value;
-      document.getElementById('simple-config').style.display = mode === 'simple' ? 'block' : 'none';
-      document.getElementById('advanced-config').style.display = mode === 'advanced' ? 'block' : 'none';
-      if (mode === 'simple') applySimpleConfig(document.getElementById('simple-slider').value);
+      const isAdvanced = document.getElementById('config-toggle').checked;
+      const mode = isAdvanced ? 'advanced' : 'simple';
+      document.getElementById('simple-config').style.display = isAdvanced ? 'none' : 'block';
+      document.getElementById('advanced-config').style.display = isAdvanced ? 'block' : 'none';
+      if (!isAdvanced) applySimpleConfig(document.getElementById('simple-slider').value);
     }
 
     function saveConfigToCookie() {
@@ -412,6 +417,8 @@
         weighting_scheme:      document.getElementById('weighting-scheme')?.value,
         risk_tolerance:        document.getElementById('risk-tolerance')?.value,
         multiplier:            document.getElementById('multiplier')?.value,
+        config_mode:           document.getElementById('config-toggle').checked ? 'advanced' : 'simple',
+        simple_slider:         document.getElementById('simple-slider')?.value,
         use_fp2_pace:          true,
         pace_weight:           document.getElementById('pace-weight')?.value,
         pace_modifier_type:    document.getElementById('pace-modifier-type')?.value
@@ -451,7 +458,9 @@
       if (config.weighting_scheme)  document.getElementById('weighting-scheme').value  = config.weighting_scheme;
       if (config.risk_tolerance)    document.getElementById('risk-tolerance').value    = config.risk_tolerance;
       if (config.multiplier)        document.getElementById('multiplier').value        = config.multiplier;
-        if (config.config_mode) document.getElementById("config-mode").value = config.config_mode;
+        if (config.config_mode) {
+          document.getElementById("config-toggle").checked = (config.config_mode === "advanced");
+        }
         if (config.simple_slider) {
           document.getElementById("simple-slider").value = config.simple_slider;
           updateSimpleLabel(config.simple_slider);
