@@ -1083,6 +1083,60 @@ def save_simple_config_matrix():
     return redirect(url_for("manage_data_page", message=msg))
 
 
+@app.route("/save_opt_settings", methods=["POST"])
+@login_required
+def save_opt_settings():
+    settings = load_settings()
+    settings.update({
+        "outlier_stddev_factor": request.form.get("outlier_stddev_factor", type=float),
+        "trend_slope_threshold": request.form.get("trend_slope_threshold", type=float),
+        "recent_races_fraction": request.form.get("recent_races_fraction", type=float),
+        "long_term_weight": request.form.get("long_term_weight", type=float),
+        "interaction_weight": request.form.get("interaction_weight", type=float),
+        "top_n_candidates": request.form.get("top_n_candidates", type=int),
+        "use_ilp": bool(request.form.get("use_ilp")),
+    })
+    success = save_settings(settings)
+    msg = "Settings saved." if success else "Failed to save settings."
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_api_settings", methods=["POST"])
+@login_required
+def save_api_settings():
+    settings = load_settings()
+    settings.update({
+        "openf1_base_url": request.form.get("openf1_base_url", "https://api.openf1.org/v1"),
+        "poll_interval_minutes": request.form.get("poll_interval_minutes", type=int, default=15),
+        "lap_stale_minutes": request.form.get("lap_stale_minutes", type=int, default=60),
+    })
+    success = save_settings(settings)
+    if success:
+        try:
+            schedule_job()
+        except Exception:
+            pass
+    msg = "Settings saved." if success else "Failed to save settings."
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_smtp_settings", methods=["POST"])
+@login_required
+def save_smtp_settings():
+    settings = load_settings()
+    settings.update({
+        "smtp_host": request.form.get("smtp_host", ""),
+        "smtp_port": request.form.get("smtp_port", type=int, default=587),
+        "smtp_username": request.form.get("smtp_username", ""),
+        "smtp_password": request.form.get("smtp_password", ""),
+        "smtp_tls": bool(request.form.get("smtp_tls")),
+        "smtp_from": request.form.get("smtp_from", ""),
+    })
+    success = save_settings(settings)
+    msg = "Settings saved." if success else "Failed to save settings."
+    return redirect(url_for("manage_data_page", message=msg))
+
+
 @app.route("/save_settings", methods=["POST"])
 @login_required
 def save_settings_route():
