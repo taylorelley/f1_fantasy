@@ -213,31 +213,31 @@ def load_simple_matrix():
     if not os.path.exists(path):
         return [
             {
-                "pace_weight": 0.20,
+                "pace_weight": "0.20",
                 "pace_modifier_type": "conservative",
                 "weighting_scheme": "exp_decay",
                 "risk_tolerance": "low",
             },
             {
-                "pace_weight": 0.25,
+                "pace_weight": "0.25",
                 "pace_modifier_type": "conservative",
                 "weighting_scheme": "exp_decay",
                 "risk_tolerance": "medium",
             },
             {
-                "pace_weight": 0.30,
+                "pace_weight": "0.30",
                 "pace_modifier_type": "conservative",
                 "weighting_scheme": "exp_decay",
                 "risk_tolerance": "medium",
             },
             {
-                "pace_weight": 0.35,
+                "pace_weight": "0.35",
                 "pace_modifier_type": "aggressive",
                 "weighting_scheme": "trend_based",
                 "risk_tolerance": "medium",
             },
             {
-                "pace_weight": 0.40,
+                "pace_weight": "0.40",
                 "pace_modifier_type": "aggressive",
                 "weighting_scheme": "trend_based",
                 "risk_tolerance": "high",
@@ -245,6 +245,8 @@ def load_simple_matrix():
         ]
     try:
         df = pd.read_csv(path)
+        # Ensure trailing zeros are preserved by formatting as strings
+        df["pace_weight"] = df["pace_weight"].apply(lambda x: f"{float(x):.2f}")
         return df.to_dict(orient="records")
     except Exception:
         return []
