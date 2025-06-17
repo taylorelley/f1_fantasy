@@ -369,7 +369,7 @@ def perform_optimization(data, user=None):
         "step1_swaps":          int(data.get("step1_swaps", 0)),
         "weighting_scheme":     data.get("weighting_scheme", "trend_based"),
         "risk_tolerance":       data.get("risk_tolerance", "medium"),
-        "multiplier":           int(data.get("multiplier", 1)),
+        "multiplier":           int(data.get("multiplier", 2)),
         "use_parallel":         False,
         "use_fp2_pace":         use_fp2,
         "pace_weight":          pace_weight,
