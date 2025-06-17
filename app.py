@@ -250,6 +250,32 @@ def load_simple_matrix():
         return []
 
 
+def validate_simple_matrix(df):
+    """Validate structure and values of simple configuration matrix."""
+    required_cols = [
+        "pace_weight",
+        "pace_modifier_type",
+        "weighting_scheme",
+        "risk_tolerance",
+    ]
+    if not all(col in df.columns for col in required_cols):
+        raise ValueError(f"simple_config_matrix.csv must contain columns: {', '.join(required_cols)}")
+    if df.empty:
+        raise ValueError("Simple config matrix is empty")
+    if not pd.api.types.is_numeric_dtype(df["pace_weight"]):
+        raise ValueError("pace_weight must be numeric")
+    valid_modifiers = {"conservative", "aggressive"}
+    if not df["pace_modifier_type"].isin(valid_modifiers).all():
+        raise ValueError("pace_modifier_type must be one of " + ", ".join(sorted(valid_modifiers)))
+    valid_schemes = {"equal", "linear_decay", "exp_decay", "moderate_decay", "trend_based"}
+    if not df["weighting_scheme"].isin(valid_schemes).all():
+        raise ValueError("weighting_scheme must be one of " + ", ".join(sorted(valid_schemes)))
+    valid_risks = {"low", "medium", "high"}
+    if not df["risk_tolerance"].isin(valid_risks).all():
+        raise ValueError("risk_tolerance must be one of " + ", ".join(sorted(valid_risks)))
+    return True
+
+
 def load_default_data():
     if not has_default_data():
         return None
@@ -1046,9 +1072,9 @@ def save_simple_config_matrix():
     csv_text = request.form.get("simple_matrix_data", "")
     dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "simple_config_matrix.csv")
     try:
-        pd.read_csv(io.StringIO(csv_text))
-        with open(dest, "w") as f:
-            f.write(csv_text)
+        df = pd.read_csv(io.StringIO(csv_text))
+        validate_simple_matrix(df)
+        df.to_csv(dest, index=False)
         msg = "Simple config matrix saved successfully."
     except Exception as e:
         msg = f"Failed to save simple config matrix: {e}"
