@@ -731,6 +731,26 @@ def logout():
     logout_user()
     return redirect(url_for("login"))
 
+
+@app.route("/account", methods=["GET", "POST"])
+@login_required
+def account():
+    message = None
+    if request.method == "POST":
+        email = request.form.get("email")
+        password = request.form.get("password")
+        updated = False
+        if email and email != current_user.email:
+            current_user.email = email
+            updated = True
+        if password:
+            current_user.password_hash = generate_password_hash(password)
+            updated = True
+        if updated:
+            db.session.commit()
+            message = "Account updated"
+    return render_template("account.html", message=message)
+
 @app.route("/")
 @login_required
 def index():
