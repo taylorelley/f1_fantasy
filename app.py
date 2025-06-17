@@ -296,7 +296,6 @@ def perform_optimization(data, user=None):
         "current_constructors": data.get("current_constructors", []),
         "remaining_budget":     float(data.get("remaining_budget", 0.0)),
         "step1_swaps":          int(data.get("step1_swaps", 0)),
-        "step2_swaps":          int(data.get("step2_swaps", 0)),
         "weighting_scheme":     data.get("weighting_scheme", "trend_based"),
         "risk_tolerance":       data.get("risk_tolerance", "medium"),
         "multiplier":           int(data.get("multiplier", 1)),
@@ -307,6 +306,7 @@ def perform_optimization(data, user=None):
         "next_meeting_key":     meeting_key,
         "next_race_year":       race_year,
     }
+    config["step2_swaps"] = 2
 
     settings = load_settings()
     config.update(settings)
