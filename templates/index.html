@@ -76,25 +76,6 @@
         </div>
 
 
-        <div class="form-group">
-          <label for="weighting-scheme">Past Performance Weighting</label>
-          <select id="weighting-scheme">
-            <option value="trend_based">Trend-based (Adaptive)</option>
-            <option value="equal">Equal weights</option>
-            <option value="linear_decay">Linear decay</option>
-            <option value="moderate_decay">Moderate decay</option>
-            <option value="exp_decay" selected>Exponential decay</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="risk-tolerance">Risk Tolerance</label>
-          <select id="risk-tolerance">
-            <option value="low">Low (Consistent performers)</option>
-            <option value="medium" selected>Medium (Balanced)</option>
-            <option value="high">High (Track-specific)</option>
-          </select>
-        </div>
 
         <div class="form-group">
           <label for="multiplier">Multiplier</label>
@@ -104,12 +85,12 @@
       </div>
 
       <!-- FP2 Race Pace Configuration -->
-      <div class="fp2-config" id="fp2-config">
-        <h3>Race Pace Settings</h3>
-        <div class="fp2-grid">
-          <div class="form-group">
-            <label for="pace-weight">Pace Weight</label>
-            <select id="pace-weight">
+        <div class="fp2-config" id="fp2-config">
+          <h3>Advanced Configuration</h3>
+          <div class="fp2-grid">
+            <div class="form-group">
+              <label for="pace-weight">Pace Weight</label>
+              <select id="pace-weight">
               <option value="0.20">Conservative (20% current, 80% historical)</option>
               <option value="0.30" selected>Balanced (30% current, 70% historical)</option>
               <option value="0.40">Aggressive (40% current, 60% historical)</option>
@@ -123,8 +104,28 @@
               <option value="aggressive">Aggressive (0.6× to 1.4×)</option>
             </select>
           </div>
+
+            <div class="form-group">
+              <label for="weighting-scheme">Past Performance Weighting</label>
+              <select id="weighting-scheme">
+                <option value="trend_based">Trend-based (Adaptive)</option>
+                <option value="equal">Equal weights</option>
+                <option value="linear_decay">Linear decay</option>
+                <option value="moderate_decay">Moderate decay</option>
+                <option value="exp_decay" selected>Exponential decay</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="risk-tolerance">Risk Tolerance</label>
+              <select id="risk-tolerance">
+                <option value="low">Low (Consistent performers)</option>
+                <option value="medium" selected>Medium (Balanced)</option>
+                <option value="high">High (Track-specific)</option>
+              </select>
+            </div>
+          </div>
         </div>
-      </div>
 
       <div class="button-group">
         <button class="button" onclick="runOptimization()">Run Optimisation</button>
