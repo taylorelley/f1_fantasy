@@ -162,7 +162,7 @@ flowchart TD
 
 1. Clone the repository.
 2. Copy `.env.example` to `.env` and fill in your OAuth credentials.
-3. Build and start the containers:
+3. Build and start the containers (the database container will be created automatically):
 ```bash
 docker-compose up --build
 ```
@@ -277,7 +277,7 @@ adjusted on the Administration page.
 
 ## Data Persistence
 
-The application supports three types of data persistence:
+The application supports four types of data persistence:
 
 1. **Default Data**: CSV files stored in `default_data/` directory
    - Persists across Docker container restarts
@@ -292,6 +292,9 @@ The application supports three types of data persistence:
    - Saved in `results/` directory
    - Each result has a unique timestamp
    - Can be downloaded as JSON
+4. **User Accounts**: Stored in the Postgres database
+   - Database runs in a separate Docker container
+   - Data persists in the `pgdata` volume
 
 ## Development
 
@@ -331,7 +334,7 @@ To measure code coverage:
 pytest --cov=f1_optimizer -q
 ```
 
-The included tests currently achieve around **59%** coverage of `f1_optimizer.py`.
+The included tests currently achieve around **64%** coverage of `f1_optimizer.py`.
 
 ## Environment Variables
 
@@ -344,6 +347,11 @@ The included tests currently achieve around **59%** coverage of `f1_optimizer.py
 - `GITHUB_CLIENT_ID`: Github OAuth client ID
 - `GITHUB_CLIENT_SECRET`: Github OAuth client secret
 - `ADMIN_EMAILS`: Comma separated list of administrator emails
+- `POSTGRES_USER`: Database username (default: `f1user`)
+- `POSTGRES_PASSWORD`: Database password (default: `f1pass`)
+- `POSTGRES_DB`: Database name (default: `f1db`)
+- `POSTGRES_HOST`: Database host (default: `db` when using Docker Compose)
+- `POSTGRES_PORT`: Database port (default: `5432`)
 
 Create a `.env` file (or copy `.env.example`) with the variables above set to
 your provider credentials. Docker Compose will automatically load this file.

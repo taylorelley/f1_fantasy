@@ -22,4 +22,22 @@ services:
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-your-github-client-id}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-your-github-client-secret}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-admin@example.com}
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-f1db}
+      - POSTGRES_USER=${POSTGRES_USER:-f1user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-f1pass}
     restart: unless-stopped
+
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-f1user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-f1pass}
+      POSTGRES_DB: ${POSTGRES_DB:-f1db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:

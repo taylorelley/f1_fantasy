@@ -110,10 +110,26 @@
       </div>
     </details>
 
-    <form method="post" action="/save_settings">
+    <details class="admin-section">
+      <summary>Simple Configuration Matrix</summary>
+      <div class="section">
+      <form method="post" action="/save_simple_config_matrix" onsubmit="prepareSimpleMatrixCsv()">
+        <input type="file" accept=".csv" onchange="loadCsv(event,'simple-matrix-table')" />
+        <table id="simple-matrix-table" class="data-table"></table>
+        <input type="hidden" name="simple_matrix_data" id="simple-matrix-data-hidden">
+        <div class="button-group">
+          <button type="button" class="button-secondary" onclick="addRow('simple-matrix-table')">Add Row</button>
+          <button type="button" class="button-secondary" onclick="addColumn('simple-matrix-table')">Add Column</button>
+          <button class="button" type="submit">Save Matrix</button>
+        </div>
+      </form>
+      </div>
+    </details>
+
     <details class="admin-section">
       <summary>Optimisation Parameters</summary>
       <div class="section">
+      <form method="post" action="/save_opt_settings">
         <div class="form-group">
           <label for="outlier_stddev_factor">Outlier StdDev Factor</label>
           <input type="number" step="0.1" name="outlier_stddev_factor" id="outlier_stddev_factor" value="{{ settings.outlier_stddev_factor }}">
@@ -144,12 +160,17 @@
             Use ILP-based optimisation (experimental)
           </label>
         </div>
+        <div class="button-group">
+          <button class="button" type="submit">Save Settings</button>
+        </div>
+      </form>
       </div>
     </details>
 
     <details class="admin-section">
       <summary>API Settings</summary>
       <div class="section">
+      <form method="post" action="/save_api_settings">
         <div class="form-group">
           <label for="openf1_base_url">OpenF1 Base URL</label>
           <input type="text" name="openf1_base_url" id="openf1_base_url" value="{{ settings.openf1_base_url }}">
@@ -162,12 +183,17 @@
           <label for="lap_stale_minutes">Lap Stale Threshold (minutes)</label>
           <input type="number" name="lap_stale_minutes" id="lap_stale_minutes" value="{{ settings.lap_stale_minutes }}" min="1">
         </div>
+        <div class="button-group">
+          <button class="button" type="submit">Save Settings</button>
+        </div>
+      </form>
       </div>
     </details>
 
     <details class="admin-section">
       <summary>SMTP Settings</summary>
       <div class="section">
+      <form method="post" action="/save_smtp_settings">
         <div class="form-group">
           <label for="smtp_host">SMTP Host</label>
           <input type="text" name="smtp_host" id="smtp_host" value="{{ settings.smtp_host }}">
@@ -198,9 +224,9 @@
           <button class="button" type="submit">Save Settings</button>
           <button type="button" class="button-secondary" onclick="sendTestEmail()">Send Test Email</button>
         </div>
+      </form>
       </div>
     </details>
-    </form>
 
 
     <details class="admin-section">
@@ -220,6 +246,7 @@
     const calendarCSV = {{ calendar_csv|tojson|safe }};
     const tracksCSV = {{ tracks_csv|tojson|safe }};
     const mappingCSV = {{ mapping_csv|tojson|safe }};
+    const simpleMatrixCSV = {{ simple_matrix_csv|tojson|safe }};
 
     function parseCSV(text) {
       return text.trim().split(/\r?\n/).map(r => r.split(','));
@@ -328,6 +355,10 @@
       document.getElementById('mapping-data-hidden').value = tableToCSV('mapping-table');
     }
 
+    function prepareSimpleMatrixCsv() {
+      document.getElementById('simple-matrix-data-hidden').value = tableToCSV('simple-matrix-table');
+    }
+
     async function sendTestEmail() {
       try {
         const resp = await fetch('/send_test_email', { method: 'POST' });
@@ -388,6 +419,7 @@
       buildTable(calendarCSV, 'calendar-table');
       buildTable(tracksCSV, 'tracks-table');
       buildTable(mappingCSV, 'mapping-table');
+      buildTable(simpleMatrixCSV, 'simple-matrix-table');
       loadQueuedTasks();
     });
   </script>

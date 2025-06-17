@@ -199,16 +199,8 @@ def get_user_configuration():
         except ValueError:
             print("  Please enter a valid integer.")
 
-    while True:
-        try:
-            s2 = input("Maximum swaps for Step 2 (race after next) [2]: ").strip()
-            config["step2_swaps"] = int(s2) if s2 else 2
-            if config["step2_swaps"] < 0:
-                print("  Swaps cannot be negative.")
-                continue
-            break
-        except ValueError:
-            print("  Please enter a valid integer.")
+
+    config["step2_swaps"] = 2
 
     print("\nVFM Weighting Scheme:")
     print("  1. Equal weights")
@@ -297,7 +289,6 @@ def get_user_configuration():
     print(f"Current constructors: {', '.join(config['current_constructors'])}")
     print(f"Remaining budget: ${config['remaining_budget']}M")
     print(f"Step 1 swaps: {config['step1_swaps']}")
-    print(f"Step 2 swaps: {config['step2_swaps']}")
     print(f"Weighting scheme: {config['weighting_scheme']}")
     print(f"Risk tolerance: {config['risk_tolerance']}")
     print(f"Multiplier: {config['multiplier']}")
@@ -324,7 +315,7 @@ class F1VFMCalculator:
         self.long_weight = config.get("long_term_weight", 0.7)
         self.interaction_weight = config.get("interaction_weight", 0.5)
         self.scheme = config["weighting_scheme"]
-        self.use_fp2_pace = config.get("use_fp2_pace", False)
+        self.use_fp2_pace = config.get("use_fp2_pace", True)
         self.pace_weight = config.get("pace_weight", 0.25)
         self.pace_modifier_type = config.get("pace_modifier_type", "conservative")
         self.outlier_std = config.get("outlier_stddev_factor", 2.0)
@@ -1448,9 +1439,10 @@ class F1TeamOptimizer:
             if s1_res["points"] <= 0:
                 continue
 
+            s2_limit = 3 if len(s1_res["swaps"]) < 2 else 2
             s2_res = self.optimize_step(
                 s1_res["drivers"], s1_res["constructors"],
-                self.config["step2_swaps"], 2
+                s2_limit, 2
             )
             if (
                 s2_res["points"] > best["final_points"] or
@@ -1522,7 +1514,7 @@ class F1TeamOptimizer:
         print(f"Time taken: {self.performance_stats['optimization_time']:.1f}s")
         print(f"Step1 time: {self.performance_stats['step1_time']:.2f}s, Step2 time: {self.performance_stats['step2_time']:.2f}s")
 
-        if self.config.get("use_fp2_pace", False):
+        if self.config.get("use_fp2_pace", True):
             print("\n" + "-"*80)
             print("FP2 PACE INTEGRATION")
             print("-"*80)

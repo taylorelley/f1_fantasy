@@ -48,7 +48,17 @@ app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["RESULTS_FOLDER"] = "results"
 app.config["DEFAULT_DATA_FOLDER"] = "default_data"
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "replace-me")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///users.db"
+db_host = os.environ.get("POSTGRES_HOST")
+if db_host:
+    db_user = os.environ.get("POSTGRES_USER", "f1user")
+    db_pass = os.environ.get("POSTGRES_PASSWORD", "f1pass")
+    db_name = os.environ.get("POSTGRES_DB", "f1db")
+    db_port = os.environ.get("POSTGRES_PORT", "5432")
+    app.config["SQLALCHEMY_DATABASE_URI"] = (
+        f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    )
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///users.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
@@ -197,6 +207,77 @@ def save_settings(data):
         return False
 
 
+def load_simple_matrix():
+    """Load simple configuration slider matrix from CSV."""
+    path = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "simple_config_matrix.csv")
+    if not os.path.exists(path):
+        return [
+            {
+                "pace_weight": "0.20",
+                "pace_modifier_type": "conservative",
+                "weighting_scheme": "exp_decay",
+                "risk_tolerance": "low",
+            },
+            {
+                "pace_weight": "0.25",
+                "pace_modifier_type": "conservative",
+                "weighting_scheme": "exp_decay",
+                "risk_tolerance": "medium",
+            },
+            {
+                "pace_weight": "0.30",
+                "pace_modifier_type": "conservative",
+                "weighting_scheme": "exp_decay",
+                "risk_tolerance": "medium",
+            },
+            {
+                "pace_weight": "0.35",
+                "pace_modifier_type": "aggressive",
+                "weighting_scheme": "trend_based",
+                "risk_tolerance": "medium",
+            },
+            {
+                "pace_weight": "0.40",
+                "pace_modifier_type": "aggressive",
+                "weighting_scheme": "trend_based",
+                "risk_tolerance": "high",
+            },
+        ]
+    try:
+        df = pd.read_csv(path)
+        # Ensure trailing zeros are preserved by formatting as strings
+        df["pace_weight"] = df["pace_weight"].apply(lambda x: f"{float(x):.2f}")
+        return df.to_dict(orient="records")
+    except Exception:
+        return []
+
+
+def validate_simple_matrix(df):
+    """Validate structure and values of simple configuration matrix."""
+    required_cols = [
+        "pace_weight",
+        "pace_modifier_type",
+        "weighting_scheme",
+        "risk_tolerance",
+    ]
+    if not all(col in df.columns for col in required_cols):
+        raise ValueError(f"simple_config_matrix.csv must contain columns: {', '.join(required_cols)}")
+    if df.empty:
+        raise ValueError("Simple config matrix is empty")
+    if not pd.api.types.is_numeric_dtype(df["pace_weight"]):
+        raise ValueError("pace_weight must be numeric")
+    valid_modifiers = {"conservative", "aggressive"}
+    if not df["pace_modifier_type"].isin(valid_modifiers).all():
+        raise ValueError("pace_modifier_type must be one of " + ", ".join(sorted(valid_modifiers)))
+    valid_schemes = {"equal", "linear_decay", "exp_decay", "moderate_decay", "trend_based"}
+    if not df["weighting_scheme"].isin(valid_schemes).all():
+        raise ValueError("weighting_scheme must be one of " + ", ".join(sorted(valid_schemes)))
+    valid_risks = {"low", "medium", "high"}
+    if not df["risk_tolerance"].isin(valid_risks).all():
+        raise ValueError("risk_tolerance must be one of " + ", ".join(sorted(valid_risks)))
+    return True
+
+
 def load_default_data():
     if not has_default_data():
         return None
@@ -258,7 +339,7 @@ def perform_optimization(data, user=None):
         data_folder = get_data_folder(session_id)
         races_completed = sessions[session_id]["races_completed"]
 
-    use_fp2 = bool(data.get("use_fp2_pace", False))
+    use_fp2 = bool(data.get("use_fp2_pace", True))
     raw_pw = data.get("pace_weight", None)
     pace_weight = float(raw_pw) if raw_pw is not None else 0.25
     pace_modifier_type = data.get("pace_modifier_type") or "conservative"
@@ -286,10 +367,9 @@ def perform_optimization(data, user=None):
         "current_constructors": data.get("current_constructors", []),
         "remaining_budget":     float(data.get("remaining_budget", 0.0)),
         "step1_swaps":          int(data.get("step1_swaps", 0)),
-        "step2_swaps":          int(data.get("step2_swaps", 0)),
         "weighting_scheme":     data.get("weighting_scheme", "trend_based"),
         "risk_tolerance":       data.get("risk_tolerance", "medium"),
-        "multiplier":           int(data.get("multiplier", 1)),
+        "multiplier":           int(data.get("multiplier", 2)),
         "use_parallel":         False,
         "use_fp2_pace":         use_fp2,
         "pace_weight":          pace_weight,
@@ -297,6 +377,7 @@ def perform_optimization(data, user=None):
         "next_meeting_key":     meeting_key,
         "next_race_year":       race_year,
     }
+    config["step2_swaps"] = 2
 
     settings = load_settings()
     config.update(settings)
@@ -659,7 +740,8 @@ def index():
             cfg = json.loads(current_user.config_json)
         except Exception:
             cfg = None
-    return render_template("index.html", user_config=cfg)
+    matrix = load_simple_matrix()
+    return render_template("index.html", user_config=cfg, simple_matrix=matrix)
 
 
 @app.route("/check_default_data")
@@ -860,12 +942,14 @@ def manage_data_page():
     calendar_path = os.path.join(base, "calendar.csv")
     tracks_path = os.path.join(base, "tracks.csv")
     mapping_path = os.path.join(base, "driver_mapping.csv")
+    matrix_path = os.path.join(base, "simple_config_matrix.csv")
 
     driver_csv = ""
     constructor_csv = ""
     calendar_csv = ""
     tracks_csv = ""
     mapping_csv = ""
+    simple_matrix_csv = ""
     if os.path.exists(driver_path):
         with open(driver_path, "r") as f:
             driver_csv = f.read()
@@ -881,6 +965,9 @@ def manage_data_page():
     if os.path.exists(mapping_path):
         with open(mapping_path, "r") as f:
             mapping_csv = f.read()
+    if os.path.exists(matrix_path):
+        with open(matrix_path, "r") as f:
+            simple_matrix_csv = f.read()
 
     settings = load_settings()
 
@@ -892,6 +979,7 @@ def manage_data_page():
         calendar_csv=calendar_csv,
         tracks_csv=tracks_csv,
         mapping_csv=mapping_csv,
+        simple_matrix_csv=simple_matrix_csv,
         message=message,
         settings=settings,
     )
@@ -977,6 +1065,75 @@ def save_mapping_data():
         msg = "Driver mapping saved successfully."
     except Exception as e:
         msg = f"Failed to save driver mapping: {e}"
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_simple_config_matrix", methods=["POST"])
+@login_required
+def save_simple_config_matrix():
+    csv_text = request.form.get("simple_matrix_data", "")
+    dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "simple_config_matrix.csv")
+    try:
+        df = pd.read_csv(io.StringIO(csv_text))
+        validate_simple_matrix(df)
+        df.to_csv(dest, index=False)
+        msg = "Simple config matrix saved successfully."
+    except Exception as e:
+        msg = f"Failed to save simple config matrix: {e}"
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_opt_settings", methods=["POST"])
+@login_required
+def save_opt_settings():
+    settings = load_settings()
+    settings.update({
+        "outlier_stddev_factor": request.form.get("outlier_stddev_factor", type=float),
+        "trend_slope_threshold": request.form.get("trend_slope_threshold", type=float),
+        "recent_races_fraction": request.form.get("recent_races_fraction", type=float),
+        "long_term_weight": request.form.get("long_term_weight", type=float),
+        "interaction_weight": request.form.get("interaction_weight", type=float),
+        "top_n_candidates": request.form.get("top_n_candidates", type=int),
+        "use_ilp": bool(request.form.get("use_ilp")),
+    })
+    success = save_settings(settings)
+    msg = "Settings saved." if success else "Failed to save settings."
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_api_settings", methods=["POST"])
+@login_required
+def save_api_settings():
+    settings = load_settings()
+    settings.update({
+        "openf1_base_url": request.form.get("openf1_base_url", "https://api.openf1.org/v1"),
+        "poll_interval_minutes": request.form.get("poll_interval_minutes", type=int, default=15),
+        "lap_stale_minutes": request.form.get("lap_stale_minutes", type=int, default=60),
+    })
+    success = save_settings(settings)
+    if success:
+        try:
+            schedule_job()
+        except Exception:
+            pass
+    msg = "Settings saved." if success else "Failed to save settings."
+    return redirect(url_for("manage_data_page", message=msg))
+
+
+@app.route("/save_smtp_settings", methods=["POST"])
+@login_required
+def save_smtp_settings():
+    settings = load_settings()
+    settings.update({
+        "smtp_host": request.form.get("smtp_host", ""),
+        "smtp_port": request.form.get("smtp_port", type=int, default=587),
+        "smtp_username": request.form.get("smtp_username", ""),
+        "smtp_password": request.form.get("smtp_password", ""),
+        "smtp_tls": bool(request.form.get("smtp_tls")),
+        "smtp_from": request.form.get("smtp_from", ""),
+    })
+    success = save_settings(settings)
+    msg = "Settings saved." if success else "Failed to save settings."
     return redirect(url_for("manage_data_page", message=msg))
 
 
@@ -1072,7 +1229,7 @@ def get_statistics():
                 "base_path":         data_folder,
                 "races_completed":   get_races_completed(data_folder),
                 "weighting_scheme":  "trend_based",
-                "use_fp2_pace":      False,
+                "use_fp2_pace":      True,
             }
             vfm_calc = F1VFMCalculator(cfg)
             vfm_calc.run()

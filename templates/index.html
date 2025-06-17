@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script>
     const serverConfig = {{ user_config|tojson|safe }};
+    const simpleMatrix = {{ simple_matrix|tojson|safe }};
   </script>
 </head>
 <body>
@@ -37,8 +38,16 @@
 
 
     <!-- Configuration Section -->
-    <div class="section" id="config-section" style="display: none;">
+    <div class="section" id="config-section" style="display: none; position: relative;">
       <h2>Configure Optimisation</h2>
+
+      <div class="config-mode-toggle">
+        <label for="config-toggle">Advanced</label>
+        <label class="switch">
+          <input type="checkbox" id="config-toggle" onchange="toggleConfigMode()">
+          <span class="slider round"></span>
+        </label>
+      </div>
 
       <div class="form-group">
         <label>Races Completed: <span id="races-completed">-</span></label>
@@ -71,58 +80,35 @@
         </div>
 
         <div class="form-group">
-          <label for="step1-swaps">Next Race Max Swaps</label>
+          <label for="step1-swaps">Available Swaps</label>
           <input type="number" id="step1-swaps" value="2" min="0" max="7">
         </div>
 
-        <div class="form-group">
-          <label for="step2-swaps">Following Race Max Swaps</label>
-          <input type="number" id="step2-swaps" value="2" min="0" max="7">
-        </div>
 
-        <div class="form-group">
-          <label for="weighting-scheme">Past Performance Weighting</label>
-          <select id="weighting-scheme">
-            <option value="trend_based">Trend-based (Adaptive)</option>
-            <option value="equal">Equal weights</option>
-            <option value="linear_decay">Linear decay</option>
-            <option value="moderate_decay">Moderate decay</option>
-            <option value="exp_decay" selected>Exponential decay</option>
-          </select>
-        </div>
 
-        <div class="form-group">
-          <label for="risk-tolerance">Risk Tolerance</label>
-          <select id="risk-tolerance">
-            <option value="low">Low (Consistent performers)</option>
-            <option value="medium" selected>Medium (Balanced)</option>
-            <option value="high">High (Track-specific)</option>
-          </select>
-        </div>
+        
 
-        <div class="form-group">
-          <label for="multiplier">Multiplier</label>
-          <input type="number" id="multiplier" value="2" min="2" max="3">
-        </div>
+      </div>
 
+      <div id="simple-config" style="display:none;">
+        <label for="simple-slider">Risk Level: <span id="simple-slider-label"></span></label>
+        <input type="range" id="simple-slider" min="1" max="5" step="1" value="3" oninput="updateSimpleLabel(this.value)" onchange="applySimpleConfig(this.value)">
+        <div class="slider-labels" style="display:flex; justify-content:space-between; font-size:0.9em;">
+          <span>Low Risk</span><span>High Risk</span>
+        </div>
       </div>
 
       <!-- FP2 Race Pace Configuration -->
-      <div class="checkbox-group">
-        <label>
-          <input type="checkbox" id="use-fp2-pace">
-          Include Race Pace Estimation using FP2 Lap Data (if available)
-        </label>
-      </div>
-
-      <div class="fp2-config" id="fp2-config" style="display: none;">
-        <h3>Race Pace Settings</h3>
-        <div class="fp2-grid">
-          <div class="form-group">
-            <label for="pace-weight">Pace Weight</label>
-            <select id="pace-weight">
+        <div class="fp2-config" id="advanced-config">
+          <h3>Advanced Configuration</h3>
+          <div class="fp2-grid">
+            <div class="form-group">
+              <label for="pace-weight">Pace Weight</label>
+              <select id="pace-weight">
               <option value="0.20">Conservative (20% current, 80% historical)</option>
+              <option value="0.25">Conservative-Medium (25% current, 75% historical)</option>
               <option value="0.30" selected>Balanced (30% current, 70% historical)</option>
+              <option value="0.35">Balanced-Aggressive (35% current, 65% historical)</option>
               <option value="0.40">Aggressive (40% current, 60% historical)</option>
             </select>
           </div>
@@ -134,8 +120,28 @@
               <option value="aggressive">Aggressive (0.6× to 1.4×)</option>
             </select>
           </div>
+
+            <div class="form-group">
+              <label for="weighting-scheme">Past Performance Weighting</label>
+              <select id="weighting-scheme">
+                <option value="trend_based">Trend-based (Adaptive)</option>
+                <option value="equal">Equal weights</option>
+                <option value="linear_decay">Linear decay</option>
+                <option value="moderate_decay">Moderate decay</option>
+                <option value="exp_decay" selected>Exponential decay</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="risk-tolerance">Risk Tolerance</label>
+              <select id="risk-tolerance">
+                <option value="low">Low (Consistent performers)</option>
+                <option value="medium" selected>Medium (Balanced)</option>
+                <option value="high">High (Track-specific)</option>
+              </select>
+            </div>
+          </div>
         </div>
-      </div>
 
       <div class="button-group">
         <button class="button" onclick="runOptimization()">Run Optimisation</button>
@@ -176,18 +182,6 @@
           document.getElementById('config-section').style.display = 'none';
         }
 
-        const fp2Checkbox = document.getElementById('use-fp2-pace');
-        const fp2Config = document.getElementById('fp2-config');
-        if (fp2Checkbox) {
-          fp2Checkbox.addEventListener('change', function() {
-            if (fp2Config) {
-              fp2Config.style.display = this.checked ? 'block' : 'none';
-            }
-            if (this.checked) {
-              checkDriverMapping();
-            }
-          });
-        }
       } catch (error) {
         console.error('Error during page initialization:', error);
       }
@@ -286,11 +280,6 @@
             uploadSection.style.display = 'none';
           }
 
-          const fp2Checkbox = document.getElementById('use-fp2-pace');
-          if (fp2Checkbox) {
-            fp2Checkbox.disabled = false;
-          }
-
           checkDriverMapping();
         })
         .catch(error => {
@@ -330,6 +319,7 @@
       }
 
       validateUniqueSelections();
+      toggleConfigMode();
     }
 
     function validateUniqueSelections() {
@@ -381,6 +371,30 @@
       return null;
     }
 
+    function updateSimpleLabel(val) {
+      const labels = ['Low Risk','Low-Med','Medium','Med-High','High Risk'];
+      document.getElementById('simple-slider-label').textContent = labels[val-1] || '';
+    }
+
+    function applySimpleConfig(val) {
+      const idx = parseInt(val) - 1;
+      if (!simpleMatrix || !simpleMatrix[idx]) return;
+      const m = simpleMatrix[idx];
+      if (m.pace_weight)        document.getElementById('pace-weight').value = m.pace_weight;
+      if (m.pace_modifier_type) document.getElementById('pace-modifier-type').value = m.pace_modifier_type;
+      if (m.weighting_scheme)   document.getElementById('weighting-scheme').value = m.weighting_scheme;
+      if (m.risk_tolerance)     document.getElementById('risk-tolerance').value = m.risk_tolerance;
+      saveConfigToCookie();
+    }
+
+    function toggleConfigMode() {
+      const isAdvanced = document.getElementById('config-toggle').checked;
+      const mode = isAdvanced ? 'advanced' : 'simple';
+      document.getElementById('simple-config').style.display = isAdvanced ? 'none' : 'block';
+      document.getElementById('advanced-config').style.display = isAdvanced ? 'block' : 'none';
+      if (!isAdvanced) applySimpleConfig(document.getElementById('simple-slider').value);
+    }
+
     function saveConfigToCookie() {
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => {
@@ -395,11 +409,12 @@
         current_constructors:  constructors,
         remaining_budget:      document.getElementById('remaining-budget')?.value,
         step1_swaps:           document.getElementById('step1-swaps')?.value,
-        step2_swaps:           document.getElementById('step2-swaps')?.value,
         weighting_scheme:      document.getElementById('weighting-scheme')?.value,
         risk_tolerance:        document.getElementById('risk-tolerance')?.value,
-        multiplier:            document.getElementById('multiplier')?.value,
-        use_fp2_pace:          document.getElementById('use-fp2-pace')?.checked,
+        multiplier:            2,
+        config_mode:           document.getElementById('config-toggle').checked ? 'advanced' : 'simple',
+        simple_slider:         document.getElementById('simple-slider')?.value,
+        use_fp2_pace:          true,
         pace_weight:           document.getElementById('pace-weight')?.value,
         pace_modifier_type:    document.getElementById('pace-modifier-type')?.value
       };
@@ -435,26 +450,21 @@
       }
       if (config.remaining_budget) document.getElementById('remaining-budget').value = config.remaining_budget;
       if (config.step1_swaps)       document.getElementById('step1-swaps').value       = config.step1_swaps;
-      if (config.step2_swaps)       document.getElementById('step2-swaps').value       = config.step2_swaps;
       if (config.weighting_scheme)  document.getElementById('weighting-scheme').value  = config.weighting_scheme;
       if (config.risk_tolerance)    document.getElementById('risk-tolerance').value    = config.risk_tolerance;
-      if (config.multiplier)        document.getElementById('multiplier').value        = config.multiplier;
-
-      if (config.use_fp2_pace !== undefined) {
-        const fp2Checkbox = document.getElementById('use-fp2-pace');
-        const fp2ConfigEl  = document.getElementById('fp2-config');
-        if (fp2Checkbox) {
-          fp2Checkbox.checked = config.use_fp2_pace;
-          if (fp2ConfigEl) {
-            fp2ConfigEl.style.display = config.use_fp2_pace ? 'block' : 'none';
-          }
-          if (config.use_fp2_pace) showDriverMapping();
+        if (config.config_mode) {
+          document.getElementById("config-toggle").checked = (config.config_mode === "advanced");
         }
-      }
+        if (config.simple_slider) {
+          document.getElementById("simple-slider").value = config.simple_slider;
+          updateSimpleLabel(config.simple_slider);
+        }
+
       if (config.pace_weight)        document.getElementById('pace-weight').value       = config.pace_weight;
       if (config.pace_modifier_type) document.getElementById('pace-modifier-type').value = config.pace_modifier_type;
 
       validateUniqueSelections();
+      toggleConfigMode();
     }
 
     async function uploadFiles() {
@@ -533,7 +543,6 @@
         const statusDiv = document.getElementById('mapping-status');
         if (data.success) {
           statusDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
-          document.getElementById('use-fp2-pace').disabled = false;
         } else {
           statusDiv.innerHTML = `<div class="error">❌ ${data.message}</div>`;
         }
@@ -545,6 +554,7 @@
 
     async function runOptimization() {
       validateUniqueSelections();
+      toggleConfigMode();
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => {
         if (sel.value) drivers.push(sel.value);
@@ -571,14 +581,12 @@
         return;
       }
 
-      const useFP2 = document.getElementById('use-fp2-pace')?.checked;
-      if (useFP2) {
-        const mappingCheck = await fetch('/check_driver_mapping');
-        const mappingData  = await mappingCheck.json();
-        if (!mappingData.exists) {
-          alert('Driver mapping file is required for Race Pace Estimation. Please upload it first.');
-          return;
-        }
+      const useFP2 = true;
+      const mappingCheck = await fetch('/check_driver_mapping');
+      const mappingData  = await mappingCheck.json();
+      if (!mappingData.exists) {
+        alert('Driver mapping file is required for Race Pace Estimation. Please upload it first.');
+        return;
       }
 
       const config = {
@@ -587,13 +595,12 @@
         current_constructors: constructors,
         remaining_budget:    document.getElementById('remaining-budget')?.value,
         step1_swaps:         document.getElementById('step1-swaps')?.value,
-        step2_swaps:         document.getElementById('step2-swaps')?.value,
         weighting_scheme:    document.getElementById('weighting-scheme')?.value,
         risk_tolerance:      document.getElementById('risk-tolerance')?.value,
-        multiplier:          document.getElementById('multiplier')?.value,
+        multiplier:          2,
         use_fp2_pace:        useFP2,
-        pace_weight:         useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
-        pace_modifier_type:  useFP2 ? document.getElementById('pace-modifier-type')?.value : null
+        pace_weight:         parseFloat(document.getElementById('pace-weight')?.value),
+        pace_modifier_type:  document.getElementById('pace-modifier-type')?.value
       };
 
       saveConfigToCookie();
@@ -622,6 +629,7 @@
 
     async function scheduleOptimization() {
       validateUniqueSelections();
+      toggleConfigMode();
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => { if (sel.value) drivers.push(sel.value); });
       if (drivers.length !== 5) { alert('Please select exactly 5 drivers'); return; }
@@ -630,20 +638,19 @@
       document.querySelectorAll('.constructor-select').forEach(sel => { if (sel.value) constructors.push(sel.value); });
       if (constructors.length !== 2) { alert('Please select exactly 2 constructors'); return; }
       if (new Set(constructors).size !== constructors.length) { alert('Each constructor must be unique'); return; }
-      const useFP2 = document.getElementById('use-fp2-pace')?.checked;
+      const useFP2 = true;
       const config = {
         session_id: sessionId,
         current_drivers: drivers,
         current_constructors: constructors,
         remaining_budget: document.getElementById('remaining-budget')?.value,
         step1_swaps: document.getElementById('step1-swaps')?.value,
-        step2_swaps: document.getElementById('step2-swaps')?.value,
         weighting_scheme: document.getElementById('weighting-scheme')?.value,
         risk_tolerance: document.getElementById('risk-tolerance')?.value,
-        multiplier: document.getElementById('multiplier')?.value,
+        multiplier: 2,
         use_fp2_pace: useFP2,
-        pace_weight: useFP2 ? parseFloat(document.getElementById('pace-weight')?.value) : null,
-        pace_modifier_type: useFP2 ? document.getElementById('pace-modifier-type')?.value : null
+        pace_weight: parseFloat(document.getElementById('pace-weight')?.value),
+        pace_modifier_type: document.getElementById('pace-modifier-type')?.value
       };
       saveConfigToCookie();
       try {
