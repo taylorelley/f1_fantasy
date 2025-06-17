@@ -75,10 +75,6 @@
           <input type="number" id="step1-swaps" value="2" min="0" max="7">
         </div>
 
-        <div class="form-group">
-          <label for="step2-swaps">Following Race Max Swaps</label>
-          <input type="number" id="step2-swaps" value="2" min="0" max="7">
-        </div>
 
         <div class="form-group">
           <label for="weighting-scheme">Past Performance Weighting</label>
@@ -395,7 +391,6 @@
         current_constructors:  constructors,
         remaining_budget:      document.getElementById('remaining-budget')?.value,
         step1_swaps:           document.getElementById('step1-swaps')?.value,
-        step2_swaps:           document.getElementById('step2-swaps')?.value,
         weighting_scheme:      document.getElementById('weighting-scheme')?.value,
         risk_tolerance:        document.getElementById('risk-tolerance')?.value,
         multiplier:            document.getElementById('multiplier')?.value,
@@ -435,7 +430,6 @@
       }
       if (config.remaining_budget) document.getElementById('remaining-budget').value = config.remaining_budget;
       if (config.step1_swaps)       document.getElementById('step1-swaps').value       = config.step1_swaps;
-      if (config.step2_swaps)       document.getElementById('step2-swaps').value       = config.step2_swaps;
       if (config.weighting_scheme)  document.getElementById('weighting-scheme').value  = config.weighting_scheme;
       if (config.risk_tolerance)    document.getElementById('risk-tolerance').value    = config.risk_tolerance;
       if (config.multiplier)        document.getElementById('multiplier').value        = config.multiplier;
@@ -587,7 +581,6 @@
         current_constructors: constructors,
         remaining_budget:    document.getElementById('remaining-budget')?.value,
         step1_swaps:         document.getElementById('step1-swaps')?.value,
-        step2_swaps:         document.getElementById('step2-swaps')?.value,
         weighting_scheme:    document.getElementById('weighting-scheme')?.value,
         risk_tolerance:      document.getElementById('risk-tolerance')?.value,
         multiplier:          document.getElementById('multiplier')?.value,
@@ -637,7 +630,6 @@
         current_constructors: constructors,
         remaining_budget: document.getElementById('remaining-budget')?.value,
         step1_swaps: document.getElementById('step1-swaps')?.value,
-        step2_swaps: document.getElementById('step2-swaps')?.value,
         weighting_scheme: document.getElementById('weighting-scheme')?.value,
         risk_tolerance: document.getElementById('risk-tolerance')?.value,
         multiplier: document.getElementById('multiplier')?.value,
