@@ -335,6 +335,8 @@ pytest --cov=f1_optimizer -q
 
 The included tests currently achieve around **64%** coverage of `f1_optimizer.py`.
 
+Continuous integration runs the test suite via GitHub Actions in `.github/workflows/ci.yml`.
+
 ## Environment Variables
 
 - `FLASK_SECRET_KEY`: Secret key for Flask sessions (default: auto-generated)
