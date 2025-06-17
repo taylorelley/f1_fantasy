@@ -42,6 +42,18 @@ from f1_optimizer import (
     get_expected_race_pace,
 )
 
+EMAIL_REGEX = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
+PASSWORD_REGEX = re.compile(r"^(?=.*[A-Za-z])(?=.*\d).{8,}$")
+
+def is_valid_email(email: str) -> bool:
+    """Basic email format validation."""
+    return bool(email and EMAIL_REGEX.match(email))
+
+
+def is_strong_password(password: str) -> bool:
+    """Check password length and character requirements."""
+    return bool(password and PASSWORD_REGEX.match(password))
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max
 app.config["UPLOAD_FOLDER"] = "uploads"
@@ -736,20 +748,41 @@ def logout():
 @login_required
 def account():
     message = None
+    error = None
     if request.method == "POST":
+        current_password = request.form.get("current_password")
         email = request.form.get("email")
         password = request.form.get("password")
+        confirm = request.form.get("confirm_password")
         updated = False
         if email and email != current_user.email:
-            current_user.email = email
-            updated = True
+            if current_user.password_hash and not (
+                current_password
+                and check_password_hash(current_user.password_hash, current_password)
+            ):
+                error = "Current password required to change email"
+            elif not is_valid_email(email):
+                error = "Invalid email address"
+            else:
+                current_user.email = email
+                updated = True
         if password:
-            current_user.password_hash = generate_password_hash(password)
-            updated = True
-        if updated:
+            if current_user.password_hash and not (
+                current_password
+                and check_password_hash(current_user.password_hash, current_password)
+            ):
+                error = "Current password incorrect"
+            elif password != confirm:
+                error = "Passwords do not match"
+            elif not is_strong_password(password):
+                error = "Password must be at least 8 characters and contain a number"
+            else:
+                current_user.password_hash = generate_password_hash(password)
+                updated = True
+        if updated and not error:
             db.session.commit()
             message = "Account updated"
-    return render_template("account.html", message=message)
+    return render_template("account.html", message=message, error=error)
 
 @app.route("/")
 @login_required
