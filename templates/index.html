@@ -13,7 +13,7 @@
   <script>
     const serverConfig = {{ user_config|tojson|safe }};
     const simpleMatrix = {{ simple_matrix|tojson|safe }};
-    const autoEmailOptIn = {{ 'true' if auto_email else 'false' }};
+    let autoEmailOptIn = {{ 'true' if auto_email else 'false' }};
   </script>
 </head>
 <body>
