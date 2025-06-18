@@ -904,8 +904,9 @@ table.data-table input[type="text"] {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 300px));
   gap: 20px;
-  margin: 40px 0;
+  margin: 40px auto;
   justify-content: center;
+  max-width: 960px;
 }
 .feature {
   background: #fff;
