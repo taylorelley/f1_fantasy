@@ -11,7 +11,9 @@
   <header>
     <div class="header-content">
       <h1>Sign In</h1>
+      <button class="nav-toggle" onclick="toggleNav()">&#9776;</button>
       <nav class="nav-links">
+        <a href="/">Home</a>
         <a href="/login" class="active">Login</a>
       </nav>
     </div>
@@ -53,8 +55,13 @@
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
+</div>
+</div>
+</div>
+  <script>
+    function toggleNav() {
+      document.querySelector('.nav-links').classList.toggle('open');
+    }
+  </script>
 </body>
 </html>

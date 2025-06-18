@@ -11,15 +11,19 @@
   <header>
     <div class="header-content">
     <h1>Administration</h1>
+      <button class="nav-toggle" onclick="toggleNav()">&#9776;</button>
       <nav class="nav-links">
         {% if current_user.is_authenticated %}
-          <a href="/">Optimiser</a>
+          <a href="/">Home</a>
+          <a href="/optimizer">Optimiser</a>
           <a href="/statistics">Statistics</a>
           {% if current_user.admin %}
           <a href="/manage_data" class="active">Administration</a>
           {% endif %}
+          <a href="/account">Account</a>
           <a href="/logout">Logout</a>
         {% else %}
+          <a href="/">Home</a>
           <a href="/login">Login</a>
         {% endif %}
       </nav>
@@ -420,8 +424,13 @@
       buildTable(tracksCSV, 'tracks-table');
       buildTable(mappingCSV, 'mapping-table');
       buildTable(simpleMatrixCSV, 'simple-matrix-table');
-      loadQueuedTasks();
-    });
+  loadQueuedTasks();
+  });
+  </script>
+  <script>
+    function toggleNav() {
+      document.querySelector('.nav-links').classList.toggle('open');
+    }
   </script>
 </body>
 </html>

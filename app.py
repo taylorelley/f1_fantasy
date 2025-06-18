@@ -42,6 +42,18 @@ from f1_optimizer import (
     get_expected_race_pace,
 )
 
+EMAIL_REGEX = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
+PASSWORD_REGEX = re.compile(r"^(?=.*[A-Za-z])(?=.*\d).{8,}$")
+
+def is_valid_email(email: str) -> bool:
+    """Basic email format validation."""
+    return bool(email and EMAIL_REGEX.match(email))
+
+
+def is_strong_password(password: str) -> bool:
+    """Check password length and character requirements."""
+    return bool(password and PASSWORD_REGEX.match(password))
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max
 app.config["UPLOAD_FOLDER"] = "uploads"
@@ -629,7 +641,7 @@ def schedule_job():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("index"))
+        return redirect(url_for("optimizer"))
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
@@ -642,7 +654,7 @@ def login():
                     user.admin = new_admin
                     db.session.commit()
                 login_user(user)
-                return redirect(url_for("index"))
+                return redirect(url_for("optimizer"))
             return render_template("login.html", message="Invalid credentials")
     return render_template("login.html")
 
@@ -650,7 +662,7 @@ def login():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for("index"))
+        return redirect(url_for("optimizer"))
     if request.method == "POST":
         username = request.form.get("username")
         email = request.form.get("email")
@@ -672,7 +684,7 @@ def register():
         db.session.add(user)
         db.session.commit()
         login_user(user)
-        return redirect(url_for("index"))
+        return redirect(url_for("optimizer"))
     return render_template("register.html")
 
 
@@ -722,7 +734,7 @@ def authorize(provider):
         db.session.commit()
 
     login_user(user)
-    return redirect(url_for("index"))
+    return redirect(url_for("optimizer"))
 
 
 @app.route("/logout")
@@ -731,9 +743,55 @@ def logout():
     logout_user()
     return redirect(url_for("login"))
 
-@app.route("/")
+
+@app.route("/account", methods=["GET", "POST"])
 @login_required
-def index():
+def account():
+    message = None
+    error = None
+    if request.method == "POST":
+        current_password = request.form.get("current_password")
+        email = request.form.get("email")
+        password = request.form.get("password")
+        confirm = request.form.get("confirm_password")
+        updated = False
+        if email and email != current_user.email:
+            if current_user.password_hash and not (
+                current_password
+                and check_password_hash(current_user.password_hash, current_password)
+            ):
+                error = "Current password required to change email"
+            elif not is_valid_email(email):
+                error = "Invalid email address"
+            else:
+                current_user.email = email
+                updated = True
+        if password:
+            if current_user.password_hash and not (
+                current_password
+                and check_password_hash(current_user.password_hash, current_password)
+            ):
+                error = "Current password incorrect"
+            elif password != confirm:
+                error = "Passwords do not match"
+            elif not is_strong_password(password):
+                error = "Password must be at least 8 characters and contain a number"
+            else:
+                current_user.password_hash = generate_password_hash(password)
+                updated = True
+        if updated and not error:
+            db.session.commit()
+            message = "Account updated"
+    return render_template("account.html", message=message, error=error)
+
+@app.route("/")
+def home():
+    return render_template("home.html", year=datetime.now().year)
+
+
+@app.route("/optimizer")
+@login_required
+def optimizer():
     cfg = None
     if current_user.config_json:
         try:
@@ -935,7 +993,7 @@ def statistics():
 @login_required
 def manage_data_page():
     if not current_user.admin:
-        return redirect(url_for("index"))
+        return redirect(url_for("optimizer"))
     base = app.config["DEFAULT_DATA_FOLDER"]
     driver_path = os.path.join(base, "driver_race_data.csv")
     constructor_path = os.path.join(base, "constructor_race_data.csv")

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account Settings</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <h1>Account</h1>
+      <button class="nav-toggle" onclick="toggleNav()">&#9776;</button>
+      <nav class="nav-links">
+        {% if current_user.is_authenticated %}
+          <a href="/">Home</a>
+          <a href="/optimizer">Optimiser</a>
+          <a href="/statistics">Statistics</a>
+          {% if current_user.admin %}
+          <a href="/manage_data">Administration</a>
+          {% endif %}
+          <a href="/account" class="active">Account</a>
+          <a href="/logout">Logout</a>
+        {% else %}
+          <a href="/">Home</a>
+          <a href="/login">Login</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h1 class="h4 mb-4 text-center">Account Settings</h1>
+            {% if error %}
+              <div class="alert alert-danger" role="alert">{{ error }}</div>
+            {% endif %}
+            {% if message %}
+              <div class="alert alert-success" role="alert">{{ message }}</div>
+            {% endif %}
+            <form method="post" action="/account">
+              <div class="mb-3">
+                <label for="current_password" class="form-label">Current Password</label>
+                <input type="password" class="form-control" id="current_password" name="current_password" placeholder="Required to update">
+              </div>
+              <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" name="email" value="{{ current_user.email }}" required>
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">New Password</label>
+                <input type="password" class="form-control" id="password" name="password" placeholder="Leave blank to keep current">
+              </div>
+              <div class="mb-3">
+                <label for="confirm_password" class="form-label">Confirm Password</label>
+                <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Repeat new password">
+              </div>
+              <button type="submit" class="btn btn-primary w-100">Update</button>
+            </form>
+          </div>
+        </div>
+  </div>
+  </div>
+  </div>
+  <script>
+    function toggleNav() {
+      document.querySelector('.nav-links').classList.toggle('open');
+    }
+  </script>
+</body>
+</html>

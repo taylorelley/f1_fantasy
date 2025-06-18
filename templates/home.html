@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>F1 Fantasy Optimiser</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <h1>F1 Fantasy Optimiser</h1>
+      <button class="nav-toggle" onclick="toggleNav()">&#9776;</button>
+      <nav class="nav-links">
+        {% if current_user.is_authenticated %}
+          <a href="/" class="active">Home</a>
+          <a href="/optimizer">Optimiser</a>
+          <a href="/statistics">Statistics</a>
+          {% if current_user.admin %}
+          <a href="/manage_data">Administration</a>
+          {% endif %}
+          <a href="/account">Account</a>
+          <a href="/logout">Logout</a>
+        {% else %}
+          <a href="/" class="active">Home</a>
+          <a href="/login">Login</a>
+          <a href="/register">Register</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-content">
+      <h2>Optimise your F1 Fantasy team</h2>
+      <p>Leverage data-driven insights to maximise points every race.</p>
+      {% if current_user.is_authenticated %}
+        <a class="button" href="/optimizer">Open Optimiser</a>
+      {% else %}
+        <a class="button" href="/register">Get Started</a>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="features container">
+    <div class="feature">
+      <h3>Smart Recommendations</h3>
+      <p>Advanced algorithms analyse driver form and track performance to suggest the best swaps.</p>
+    </div>
+    <div class="feature">
+      <h3>Historical Data</h3>
+      <p>Explore detailed statistics from previous races to guide your decisions.</p>
+    </div>
+    <div class="feature">
+      <h3>Easy to Use</h3>
+      <p>Clean design and responsive layout work great on mobile and desktop.</p>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container text-center">
+      <small>&copy; {{ year }} F1 Fantasy Optimiser</small>
+    </div>
+  </footer>
+  <script>
+    function toggleNav() {
+      document.querySelector('.nav-links').classList.toggle('open');
+    }
+  </script>
+</body>
+</html>
