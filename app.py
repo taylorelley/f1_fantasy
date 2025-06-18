@@ -551,7 +551,7 @@ def perform_optimization(data, user=None):
     return resp
 
 
-def process_queue(email_only=False, task_id=None):
+def process_queue(email_only=False, task_id=None, meeting_key=None, race_year=None):
     with app.app_context():
         query = OptimizationTask.query.filter_by(status="pending")
         if email_only:
@@ -582,8 +582,26 @@ def process_queue(email_only=False, task_id=None):
                 results.append((task.id, result))
                 if task.notify and user.email_opt_in:
                     next_cfg = json.loads(task.config_json)
-                    next_cfg.pop("next_meeting_key", None)
-                    next_cfg.pop("next_race_year", None)
+                    sess_id = next_cfg.get("session_id", "default")
+                    base = (
+                        app.config["DEFAULT_DATA_FOLDER"]
+                        if sess_id == "default"
+                        else get_data_folder(sess_id)
+                    )
+                    try:
+                        cal_df = pd.read_csv(os.path.join(base, "calendar.csv"), skipinitialspace=True)
+                        m_key = meeting_key or config.get("next_meeting_key")
+                        if m_key and "meeting_key" in cal_df.columns:
+                            rows = cal_df.index[cal_df["meeting_key"] == int(m_key)].tolist()
+                            if rows and rows[0] + 1 < len(cal_df):
+                                nxt = cal_df.iloc[rows[0] + 1]
+                                nm = nxt.get("meeting_key")
+                                yr = nxt.get("year")
+                                if pd.notna(nm) and pd.notna(yr):
+                                    next_cfg["next_meeting_key"] = int(nm)
+                                    next_cfg["next_race_year"] = int(yr)
+                    except Exception:
+                        pass
                     db.session.add(
                         OptimizationTask(
                             user_id=user.id,
@@ -690,7 +708,7 @@ def check_api_job():
                     last_change_time
                     and (now - last_change_time).total_seconds() >= timeout
                 ):
-                    process_queue(email_only=True)
+                    process_queue(email_only=True, meeting_key=mk, race_year=yr)
                     last_session_key = None
                     last_lap_value = None
                     last_change_time = None
@@ -1443,12 +1461,19 @@ def queued_email_tasks_route():
     results = []
     for t in tasks:
         user = User.query.get(t.user_id)
+        cfg = {}
+        try:
+            cfg = json.loads(t.config_json)
+        except Exception:
+            pass
         results.append(
             {
                 "id": t.id,
                 "user": user.email if user else "Unknown",
                 "created_at": t.created_at.strftime("%Y-%m-%d %H:%M"),
                 "status": t.status,
+                "session_id": cfg.get("session_id", "default"),
+                "config": cfg,
             }
         )
     return jsonify({"success": True, "tasks": results})

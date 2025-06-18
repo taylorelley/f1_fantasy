@@ -393,17 +393,17 @@
         }
         const thead = document.createElement('thead');
         const hrow = document.createElement('tr');
-        ['ID','User','Created','Status'].forEach(h => {
-          const th = document.createElement('th');
-          th.textContent = h;
-          hrow.appendChild(th);
+        ['ID','User','Session','Created','Status','Config'].forEach(h => {
+            const th = document.createElement('th');
+            th.textContent = h;
+            hrow.appendChild(th);
         });
         thead.appendChild(hrow);
         table.appendChild(thead);
         const tbody = document.createElement('tbody');
         data.tasks.forEach(t => {
           const tr = document.createElement('tr');
-          [t.id, t.user, t.created_at, t.status].forEach(val => {
+          [t.id, t.user, t.session_id, t.created_at, t.status, JSON.stringify(t.config)].forEach(val => {
             const td = document.createElement('td');
             td.textContent = val;
             tr.appendChild(td);
