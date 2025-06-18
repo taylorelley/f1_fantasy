@@ -250,6 +250,13 @@ table.data-table td {
   padding: 6px;
 }
 
+#tasks-table .config-cell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 table.data-table th {
   background: #f8f8f8;
   text-align: left;
