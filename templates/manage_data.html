@@ -407,9 +407,18 @@
         const tbody = document.createElement('tbody');
         data.tasks.forEach(t => {
           const tr = document.createElement('tr');
-          [t.id, t.user, t.session_id, t.created_at, t.status, JSON.stringify(t.config)].forEach(val => {
+          const fullConfig = JSON.stringify(t.config);
+          const rowValues = [t.id, t.user, t.session_id, t.created_at, t.status, fullConfig];
+          rowValues.forEach((val, idx) => {
             const td = document.createElement('td');
-            td.textContent = val;
+            if (idx === 5) { // Config column
+              const shortVal = val.length > 100 ? val.slice(0, 100) + '...' : val;
+              td.textContent = shortVal;
+              td.title = val;
+              td.classList.add('config-cell');
+            } else {
+              td.textContent = val;
+            }
             tr.appendChild(td);
           });
           const cancelTd = document.createElement('td');
