@@ -24,6 +24,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -1829,6 +1830,16 @@ def export_statistics():
 
 with app.app_context():
     db.create_all()
+    insp = inspect(db.engine)
+    cols = [c["name"] for c in insp.get_columns("user")]
+    if "email_opt_in" not in cols:
+        try:
+            db.session.execute(
+                text('ALTER TABLE "user" ADD COLUMN email_opt_in BOOLEAN DEFAULT FALSE')
+            )
+            db.session.commit()
+        except Exception:
+            pass
     schedule_job()
     # Start the scheduler only in the main process
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
