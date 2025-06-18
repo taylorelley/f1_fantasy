@@ -1479,6 +1479,25 @@ def queued_email_tasks_route():
     return jsonify({"success": True, "tasks": results})
 
 
+@app.route("/cancel_email_task", methods=["POST"])
+@login_required
+def cancel_email_task_route():
+    if not current_user.admin:
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    data = request.get_json() or {}
+    task_id = data.get("task_id")
+    if not task_id:
+        return jsonify({"success": False, "message": "Task ID required"})
+    task = OptimizationTask.query.filter_by(
+        id=task_id, status="pending", notify=True
+    ).first()
+    if not task:
+        return jsonify({"success": False, "message": "Task not found"})
+    db.session.delete(task)
+    db.session.commit()
+    return jsonify({"success": True})
+
+
 @app.route("/api/statistics")
 @login_required
 def get_statistics():
