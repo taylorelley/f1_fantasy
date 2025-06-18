@@ -58,6 +58,10 @@
                 <label for="confirm_password" class="form-label">Confirm Password</label>
                 <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Repeat new password">
               </div>
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="auto_email_opt_in" name="auto_email_opt_in" {% if current_user.email_opt_in %}checked{% endif %}>
+                <label class="form-check-label" for="auto_email_opt_in">Receive automatic email optimisations each race</label>
+              </div>
               <button type="submit" class="btn btn-primary w-100">Update</button>
             </form>
           </div>
