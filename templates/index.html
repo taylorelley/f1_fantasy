@@ -612,6 +612,7 @@
 
       document.getElementById('progress-section').style.display = 'block';
       document.getElementById('results-section').style.display  = 'none';
+      document.getElementById('progress-section').scrollIntoView({ behavior: 'smooth' });
 
       try {
         const response = await fetch('/optimize', {
