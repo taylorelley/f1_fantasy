@@ -932,3 +932,7 @@ table.data-table input[type="text"] {
     font-size: 1em;
   }
 }
+
+#tasks-table { table-layout: fixed; }
+#tasks-table td.config-cell { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+

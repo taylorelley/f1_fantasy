@@ -407,11 +407,18 @@
         const tbody = document.createElement('tbody');
         data.tasks.forEach(t => {
           const tr = document.createElement('tr');
-          [t.id, t.user, t.session_id, t.created_at, t.status, JSON.stringify(t.config)].forEach(val => {
+          const values = [t.id, t.user, t.session_id, t.created_at, t.status];
+          values.forEach(val => {
             const td = document.createElement('td');
             td.textContent = val;
             tr.appendChild(td);
           });
+          const configTd = document.createElement('td');
+          const configStr = JSON.stringify(t.config);
+          configTd.textContent = configStr;
+          configTd.title = configStr;
+          configTd.className = 'config-cell';
+          tr.appendChild(configTd);
           const cancelTd = document.createElement('td');
           const btn = document.createElement('button');
           btn.textContent = 'Cancel';
