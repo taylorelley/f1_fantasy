@@ -13,6 +13,7 @@
   <script>
     const serverConfig = {{ user_config|tojson|safe }};
     const simpleMatrix = {{ simple_matrix|tojson|safe }};
+    const autoEmailOptIn = {{ 'true' if auto_email else 'false' }};
   </script>
 </head>
 <body>
@@ -658,6 +659,35 @@
       };
       saveConfigToCookie();
       try {
+        if (autoEmailOptIn) {
+          const update = confirm('You are currently opted in for automatic email optimisations.\nOK to update defaults, Cancel for one-off.');
+          if (update) {
+            const r = await fetch('/auto_email_config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ opt_in: true, config })
+            });
+            if ((await r.json()).success) {
+              alert('Default optimisation settings updated.');
+            }
+            return;
+          }
+        } else {
+          const opt = confirm('Opt-in to receive optimisations for every race?');
+          if (opt) {
+            const r = await fetch('/auto_email_config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ opt_in: true, config })
+            });
+            if ((await r.json()).success) {
+              alert('Automatic email optimisation enabled.');
+              autoEmailOptIn = true;
+            }
+            return;
+          }
+        }
+
         const resp = await fetch('/schedule_optimization', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
