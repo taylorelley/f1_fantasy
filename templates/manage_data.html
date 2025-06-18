@@ -393,7 +393,7 @@
         }
         const thead = document.createElement('thead');
         const hrow = document.createElement('tr');
-        ['ID','User','Session','Created','Status','Config'].forEach(h => {
+        ['ID','User','Session','Created','Status','Config','Action'].forEach(h => {
             const th = document.createElement('th');
             th.textContent = h;
             hrow.appendChild(th);
@@ -408,6 +408,30 @@
             td.textContent = val;
             tr.appendChild(td);
           });
+          const cancelTd = document.createElement('td');
+          const btn = document.createElement('button');
+          btn.textContent = 'Cancel';
+          btn.className = 'button-secondary';
+          btn.onclick = async () => {
+            if (!confirm(`Cancel task ${t.id}?`)) return;
+            try {
+              const resp = await fetch('/cancel_email_task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_id: t.id })
+              });
+              const res = await resp.json();
+              if (res.success) {
+                tr.remove();
+              } else {
+                alert('Failed to cancel: ' + (res.message || 'unknown error'));
+              }
+            } catch (err) {
+              alert('Failed to cancel: ' + err.message);
+            }
+          };
+          cancelTd.appendChild(btn);
+          tr.appendChild(cancelTd);
           tbody.appendChild(tr);
         });
         table.appendChild(tbody);
