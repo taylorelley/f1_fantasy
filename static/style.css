@@ -902,6 +902,7 @@ table.data-table input[type="text"] {
 .hero h2 {
   font-size: 2.5em;
   margin-bottom: 10px;
+  color: #000;
 }
 .hero p {
   font-size: 1.2em;
@@ -934,6 +935,7 @@ table.data-table input[type="text"] {
   }
   .hero h2 {
     font-size: 2em;
+    color: #000;
   }
   .hero p {
     font-size: 1em;
