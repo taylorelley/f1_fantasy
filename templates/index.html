@@ -429,14 +429,6 @@
       document.querySelectorAll('.constructor-select').forEach(sel => {
         if (sel.value) constructors.push(sel.value);
       });
-      const keepDrivers = [];
-      document.querySelectorAll('.driver-keep').forEach((cb, idx) => {
-        if (cb.checked && drivers[idx]) keepDrivers.push(drivers[idx]);
-      });
-      const keepConstructors = [];
-      document.querySelectorAll('.constructor-keep').forEach((cb, idx) => {
-        if (cb.checked && constructors[idx]) keepConstructors.push(constructors[idx]);
-      });
       const keepConstructors = [];
       document.querySelectorAll('.constructor-keep').forEach((cb, idx) => {
         if (cb.checked && constructors[idx]) keepConstructors.push(constructors[idx]);
@@ -641,6 +633,15 @@
         alert('Driver mapping file is required for Race Pace Estimation. Please upload it first.');
         return;
       }
+
+      const keepDrivers = [];
+      document.querySelectorAll('.driver-keep').forEach((cb, idx) => {
+        if (cb.checked && drivers[idx]) keepDrivers.push(drivers[idx]);
+      });
+      const keepConstructors = [];
+      document.querySelectorAll('.constructor-keep').forEach((cb, idx) => {
+        if (cb.checked && constructors[idx]) keepConstructors.push(constructors[idx]);
+      });
 
       const config = {
         session_id:          sessionId,
