@@ -610,9 +610,11 @@
 
       saveConfigToCookie();
 
-      document.getElementById('progress-section').style.display = 'block';
-      document.getElementById('results-section').style.display  = 'none';
-      document.getElementById('progress-section').scrollIntoView({ behavior: 'smooth' });
+      const progressSection = document.getElementById('progress-section');
+      progressSection.style.display = 'block';
+      document.getElementById('results-section').style.display = 'none';
+      await new Promise(requestAnimationFrame);
+      progressSection.scrollIntoView({ behavior: 'smooth' });
 
       try {
         const response = await fetch('/optimize', {
