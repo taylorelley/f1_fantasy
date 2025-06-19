@@ -408,6 +408,8 @@ def perform_optimization(data, user=None):
         "races_completed": races_completed,
         "current_drivers": data.get("current_drivers", []),
         "current_constructors": data.get("current_constructors", []),
+        "keep_drivers": data.get("keep_drivers", []),
+        "keep_constructors": data.get("keep_constructors", []),
         "remaining_budget": float(data.get("remaining_budget", 0.0)),
         "step1_swaps": int(data.get("step1_swaps", 0)),
         "weighting_scheme": data.get("weighting_scheme", "trend_based"),

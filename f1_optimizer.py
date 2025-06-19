@@ -1012,6 +1012,8 @@ class F1TeamOptimizer:
         self.risk_tolerance = config["risk_tolerance"]
         self.top_n = config.get("top_n_candidates", 10)
         self.use_ilp = config.get("use_ilp", False)
+        self.keep_drivers = set(config.get("keep_drivers", []))
+        self.keep_constructors = set(config.get("keep_constructors", []))
 
         self.drivers_df = None
         self.constructors_df = None
@@ -1209,18 +1211,21 @@ class F1TeamOptimizer:
         if np.isnan(min_c):
             min_c = self.constructors_df["Cost_Value"].min()
 
+        avail_out_d = [d for d in current_drivers if d not in self.keep_drivers]
+        avail_out_c = [c for c in current_constructors if c not in self.keep_constructors]
+
         for total in range(max_swaps + 1):
-            for d_swaps in range(min(total + 1, len(current_drivers) + 1)):
+            for d_swaps in range(min(total + 1, len(avail_out_d) + 1)):
                 c_swaps = total - d_swaps
-                if c_swaps > len(current_constructors):
+                if c_swaps > len(avail_out_c):
                     continue
 
                 potential_savings = d_swaps * min_d + c_swaps * min_c
                 if self.current_team_cost - potential_savings > self.max_budget:
                     continue
 
-                for out_d in itertools.combinations(current_drivers, d_swaps):
-                    for out_c in itertools.combinations(current_constructors, c_swaps):
+                for out_d in itertools.combinations(avail_out_d, d_swaps):
+                    for out_c in itertools.combinations(avail_out_c, c_swaps):
                         patterns.append((out_d, out_c))
 
         return patterns
@@ -1365,6 +1370,13 @@ class F1TeamOptimizer:
             + lpSum(c_vars[name] for name in c_vars if name not in current_constructors)
             <= max_swaps
         )
+
+        for name in self.keep_drivers:
+            if name in d_vars:
+                prob += d_vars[name] == 1
+        for name in self.keep_constructors:
+            if name in c_vars:
+                prob += c_vars[name] == 1
 
         prob.solve(PULP_CBC_CMD(msg=False))
 

@@ -297,6 +297,8 @@
       if (driverContainer) {
         driverContainer.innerHTML = '';
         for (let i = 0; i < 5; i++) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'select-wrapper';
           const select = document.createElement('select');
           select.className = 'driver-select';
           select.innerHTML = '<option value="">Select driver…</option>';
@@ -304,7 +306,13 @@
             select.innerHTML += `<option value="${driver}">${driver}</option>`;
           });
           select.addEventListener('change', validateUniqueSelections);
-          driverContainer.appendChild(select);
+          const keep = document.createElement('input');
+          keep.type = 'checkbox';
+          keep.className = 'driver-keep';
+          keep.title = 'Keep';
+          wrapper.appendChild(select);
+          wrapper.appendChild(keep);
+          driverContainer.appendChild(wrapper);
         }
       }
 
@@ -312,6 +320,8 @@
       if (constructorContainer) {
         constructorContainer.innerHTML = '';
         for (let i = 0; i < 2; i++) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'select-wrapper';
           const select = document.createElement('select');
           select.className = 'constructor-select';
           select.innerHTML = '<option value="">Select constructor…</option>';
@@ -319,7 +329,13 @@
             select.innerHTML += `<option value="${cons}">${cons}</option>`;
           });
           select.addEventListener('change', validateUniqueSelections);
-          constructorContainer.appendChild(select);
+          const keep = document.createElement('input');
+          keep.type = 'checkbox';
+          keep.className = 'constructor-keep';
+          keep.title = 'Keep';
+          wrapper.appendChild(select);
+          wrapper.appendChild(keep);
+          constructorContainer.appendChild(wrapper);
         }
       }
 
@@ -405,13 +421,31 @@
       document.querySelectorAll('.driver-select').forEach(sel => {
         if (sel.value) drivers.push(sel.value);
       });
+      const keepDrivers = [];
+      document.querySelectorAll('.driver-keep').forEach((cb, idx) => {
+        if (cb.checked && drivers[idx]) keepDrivers.push(drivers[idx]);
+      });
       const constructors = [];
       document.querySelectorAll('.constructor-select').forEach(sel => {
         if (sel.value) constructors.push(sel.value);
       });
+      const keepDrivers = [];
+      document.querySelectorAll('.driver-keep').forEach((cb, idx) => {
+        if (cb.checked && drivers[idx]) keepDrivers.push(drivers[idx]);
+      });
+      const keepConstructors = [];
+      document.querySelectorAll('.constructor-keep').forEach((cb, idx) => {
+        if (cb.checked && constructors[idx]) keepConstructors.push(constructors[idx]);
+      });
+      const keepConstructors = [];
+      document.querySelectorAll('.constructor-keep').forEach((cb, idx) => {
+        if (cb.checked && constructors[idx]) keepConstructors.push(constructors[idx]);
+      });
       const config = {
         current_drivers:       drivers,
         current_constructors:  constructors,
+        keep_drivers:          keepDrivers,
+        keep_constructors:     keepConstructors,
         remaining_budget:      document.getElementById('remaining-budget')?.value,
         step1_swaps:           document.getElementById('step1-swaps')?.value,
         weighting_scheme:      document.getElementById('weighting-scheme')?.value,
@@ -447,10 +481,24 @@
           if (driverSelects[idx]) driverSelects[idx].value = driver;
         });
       }
+      if (config.keep_drivers) {
+        const keepSet = new Set(config.keep_drivers);
+        document.querySelectorAll('.driver-keep').forEach((cb, idx) => {
+          const val = driverSelects[idx]?.value;
+          cb.checked = val && keepSet.has(val);
+        });
+      }
       const constructorSelects = document.querySelectorAll('.constructor-select');
       if (config.current_constructors) {
         config.current_constructors.forEach((cons, idx) => {
           if (constructorSelects[idx]) constructorSelects[idx].value = cons;
+        });
+      }
+      if (config.keep_constructors) {
+        const keepSet = new Set(config.keep_constructors);
+        document.querySelectorAll('.constructor-keep').forEach((cb, idx) => {
+          const val = constructorSelects[idx]?.value;
+          cb.checked = val && keepSet.has(val);
         });
       }
       if (config.remaining_budget) document.getElementById('remaining-budget').value = config.remaining_budget;
@@ -598,6 +646,8 @@
         session_id:          sessionId,
         current_drivers:     drivers,
         current_constructors: constructors,
+        keep_drivers:        keepDrivers,
+        keep_constructors:   keepConstructors,
         remaining_budget:    document.getElementById('remaining-budget')?.value,
         step1_swaps:         document.getElementById('step1-swaps')?.value,
         weighting_scheme:    document.getElementById('weighting-scheme')?.value,
@@ -648,10 +698,16 @@
       if (constructors.length !== 2) { alert('Please select exactly 2 constructors'); return; }
       if (new Set(constructors).size !== constructors.length) { alert('Each constructor must be unique'); return; }
       const useFP2 = true;
+      const keepDrivers = [];
+      document.querySelectorAll('.driver-keep').forEach((cb, idx) => { if (cb.checked && drivers[idx]) keepDrivers.push(drivers[idx]); });
+      const keepConstructors = [];
+      document.querySelectorAll('.constructor-keep').forEach((cb, idx) => { if (cb.checked && constructors[idx]) keepConstructors.push(constructors[idx]); });
       const config = {
         session_id: sessionId,
         current_drivers: drivers,
         current_constructors: constructors,
+        keep_drivers: keepDrivers,
+        keep_constructors: keepConstructors,
         remaining_budget: document.getElementById('remaining-budget')?.value,
         step1_swaps: document.getElementById('step1-swaps')?.value,
         weighting_scheme: document.getElementById('weighting-scheme')?.value,

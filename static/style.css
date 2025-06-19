@@ -149,6 +149,12 @@ textarea {
       gap: 20px;
     }
 
+    .select-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
 .driver-select, .constructor-select {
       margin-bottom: 10px;
     }
