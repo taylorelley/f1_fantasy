@@ -7,13 +7,16 @@ A Dockerized Flask application for building the optimal F1 Fantasy team. It calc
 - **VFM Calculation**: Analyzes driver and constructor performance with outlier removal
 - **Track Affinity Analysis**: Determines how well drivers/constructors perform at specific track types
 - **Two-Step Optimization**: Optimizes team selection for the next two races
+- **Keep Drivers/Constructors**: Lock certain team members to avoid swapping them
 - **Risk Tolerance Settings**: Choose between consistent performers or track-specific optimization
+- **Simple Configuration Slider**: Apply recommended weighting and risk presets with one slider
 - **Interactive Web Interface**: Easy-to-use web UI for configuration and results
 - **Default Data Support**: Upload data once and reuse it for multiple optimizations
 - **Configuration Memory**: Each user's last team configuration is saved and reloaded on login
 - **Docker Support**: Fully containerized for easy deployment
 - **User Authentication**: Login via Google, Facebook, GitHub or a local account
-- **Administration Panel**: Manage data files and configure automated email optimisation
+- **Account Management**: Update email, change password and opt into automatic emails
+- **Administration Panel**: Manage data files, edit the configuration matrix and cancel queued tasks
 - **Queued Jobs & Automated Emails**: Optimisations run in the background and emailed results
 - **Statistics Dashboard**: Visualise data and export statistics to Excel
 
@@ -188,7 +191,8 @@ docker-compose up --build
    - Select your current 5 drivers and 2 constructors
    - Set your remaining budget
    - Choose swap limits for each step
-   - Select weighting scheme and risk tolerance
+   - Select weighting scheme and risk tolerance or use the simple slider presets
+   - Use the "Keep" checkboxes to prevent selected drivers or constructors from being swapped
 
 2. **Run Optimization**:
    - Click "Run Optimization"
@@ -206,6 +210,12 @@ docker-compose up --build
 5. **Queued & Scheduled Runs**:
    - Optimisations are placed in a background queue
    - Configure SMTP and an API poll interval on the Administration page to receive results once lap data finishes uploading
+   - Administrators can cancel pending email tasks from the queue table
+
+### Managing Your Account
+
+- Update your email address and password from the Account page
+- Opt in to receive automatic optimisation emails for each race
 
 ## Data File Formats
 
