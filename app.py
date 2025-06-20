@@ -24,6 +24,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -45,6 +46,7 @@ from f1_optimizer import (
 EMAIL_REGEX = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
 PASSWORD_REGEX = re.compile(r"^(?=.*[A-Za-z])(?=.*\d).{8,}$")
 
+
 def is_valid_email(email: str) -> bool:
     """Basic email format validation."""
     return bool(email and EMAIL_REGEX.match(email))
@@ -53,6 +55,7 @@ def is_valid_email(email: str) -> bool:
 def is_strong_password(password: str) -> bool:
     """Check password length and character requirements."""
     return bool(password and PASSWORD_REGEX.match(password))
+
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max
@@ -112,6 +115,7 @@ os.makedirs(app.config["DEFAULT_DATA_FOLDER"], exist_ok=True)
 
 sessions = {}
 
+
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     provider_id = db.Column(db.String(256), unique=True, nullable=False)
@@ -122,20 +126,22 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(256))
     admin = db.Column(db.Boolean, default=False)
     config_json = db.Column(db.Text, default="{}")
+    email_opt_in = db.Column(db.Boolean, default=False)
+
 
 class OptimizationTask(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     config_json = db.Column(db.Text, nullable=False)
     notify = db.Column(db.Boolean, default=False)
-    status = db.Column(db.String(20), default='pending')
+    status = db.Column(db.String(20), default="pending")
     result_json = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
 
 
 def get_data_folder(session_id=None):
@@ -273,20 +279,34 @@ def validate_simple_matrix(df):
         "risk_tolerance",
     ]
     if not all(col in df.columns for col in required_cols):
-        raise ValueError(f"simple_config_matrix.csv must contain columns: {', '.join(required_cols)}")
+        raise ValueError(
+            f"simple_config_matrix.csv must contain columns: {', '.join(required_cols)}"
+        )
     if df.empty:
         raise ValueError("Simple config matrix is empty")
     if not pd.api.types.is_numeric_dtype(df["pace_weight"]):
         raise ValueError("pace_weight must be numeric")
     valid_modifiers = {"conservative", "aggressive"}
     if not df["pace_modifier_type"].isin(valid_modifiers).all():
-        raise ValueError("pace_modifier_type must be one of " + ", ".join(sorted(valid_modifiers)))
-    valid_schemes = {"equal", "linear_decay", "exp_decay", "moderate_decay", "trend_based"}
+        raise ValueError(
+            "pace_modifier_type must be one of " + ", ".join(sorted(valid_modifiers))
+        )
+    valid_schemes = {
+        "equal",
+        "linear_decay",
+        "exp_decay",
+        "moderate_decay",
+        "trend_based",
+    }
     if not df["weighting_scheme"].isin(valid_schemes).all():
-        raise ValueError("weighting_scheme must be one of " + ", ".join(sorted(valid_schemes)))
+        raise ValueError(
+            "weighting_scheme must be one of " + ", ".join(sorted(valid_schemes))
+        )
     valid_risks = {"low", "medium", "high"}
     if not df["risk_tolerance"].isin(valid_risks).all():
-        raise ValueError("risk_tolerance must be one of " + ", ".join(sorted(valid_risks)))
+        raise ValueError(
+            "risk_tolerance must be one of " + ", ".join(sorted(valid_risks))
+        )
     return True
 
 
@@ -301,7 +321,9 @@ def load_default_data():
         constructor_df = pd.read_csv(os.path.join(base, "constructor_race_data.csv"))
 
         drivers_list = sorted(driver_df["Driver"].astype(str).unique().tolist())
-        constructors_list = sorted(constructor_df["Constructor"].astype(str).unique().tolist())
+        constructors_list = sorted(
+            constructor_df["Constructor"].astype(str).unique().tolist()
+        )
 
         return {
             "races_completed": races_completed,
@@ -315,13 +337,18 @@ def load_default_data():
 
 scheduler = BackgroundScheduler()
 
+
 def send_email(to_email, subject, html_body, settings):
     if not settings.get("smtp_host"):
         print("SMTP host not configured; skipping email")
         return False
     msg = MIMEText(html_body, "html")
     msg["Subject"] = subject
-    msg["From"] = settings.get("smtp_from") or settings.get("smtp_username") or settings.get("smtp_host")
+    msg["From"] = (
+        settings.get("smtp_from")
+        or settings.get("smtp_username")
+        or settings.get("smtp_host")
+    )
     msg["To"] = to_email
     try:
         server = smtplib.SMTP(settings.get("smtp_host"), settings.get("smtp_port"))
@@ -361,7 +388,11 @@ def perform_optimization(data, user=None):
     next_race = f"Race{races_completed + 1}"
     row = cal_df[cal_df["Race"] == next_race]
     if use_fp2:
-        if row.empty or "meeting_key" not in cal_df.columns or pd.isna(row.iloc[0]["meeting_key"]):
+        if (
+            row.empty
+            or "meeting_key" not in cal_df.columns
+            or pd.isna(row.iloc[0]["meeting_key"])
+        ):
             use_fp2 = False
             meeting_key = None
             race_year = None
@@ -373,21 +404,23 @@ def perform_optimization(data, user=None):
         race_year = None
 
     config = {
-        "base_path":            data_folder,
-        "races_completed":      races_completed,
-        "current_drivers":      data.get("current_drivers", []),
+        "base_path": data_folder,
+        "races_completed": races_completed,
+        "current_drivers": data.get("current_drivers", []),
         "current_constructors": data.get("current_constructors", []),
-        "remaining_budget":     float(data.get("remaining_budget", 0.0)),
-        "step1_swaps":          int(data.get("step1_swaps", 0)),
-        "weighting_scheme":     data.get("weighting_scheme", "trend_based"),
-        "risk_tolerance":       data.get("risk_tolerance", "medium"),
-        "multiplier":           int(data.get("multiplier", 2)),
-        "use_parallel":         False,
-        "use_fp2_pace":         use_fp2,
-        "pace_weight":          pace_weight,
-        "pace_modifier_type":   pace_modifier_type,
-        "next_meeting_key":     meeting_key,
-        "next_race_year":       race_year,
+        "keep_drivers": data.get("keep_drivers", []),
+        "keep_constructors": data.get("keep_constructors", []),
+        "remaining_budget": float(data.get("remaining_budget", 0.0)),
+        "step1_swaps": int(data.get("step1_swaps", 0)),
+        "weighting_scheme": data.get("weighting_scheme", "trend_based"),
+        "risk_tolerance": data.get("risk_tolerance", "medium"),
+        "multiplier": int(data.get("multiplier", 2)),
+        "use_parallel": False,
+        "use_fp2_pace": use_fp2,
+        "pace_weight": pace_weight,
+        "pace_modifier_type": pace_modifier_type,
+        "next_meeting_key": meeting_key,
+        "next_race_year": race_year,
     }
     config["step2_swaps"] = 2
 
@@ -409,7 +442,9 @@ def perform_optimization(data, user=None):
     results = {"status": "running", "progress": []}
 
     if config["use_fp2_pace"]:
-        results["progress"].append(f"Fetching FP2 pace data for meeting_key {meeting_key}...")
+        results["progress"].append(
+            f"Fetching FP2 pace data for meeting_key {meeting_key}..."
+        )
     results["progress"].append("Calculating VFM scores...")
     vfm_calc = F1VFMCalculator(config)
     driver_vfm_df, constructor_vfm_df = vfm_calc.run()
@@ -439,37 +474,49 @@ def perform_optimization(data, user=None):
         "success": True,
         "optimization": {
             "step1": {
-                "race":             optimizer.step1_race,
-                "circuit":          optimizer.step1_circuit,
-                "swaps":            step1["swaps"] if step1 else [],
-                "expected_points":  step1["points"] if step1 else base_s1[0],
-                "improvement":      (step1["points"] - base_s1[0]) if step1 else 0.0,
-                "boost_driver":     step1["boost_driver"] if step1 else base_s1[3],
+                "race": optimizer.step1_race,
+                "circuit": optimizer.step1_circuit,
+                "swaps": step1["swaps"] if step1 else [],
+                "expected_points": step1["points"] if step1 else base_s1[0],
+                "improvement": (step1["points"] - base_s1[0]) if step1 else 0.0,
+                "boost_driver": step1["boost_driver"] if step1 else base_s1[3],
                 "team": {
-                    "drivers":      step1["drivers"] if step1 else config["current_drivers"],
-                    "constructors": step1["constructors"] if step1 else config["current_constructors"],
+                    "drivers": step1["drivers"] if step1 else config["current_drivers"],
+                    "constructors": (
+                        step1["constructors"]
+                        if step1
+                        else config["current_constructors"]
+                    ),
                 },
             },
             "step2": {
-                "race":             optimizer.step2_race,
-                "circuit":          optimizer.step2_circuit,
-                "swaps":            step2["swaps"] if step2 else [],
-                "expected_points":  step2["points"] if step2 else base_s2[0],
-                "improvement":      (step2["points"] - base_s2[0]) if step2 else 0.0,
-                "boost_driver":     step2["boost_driver"] if step2 else base_s2[3],
+                "race": optimizer.step2_race,
+                "circuit": optimizer.step2_circuit,
+                "swaps": step2["swaps"] if step2 else [],
+                "expected_points": step2["points"] if step2 else base_s2[0],
+                "improvement": (step2["points"] - base_s2[0]) if step2 else 0.0,
+                "boost_driver": step2["boost_driver"] if step2 else base_s2[3],
                 "team": {
-                    "drivers":      step2["drivers"] if step2 else config["current_drivers"],
-                    "constructors": step2["constructors"] if step2 else config["current_constructors"],
+                    "drivers": step2["drivers"] if step2 else config["current_drivers"],
+                    "constructors": (
+                        step2["constructors"]
+                        if step2
+                        else config["current_constructors"]
+                    ),
                 },
-                "budget_used":      step2["cost"] if step2 else base_s2[2],
-                "budget_remaining": round(optimizer.max_budget - (step2["cost"] if step2 else base_s2[2]), 2),
+                "budget_used": step2["cost"] if step2 else base_s2[2],
+                "budget_remaining": round(
+                    optimizer.max_budget - (step2["cost"] if step2 else base_s2[2]), 2
+                ),
             },
             "summary": {
-                "total_improvement":  round(best_dict["final_points"] - base_s2[0], 2),
+                "total_improvement": round(best_dict["final_points"] - base_s2[0], 2),
                 "patterns_evaluated": optimizer.performance_stats["patterns_evaluated"],
-                "optimization_time":  round(optimizer.performance_stats["optimization_time"], 2),
-                "step1_time":        round(optimizer.performance_stats["step1_time"], 2),
-                "step2_time":        round(optimizer.performance_stats["step2_time"], 2),
+                "optimization_time": round(
+                    optimizer.performance_stats["optimization_time"], 2
+                ),
+                "step1_time": round(optimizer.performance_stats["step1_time"], 2),
+                "step2_time": round(optimizer.performance_stats["step2_time"], 2),
             },
         },
         "progress": results["progress"],
@@ -477,12 +524,12 @@ def perform_optimization(data, user=None):
 
     if actual_fp2_applied:
         pace_info = {
-            "meeting_key":       meeting_key,
-            "year":              race_year,
-            "pace_weight":       config["pace_weight"],
-            "modifier_type":     config["pace_modifier_type"],
-            "applied":           True,
-            "pace_adjustments":  [],
+            "meeting_key": meeting_key,
+            "year": race_year,
+            "pace_weight": config["pace_weight"],
+            "modifier_type": config["pace_modifier_type"],
+            "applied": True,
+            "pace_adjustments": [],
         }
         for drv in config["current_drivers"]:
             row = optimizer.drivers_df[optimizer.drivers_df["Driver"] == drv]
@@ -494,11 +541,11 @@ def perform_optimization(data, user=None):
                 if ps > 0:
                     pace_info["pace_adjustments"].append(
                         {
-                            "driver":        drv,
-                            "pace_score":    round(ps, 1),
+                            "driver": drv,
+                            "pace_score": round(ps, 1),
                             "pace_modifier": round(pm, 3),
-                            "vfm_original":  round(vfm_pre, 2),
-                            "vfm_adjusted":  round(vfm_post, 2),
+                            "vfm_original": round(vfm_pre, 2),
+                            "vfm_adjusted": round(vfm_post, 2),
                         }
                     )
         resp["optimization"]["fp2_info"] = pace_info
@@ -506,9 +553,9 @@ def perform_optimization(data, user=None):
     return resp
 
 
-def process_queue(email_only=False, task_id=None):
+def process_queue(email_only=False, task_id=None, meeting_key=None, race_year=None):
     with app.app_context():
-        query = OptimizationTask.query.filter_by(status='pending')
+        query = OptimizationTask.query.filter_by(status="pending")
         if email_only:
             query = query.filter_by(notify=True)
         if task_id:
@@ -521,22 +568,54 @@ def process_queue(email_only=False, task_id=None):
         for task in tasks:
             user = User.query.get(task.user_id)
             if not user:
-                task.status = 'failed'
-                task.result_json = json.dumps({'error': 'user not found'})
+                task.status = "failed"
+                task.result_json = json.dumps({"error": "user not found"})
                 continue
             try:
                 config = json.loads(task.config_json)
                 result = perform_optimization(config, user)
                 if task.notify:
-                    html = render_template('email_results.html', opt=result['optimization'])
-                    send_email(user.email, 'F1 Optimisation Results', html, settings)
-                task.status = 'completed'
+                    html = render_template(
+                        "email_results.html", opt=result["optimization"]
+                    )
+                    send_email(user.email, "F1 Optimisation Results", html, settings)
+                task.status = "completed"
                 task.result_json = json.dumps(result)
                 results.append((task.id, result))
+                if task.notify and user.email_opt_in:
+                    next_cfg = json.loads(task.config_json)
+                    sess_id = next_cfg.get("session_id", "default")
+                    base = (
+                        app.config["DEFAULT_DATA_FOLDER"]
+                        if sess_id == "default"
+                        else get_data_folder(sess_id)
+                    )
+                    try:
+                        cal_df = pd.read_csv(os.path.join(base, "calendar.csv"), skipinitialspace=True)
+                        m_key = meeting_key or config.get("next_meeting_key")
+                        if m_key and "meeting_key" in cal_df.columns:
+                            rows = cal_df.index[cal_df["meeting_key"] == int(m_key)].tolist()
+                            if rows and rows[0] + 1 < len(cal_df):
+                                nxt = cal_df.iloc[rows[0] + 1]
+                                nm = nxt.get("meeting_key")
+                                yr = nxt.get("year")
+                                if pd.notna(nm) and pd.notna(yr):
+                                    next_cfg["next_meeting_key"] = int(nm)
+                                    next_cfg["next_race_year"] = int(yr)
+                    except Exception:
+                        pass
+                    db.session.add(
+                        OptimizationTask(
+                            user_id=user.id,
+                            config_json=json.dumps(next_cfg),
+                            notify=True,
+                            status="pending",
+                        )
+                    )
             except Exception as e:
                 traceback.print_exc()
-                task.status = 'failed'
-                task.result_json = json.dumps({'error': str(e)})
+                task.status = "failed"
+                task.result_json = json.dumps({"error": str(e)})
         db.session.commit()
         return results
 
@@ -552,33 +631,41 @@ def check_api_job():
         try:
             settings = load_settings()
             base_url = settings.get("openf1_base_url", "https://api.openf1.org/v1")
-            task = OptimizationTask.query.filter_by(status='pending', notify=True).first()
+            task = OptimizationTask.query.filter_by(
+                status="pending", notify=True
+            ).first()
             if not task:
                 return
             cfg = json.loads(task.config_json)
-            mk = cfg.get('next_meeting_key')
-            yr = cfg.get('next_race_year')
+            mk = cfg.get("next_meeting_key")
+            yr = cfg.get("next_race_year")
             if not mk or not yr:
-                session_id = cfg.get('session_id', 'default')
-                if session_id == 'default':
+                session_id = cfg.get("session_id", "default")
+                if session_id == "default":
                     if not has_default_data():
                         return
-                    base = app.config['DEFAULT_DATA_FOLDER']
-                    races_completed = load_default_data()['races_completed']
+                    base = app.config["DEFAULT_DATA_FOLDER"]
+                    races_completed = load_default_data()["races_completed"]
                 else:
                     if session_id not in sessions:
                         return
                     base = get_data_folder(session_id)
-                    races_completed = sessions[session_id]['races_completed']
-                cal_df = pd.read_csv(os.path.join(base, 'calendar.csv'), skipinitialspace=True)
+                    races_completed = sessions[session_id]["races_completed"]
+                cal_df = pd.read_csv(
+                    os.path.join(base, "calendar.csv"), skipinitialspace=True
+                )
                 next_race = f"Race{races_completed + 1}"
-                row = cal_df[cal_df['Race'] == next_race]
-                if row.empty or 'meeting_key' not in cal_df.columns or pd.isna(row.iloc[0]['meeting_key']):
+                row = cal_df[cal_df["Race"] == next_race]
+                if (
+                    row.empty
+                    or "meeting_key" not in cal_df.columns
+                    or pd.isna(row.iloc[0]["meeting_key"])
+                ):
                     return
-                mk = int(row.iloc[0]['meeting_key'])
-                yr = int(row.iloc[0]['year'])
-                cfg['next_meeting_key'] = mk
-                cfg['next_race_year'] = yr
+                mk = int(row.iloc[0]["meeting_key"])
+                yr = int(row.iloc[0]["year"])
+                cfg["next_meeting_key"] = mk
+                cfg["next_race_year"] = yr
                 task.config_json = json.dumps(cfg)
                 db.session.commit()
             sess_url = (
@@ -591,7 +678,7 @@ def check_api_job():
             s_data = s_resp.json()
             if not s_data:
                 return
-            session_key = s_data[0].get('session_key') or s_data[0].get('session_id')
+            session_key = s_data[0].get("session_key") or s_data[0].get("session_id")
             if not session_key:
                 return
 
@@ -605,7 +692,7 @@ def check_api_job():
 
             latest = 0
             for lap in laps:
-                n = lap.get('lap_number')
+                n = lap.get("lap_number")
                 if isinstance(n, int) and n > latest:
                     latest = n
 
@@ -619,8 +706,11 @@ def check_api_job():
                 last_change_time = now
             else:
                 timeout = int(settings.get("lap_stale_minutes", 60)) * 60
-                if last_change_time and (now - last_change_time).total_seconds() >= timeout:
-                    process_queue(email_only=True)
+                if (
+                    last_change_time
+                    and (now - last_change_time).total_seconds() >= timeout
+                ):
+                    process_queue(email_only=True, meeting_key=mk, race_year=yr)
                     last_session_key = None
                     last_lap_value = None
                     last_change_time = None
@@ -629,12 +719,14 @@ def check_api_job():
 
 
 def schedule_job():
-    interval = int(load_settings().get('poll_interval_minutes', 15))
+    interval = int(load_settings().get("poll_interval_minutes", 15))
     try:
         scheduler.remove_all_jobs()
     except Exception:
         pass
-    scheduler.add_job(check_api_job, 'interval', minutes=interval, id='opt_job', replace_existing=True)
+    scheduler.add_job(
+        check_api_job, "interval", minutes=interval, id="opt_job", replace_existing=True
+    )
     print(f"Scheduled API monitor every {interval} minutes")
 
 
@@ -648,7 +740,11 @@ def login():
         if username and password:
             user = User.query.filter_by(provider="local", username=username).first()
             if user and check_password_hash(user.password_hash or "", password):
-                admin_emails = [e.strip() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+                admin_emails = [
+                    e.strip()
+                    for e in os.environ.get("ADMIN_EMAILS", "").split(",")
+                    if e.strip()
+                ]
                 new_admin = user.email in admin_emails
                 if new_admin != user.admin:
                     user.admin = new_admin
@@ -679,7 +775,11 @@ def register():
             email=email,
         )
         user.password_hash = generate_password_hash(password)
-        admin_emails = [e.strip() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+        admin_emails = [
+            e.strip()
+            for e in os.environ.get("ADMIN_EMAILS", "").split(",")
+            if e.strip()
+        ]
         user.admin = email in admin_emails
         db.session.add(user)
         db.session.commit()
@@ -720,7 +820,9 @@ def authorize(provider):
         if not email:
             emails = client.get("user/emails").json()
             if emails:
-                email = next((e["email"] for e in emails if e.get("primary")), emails[0]["email"])
+                email = next(
+                    (e["email"] for e in emails if e.get("primary")), emails[0]["email"]
+                )
 
     if not provider_id:
         return redirect(url_for("login"))
@@ -728,7 +830,11 @@ def authorize(provider):
     user = User.query.filter_by(provider=provider, provider_id=provider_id).first()
     if not user:
         user = User(provider=provider, provider_id=provider_id, name=name, email=email)
-        admin_emails = [e.strip() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+        admin_emails = [
+            e.strip()
+            for e in os.environ.get("ADMIN_EMAILS", "").split(",")
+            if e.strip()
+        ]
         user.admin = email in admin_emails
         db.session.add(user)
         db.session.commit()
@@ -754,6 +860,7 @@ def account():
         email = request.form.get("email")
         password = request.form.get("password")
         confirm = request.form.get("confirm_password")
+        auto_email = bool(request.form.get("auto_email_opt_in"))
         updated = False
         if email and email != current_user.email:
             if current_user.password_hash and not (
@@ -779,10 +886,31 @@ def account():
             else:
                 current_user.password_hash = generate_password_hash(password)
                 updated = True
+        if auto_email != current_user.email_opt_in:
+            current_user.email_opt_in = auto_email
+            updated = True
+            if not auto_email:
+                OptimizationTask.query.filter_by(
+                    user_id=current_user.id, status="pending", notify=True
+                ).delete()
+            else:
+                task = OptimizationTask.query.filter_by(
+                    user_id=current_user.id, status="pending", notify=True
+                ).first()
+                if not task and current_user.config_json:
+                    db.session.add(
+                        OptimizationTask(
+                            user_id=current_user.id,
+                            config_json=current_user.config_json,
+                            notify=True,
+                            status="pending",
+                        )
+                    )
         if updated and not error:
             db.session.commit()
             message = "Account updated"
     return render_template("account.html", message=message, error=error)
+
 
 @app.route("/")
 def home():
@@ -799,7 +927,12 @@ def optimizer():
         except Exception:
             cfg = None
     matrix = load_simple_matrix()
-    return render_template("index.html", user_config=cfg, simple_matrix=matrix)
+    return render_template(
+        "index.html",
+        user_config=cfg,
+        simple_matrix=matrix,
+        auto_email=current_user.email_opt_in,
+    )
 
 
 @app.route("/check_default_data")
@@ -862,13 +995,19 @@ def upload_files():
                 }
             )
 
-        folder_with_slash = target_folder if target_folder.endswith("/") else target_folder + "/"
+        folder_with_slash = (
+            target_folder if target_folder.endswith("/") else target_folder + "/"
+        )
         races_completed = get_races_completed(folder_with_slash)
 
         driver_df = pd.read_csv(os.path.join(folder_with_slash, "driver_race_data.csv"))
-        constructor_df = pd.read_csv(os.path.join(folder_with_slash, "constructor_race_data.csv"))
+        constructor_df = pd.read_csv(
+            os.path.join(folder_with_slash, "constructor_race_data.csv")
+        )
         drivers_list = sorted(driver_df["Driver"].astype(str).unique().tolist())
-        constructors_list = sorted(constructor_df["Constructor"].astype(str).unique().tolist())
+        constructors_list = sorted(
+            constructor_df["Constructor"].astype(str).unique().tolist()
+        )
 
         if not update_default:
             sessions[session_id] = {
@@ -899,7 +1038,9 @@ def upload_files():
 def upload_driver_mapping():
     try:
         if "driver_mapping" not in request.files:
-            return jsonify({"success": False, "message": "No driver mapping file provided"})
+            return jsonify(
+                {"success": False, "message": "No driver mapping file provided"}
+            )
 
         file = request.files["driver_mapping"]
         if not file or not file.filename:
@@ -920,10 +1061,14 @@ def upload_driver_mapping():
             )
         if mapping_df.empty:
             os.remove(dest)
-            return jsonify({"success": False, "message": "Driver mapping file is empty"})
+            return jsonify(
+                {"success": False, "message": "Driver mapping file is empty"}
+            )
         if not pd.api.types.is_numeric_dtype(mapping_df["driver_number"]):
             os.remove(dest)
-            return jsonify({"success": False, "message": "driver_number must be numeric"})
+            return jsonify(
+                {"success": False, "message": "driver_number must be numeric"}
+            )
 
         return jsonify(
             {
@@ -937,7 +1082,9 @@ def upload_driver_mapping():
         dest = os.path.join(app.config["DEFAULT_DATA_FOLDER"], "driver_mapping.csv")
         if os.path.exists(dest):
             os.remove(dest)
-        return jsonify({"success": False, "message": f"Error uploading driver mapping: {e}"})
+        return jsonify(
+            {"success": False, "message": f"Error uploading driver mapping: {e}"}
+        )
 
 
 @app.route("/optimize", methods=["POST"])
@@ -949,7 +1096,7 @@ def optimize():
             user_id=current_user.id,
             config_json=json.dumps(data),
             notify=False,
-            status='pending',
+            status="pending",
         )
         db.session.add(task)
         db.session.commit()
@@ -972,7 +1119,7 @@ def schedule_optimization_route():
         user_id=current_user.id,
         config_json=json.dumps(data),
         notify=True,
-        status='pending',
+        status="pending",
     )
     db.session.add(task)
     db.session.commit()
@@ -980,6 +1127,46 @@ def schedule_optimization_route():
         schedule_job()
     except Exception:
         pass
+    return jsonify({"success": True})
+
+
+@app.route("/auto_email_config", methods=["POST"])
+@login_required
+def auto_email_config_route():
+    data = request.get_json() or {}
+    opt_in = bool(data.get("opt_in"))
+    config = data.get("config", {})
+    if config:
+        try:
+            current_user.config_json = json.dumps(config)
+        except Exception:
+            pass
+    current_user.email_opt_in = opt_in
+    db.session.commit()
+    if opt_in:
+        task = OptimizationTask.query.filter_by(
+            user_id=current_user.id, status="pending", notify=True
+        ).first()
+        if task:
+            task.config_json = json.dumps(config)
+        else:
+            task = OptimizationTask(
+                user_id=current_user.id,
+                config_json=json.dumps(config),
+                notify=True,
+                status="pending",
+            )
+            db.session.add(task)
+        db.session.commit()
+        try:
+            schedule_job()
+        except Exception:
+            pass
+    else:
+        OptimizationTask.query.filter_by(
+            user_id=current_user.id, status="pending", notify=True
+        ).delete()
+        db.session.commit()
     return jsonify({"success": True})
 
 
@@ -1145,15 +1332,23 @@ def save_simple_config_matrix():
 @login_required
 def save_opt_settings():
     settings = load_settings()
-    settings.update({
-        "outlier_stddev_factor": request.form.get("outlier_stddev_factor", type=float),
-        "trend_slope_threshold": request.form.get("trend_slope_threshold", type=float),
-        "recent_races_fraction": request.form.get("recent_races_fraction", type=float),
-        "long_term_weight": request.form.get("long_term_weight", type=float),
-        "interaction_weight": request.form.get("interaction_weight", type=float),
-        "top_n_candidates": request.form.get("top_n_candidates", type=int),
-        "use_ilp": bool(request.form.get("use_ilp")),
-    })
+    settings.update(
+        {
+            "outlier_stddev_factor": request.form.get(
+                "outlier_stddev_factor", type=float
+            ),
+            "trend_slope_threshold": request.form.get(
+                "trend_slope_threshold", type=float
+            ),
+            "recent_races_fraction": request.form.get(
+                "recent_races_fraction", type=float
+            ),
+            "long_term_weight": request.form.get("long_term_weight", type=float),
+            "interaction_weight": request.form.get("interaction_weight", type=float),
+            "top_n_candidates": request.form.get("top_n_candidates", type=int),
+            "use_ilp": bool(request.form.get("use_ilp")),
+        }
+    )
     success = save_settings(settings)
     msg = "Settings saved." if success else "Failed to save settings."
     return redirect(url_for("manage_data_page", message=msg))
@@ -1163,11 +1358,19 @@ def save_opt_settings():
 @login_required
 def save_api_settings():
     settings = load_settings()
-    settings.update({
-        "openf1_base_url": request.form.get("openf1_base_url", "https://api.openf1.org/v1"),
-        "poll_interval_minutes": request.form.get("poll_interval_minutes", type=int, default=15),
-        "lap_stale_minutes": request.form.get("lap_stale_minutes", type=int, default=60),
-    })
+    settings.update(
+        {
+            "openf1_base_url": request.form.get(
+                "openf1_base_url", "https://api.openf1.org/v1"
+            ),
+            "poll_interval_minutes": request.form.get(
+                "poll_interval_minutes", type=int, default=15
+            ),
+            "lap_stale_minutes": request.form.get(
+                "lap_stale_minutes", type=int, default=60
+            ),
+        }
+    )
     success = save_settings(settings)
     if success:
         try:
@@ -1182,14 +1385,16 @@ def save_api_settings():
 @login_required
 def save_smtp_settings():
     settings = load_settings()
-    settings.update({
-        "smtp_host": request.form.get("smtp_host", ""),
-        "smtp_port": request.form.get("smtp_port", type=int, default=587),
-        "smtp_username": request.form.get("smtp_username", ""),
-        "smtp_password": request.form.get("smtp_password", ""),
-        "smtp_tls": bool(request.form.get("smtp_tls")),
-        "smtp_from": request.form.get("smtp_from", ""),
-    })
+    settings.update(
+        {
+            "smtp_host": request.form.get("smtp_host", ""),
+            "smtp_port": request.form.get("smtp_port", type=int, default=587),
+            "smtp_username": request.form.get("smtp_username", ""),
+            "smtp_password": request.form.get("smtp_password", ""),
+            "smtp_tls": bool(request.form.get("smtp_tls")),
+            "smtp_from": request.form.get("smtp_from", ""),
+        }
+    )
     success = save_settings(settings)
     msg = "Settings saved." if success else "Failed to save settings."
     return redirect(url_for("manage_data_page", message=msg))
@@ -1206,9 +1411,15 @@ def save_settings_route():
         "interaction_weight": request.form.get("interaction_weight", type=float),
         "top_n_candidates": request.form.get("top_n_candidates", type=int),
         "use_ilp": bool(request.form.get("use_ilp")),
-        "openf1_base_url": request.form.get("openf1_base_url", "https://api.openf1.org/v1"),
-        "poll_interval_minutes": request.form.get("poll_interval_minutes", type=int, default=15),
-        "lap_stale_minutes": request.form.get("lap_stale_minutes", type=int, default=60),
+        "openf1_base_url": request.form.get(
+            "openf1_base_url", "https://api.openf1.org/v1"
+        ),
+        "poll_interval_minutes": request.form.get(
+            "poll_interval_minutes", type=int, default=15
+        ),
+        "lap_stale_minutes": request.form.get(
+            "lap_stale_minutes", type=int, default=60
+        ),
         "smtp_host": request.form.get("smtp_host", ""),
         "smtp_port": request.form.get("smtp_port", type=int, default=587),
         "smtp_username": request.form.get("smtp_username", ""),
@@ -1245,23 +1456,48 @@ def queued_email_tasks_route():
     if not current_user.admin:
         return jsonify({"success": False, "message": "Unauthorized"}), 403
     tasks = (
-        OptimizationTask.query
-        .filter_by(status="pending", notify=True)
+        OptimizationTask.query.filter_by(status="pending", notify=True)
         .order_by(OptimizationTask.created_at)
         .all()
     )
     results = []
     for t in tasks:
         user = User.query.get(t.user_id)
+        cfg = {}
+        try:
+            cfg = json.loads(t.config_json)
+        except Exception:
+            pass
         results.append(
             {
                 "id": t.id,
                 "user": user.email if user else "Unknown",
                 "created_at": t.created_at.strftime("%Y-%m-%d %H:%M"),
                 "status": t.status,
+                "session_id": cfg.get("session_id", "default"),
+                "config": cfg,
             }
         )
     return jsonify({"success": True, "tasks": results})
+
+
+@app.route("/cancel_email_task", methods=["POST"])
+@login_required
+def cancel_email_task_route():
+    if not current_user.admin:
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    data = request.get_json() or {}
+    task_id = data.get("task_id")
+    if not task_id:
+        return jsonify({"success": False, "message": "Task ID required"})
+    task = OptimizationTask.query.filter_by(
+        id=task_id, status="pending", notify=True
+    ).first()
+    if not task:
+        return jsonify({"success": False, "message": "Task not found"})
+    db.session.delete(task)
+    db.session.commit()
+    return jsonify({"success": True})
 
 
 @app.route("/api/statistics")
@@ -1270,24 +1506,40 @@ def get_statistics():
     try:
         data_folder = get_data_folder("default")
         if not data_folder:
-            return jsonify({"success": False, "message": "No data; upload files first."})
+            return jsonify(
+                {"success": False, "message": "No data; upload files first."}
+            )
 
         driver_race_df = pd.read_csv(os.path.join(data_folder, "driver_race_data.csv"))
-        constructor_race_df = pd.read_csv(os.path.join(data_folder, "constructor_race_data.csv"))
+        constructor_race_df = pd.read_csv(
+            os.path.join(data_folder, "constructor_race_data.csv")
+        )
         calendar_df = pd.read_csv(os.path.join(data_folder, "calendar.csv"))
         tracks_df = pd.read_csv(os.path.join(data_folder, "tracks.csv"))
 
         driver_aff_path = os.path.join(data_folder, "driver_affinity.csv")
         constructor_aff_path = os.path.join(data_folder, "constructor_affinity.csv")
-        driver_char_aff = os.path.join(data_folder, "driver_characteristic_affinities.csv")
-        constructor_char_aff = os.path.join(data_folder, "constructor_characteristic_affinities.csv")
+        driver_char_aff = os.path.join(
+            data_folder, "driver_characteristic_affinities.csv"
+        )
+        constructor_char_aff = os.path.join(
+            data_folder, "constructor_characteristic_affinities.csv"
+        )
 
-        if not all(os.path.exists(p) for p in [driver_aff_path, constructor_aff_path, driver_char_aff, constructor_char_aff]):
+        if not all(
+            os.path.exists(p)
+            for p in [
+                driver_aff_path,
+                constructor_aff_path,
+                driver_char_aff,
+                constructor_char_aff,
+            ]
+        ):
             cfg = {
-                "base_path":         data_folder,
-                "races_completed":   get_races_completed(data_folder),
-                "weighting_scheme":  "trend_based",
-                "use_fp2_pace":      True,
+                "base_path": data_folder,
+                "races_completed": get_races_completed(data_folder),
+                "weighting_scheme": "trend_based",
+                "use_fp2_pace": True,
             }
             vfm_calc = F1VFMCalculator(cfg)
             vfm_calc.run()
@@ -1295,17 +1547,29 @@ def get_statistics():
             aff_calc.run()
 
         driver_vfm_df = pd.read_csv(os.path.join(data_folder, "driver_vfm.csv"))
-        constructor_vfm_df = pd.read_csv(os.path.join(data_folder, "constructor_vfm.csv"))
+        constructor_vfm_df = pd.read_csv(
+            os.path.join(data_folder, "constructor_vfm.csv")
+        )
         driver_aff_df = pd.read_csv(driver_aff_path)
         constructor_aff_df = pd.read_csv(constructor_aff_path)
         driver_char_df = pd.read_csv(driver_char_aff, index_col=0)
         constructor_char_df = pd.read_csv(constructor_char_aff, index_col=0)
 
         driver_stats = process_driver_statistics(
-            driver_race_df, driver_vfm_df, driver_aff_df, driver_char_df, calendar_df, tracks_df
+            driver_race_df,
+            driver_vfm_df,
+            driver_aff_df,
+            driver_char_df,
+            calendar_df,
+            tracks_df,
         )
         constructor_stats = process_constructor_statistics(
-            constructor_race_df, constructor_vfm_df, constructor_aff_df, constructor_char_df, calendar_df, tracks_df
+            constructor_race_df,
+            constructor_vfm_df,
+            constructor_aff_df,
+            constructor_char_df,
+            calendar_df,
+            tracks_df,
         )
 
         return jsonify(
@@ -1342,18 +1606,18 @@ def process_driver_statistics(
         valid_pts = [float(p) for p in points_arr if not np.isnan(p)]
 
         s = {
-            "name":            name,
-            "team":            str(drv_row.get("Team", "Unknown")),
-            "cost":            str(drv_row["Cost"]),
-            "cost_value":      float(re.sub(r"[^\d.]", "", str(drv_row["Cost"]))),
-            "vfm":             float(drv_row["VFM"]),
-            "trend":           str(drv_row.get("Performance_Trend", "Unknown")),
-            "avg_points":      float(np.mean(valid_pts)) if valid_pts else 0.0,
-            "total_points":    float(np.sum(valid_pts)) if valid_pts else 0.0,
+            "name": name,
+            "team": str(drv_row.get("Team", "Unknown")),
+            "cost": str(drv_row["Cost"]),
+            "cost_value": float(re.sub(r"[^\d.]", "", str(drv_row["Cost"]))),
+            "vfm": float(drv_row["VFM"]),
+            "trend": str(drv_row.get("Performance_Trend", "Unknown")),
+            "avg_points": float(np.mean(valid_pts)) if valid_pts else 0.0,
+            "total_points": float(np.sum(valid_pts)) if valid_pts else 0.0,
             "races_completed": len(valid_pts),
-            "consistency":     float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
-            "best_race":       float(np.max(valid_pts)) if valid_pts else 0.0,
-            "worst_race":      float(np.min(valid_pts)) if valid_pts else 0.0,
+            "consistency": float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
+            "best_race": float(np.max(valid_pts)) if valid_pts else 0.0,
+            "worst_race": float(np.min(valid_pts)) if valid_pts else 0.0,
         }
 
         if len(valid_pts) >= 3:
@@ -1365,19 +1629,23 @@ def process_driver_statistics(
         if name in driver_char_df.index:
             char_vals = driver_char_df.loc[name]
             s["char_affinities"] = {
-                "Corners":      float(char_vals.get("Corners", 0.0)),
-                "Length":       float(char_vals.get("Length (km)", 0.0)),
-                "Overtaking":   float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
-                "Speed":        float(char_vals.get("Track Speed_encoded", 0.0)),
-                "Temperature":  float(char_vals.get("Expected Temperatures_encoded", 0.0)),
+                "Corners": float(char_vals.get("Corners", 0.0)),
+                "Length": float(char_vals.get("Length (km)", 0.0)),
+                "Overtaking": float(
+                    char_vals.get("Overtaking Opportunities_encoded", 0.0)
+                ),
+                "Speed": float(char_vals.get("Track Speed_encoded", 0.0)),
+                "Temperature": float(
+                    char_vals.get("Expected Temperatures_encoded", 0.0)
+                ),
             }
         else:
             s["char_affinities"] = {
-                "Corners":      0.0,
-                "Length":       0.0,
-                "Overtaking":   0.0,
-                "Speed":        0.0,
-                "Temperature":  0.0,
+                "Corners": 0.0,
+                "Length": 0.0,
+                "Overtaking": 0.0,
+                "Speed": 0.0,
+                "Temperature": 0.0,
             }
 
         perf_list = []
@@ -1393,7 +1661,13 @@ def process_driver_statistics(
                         circ_row = driver_aff_df[driver_aff_df["Circuit"] == circuit]
                         if not circ_row.empty:
                             aff = float(circ_row.iloc[0][affinity_col])
-                    perf_list.append({"circuit": circuit, "points": float(points_arr[idx]), "affinity": aff})
+                    perf_list.append(
+                        {
+                            "circuit": circuit,
+                            "points": float(points_arr[idx]),
+                            "affinity": aff,
+                        }
+                    )
 
         perf_list.sort(key=lambda x: x["points"], reverse=True)
         s["best_tracks"] = perf_list[:3] if len(perf_list) >= 3 else perf_list
@@ -1445,17 +1719,17 @@ def process_constructor_statistics(
         valid_pts = [float(p) for p in points_arr if not np.isnan(p)]
 
         s = {
-            "name":            name,
-            "cost":            str(const_row["Cost"]),
-            "cost_value":      float(re.sub(r"[^\d.]", "", str(const_row["Cost"]))),
-            "vfm":             float(const_row["VFM"]),
-            "trend":           str(const_row.get("Performance_Trend", "Unknown")),
-            "avg_points":      float(np.mean(valid_pts)) if valid_pts else 0.0,
-            "total_points":    float(np.sum(valid_pts)) if valid_pts else 0.0,
+            "name": name,
+            "cost": str(const_row["Cost"]),
+            "cost_value": float(re.sub(r"[^\d.]", "", str(const_row["Cost"]))),
+            "vfm": float(const_row["VFM"]),
+            "trend": str(const_row.get("Performance_Trend", "Unknown")),
+            "avg_points": float(np.mean(valid_pts)) if valid_pts else 0.0,
+            "total_points": float(np.sum(valid_pts)) if valid_pts else 0.0,
             "races_completed": len(valid_pts),
-            "consistency":     float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
-            "best_race":       float(np.max(valid_pts)) if valid_pts else 0.0,
-            "worst_race":      float(np.min(valid_pts)) if valid_pts else 0.0,
+            "consistency": float(np.std(valid_pts)) if len(valid_pts) > 1 else 0.0,
+            "best_race": float(np.max(valid_pts)) if valid_pts else 0.0,
+            "worst_race": float(np.min(valid_pts)) if valid_pts else 0.0,
         }
 
         if len(valid_pts) >= 3:
@@ -1467,19 +1741,23 @@ def process_constructor_statistics(
         if name in constructor_char_df.index:
             char_vals = constructor_char_df.loc[name]
             s["char_affinities"] = {
-                "Corners":      float(char_vals.get("Corners", 0.0)),
-                "Length":       float(char_vals.get("Length (km)", 0.0)),
-                "Overtaking":   float(char_vals.get("Overtaking Opportunities_encoded", 0.0)),
-                "Speed":        float(char_vals.get("Track Speed_encoded", 0.0)),
-                "Temperature":  float(char_vals.get("Expected Temperatures_encoded", 0.0)),
+                "Corners": float(char_vals.get("Corners", 0.0)),
+                "Length": float(char_vals.get("Length (km)", 0.0)),
+                "Overtaking": float(
+                    char_vals.get("Overtaking Opportunities_encoded", 0.0)
+                ),
+                "Speed": float(char_vals.get("Track Speed_encoded", 0.0)),
+                "Temperature": float(
+                    char_vals.get("Expected Temperatures_encoded", 0.0)
+                ),
             }
         else:
             s["char_affinities"] = {
-                "Corners":      0.0,
-                "Length":       0.0,
-                "Overtaking":   0.0,
-                "Speed":        0.0,
-                "Temperature":  0.0,
+                "Corners": 0.0,
+                "Length": 0.0,
+                "Overtaking": 0.0,
+                "Speed": 0.0,
+                "Temperature": 0.0,
             }
 
         perf_list = []
@@ -1492,10 +1770,18 @@ def process_constructor_statistics(
                     aff_col = f"{name}_affinity"
                     aff_val = 0.0
                     if aff_col in constructor_aff_df.columns:
-                        circ_row = constructor_aff_df[constructor_aff_df["Circuit"] == circuit]
+                        circ_row = constructor_aff_df[
+                            constructor_aff_df["Circuit"] == circuit
+                        ]
                         if not circ_row.empty:
                             aff_val = float(circ_row.iloc[0][aff_col])
-                    perf_list.append({"circuit": circuit, "points": float(points_arr[idx]), "affinity": aff_val})
+                    perf_list.append(
+                        {
+                            "circuit": circuit,
+                            "points": float(points_arr[idx]),
+                            "affinity": aff_val,
+                        }
+                    )
 
         perf_list.sort(key=lambda x: x["points"], reverse=True)
         s["best_tracks"] = perf_list[:3] if len(perf_list) >= 3 else perf_list
@@ -1511,7 +1797,9 @@ def process_constructor_statistics(
                 aff_col = f"{name}_affinity"
                 aff_val = 0.0
                 if aff_col in constructor_aff_df.columns:
-                    circ_row = constructor_aff_df[constructor_aff_df["Circuit"] == circuit]
+                    circ_row = constructor_aff_df[
+                        constructor_aff_df["Circuit"] == circuit
+                    ]
                     if not circ_row.empty:
                         aff_val = float(circ_row.iloc[0][aff_col])
                 upc.append({"race": rname, "circuit": circuit, "affinity": aff_val})
@@ -1539,16 +1827,16 @@ def export_statistics():
         for drv in stats_data["drivers"]:
             driver_rows.append(
                 {
-                    "Driver":      drv["name"],
-                    "Team":        drv["team"],
-                    "Cost":        drv["cost"],
-                    "VFM":         drv["vfm"],
-                    "VFM_Rank":    drv["vfm_rank"],
-                    "Avg_Points":  round(drv["avg_points"], 2),
-                    "Total_Points":drv["total_points"],
+                    "Driver": drv["name"],
+                    "Team": drv["team"],
+                    "Cost": drv["cost"],
+                    "VFM": drv["vfm"],
+                    "VFM_Rank": drv["vfm_rank"],
+                    "Avg_Points": round(drv["avg_points"], 2),
+                    "Total_Points": drv["total_points"],
                     "Consistency": round(drv["consistency"], 2),
                     "Recent_Form": round(drv["recent_form"], 2),
-                    "Trend":       drv["trend"],
+                    "Trend": drv["trend"],
                 }
             )
         df_drv = pd.DataFrame(driver_rows)
@@ -1558,14 +1846,14 @@ def export_statistics():
             const_rows.append(
                 {
                     "Constructor": const["name"],
-                    "Cost":        const["cost"],
-                    "VFM":         const["vfm"],
-                    "VFM_Rank":    const["vfm_rank"],
-                    "Avg_Points":  round(const["avg_points"], 2),
-                    "Total_Points":const["total_points"],
+                    "Cost": const["cost"],
+                    "VFM": const["vfm"],
+                    "VFM_Rank": const["vfm_rank"],
+                    "Avg_Points": round(const["avg_points"], 2),
+                    "Total_Points": const["total_points"],
                     "Consistency": round(const["consistency"], 2),
                     "Recent_Form": round(const["recent_form"], 2),
-                    "Trend":       const["trend"],
+                    "Trend": const["trend"],
                 }
             )
         df_const = pd.DataFrame(const_rows)
@@ -1584,15 +1872,25 @@ def export_statistics():
     except Exception:
         traceback.print_exc()
         return jsonify({"success": False, "message": "Error exporting statistics"})
+
+
 with app.app_context():
     db.create_all()
+    insp = inspect(db.engine)
+    cols = [c["name"] for c in insp.get_columns("user")]
+    if "email_opt_in" not in cols:
+        try:
+            db.session.execute(
+                text('ALTER TABLE "user" ADD COLUMN email_opt_in BOOLEAN DEFAULT FALSE')
+            )
+            db.session.commit()
+        except Exception:
+            pass
     schedule_job()
     # Start the scheduler only in the main process
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
         if not scheduler.running:
             scheduler.start()
-
-
 
 
 if __name__ == "__main__":

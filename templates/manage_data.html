@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='90' font-size='90'%3E🏎️%3C/text%3E%3C/svg%3E"
+  >
   <title>Administration</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -393,21 +397,54 @@
         }
         const thead = document.createElement('thead');
         const hrow = document.createElement('tr');
-        ['ID','User','Created','Status'].forEach(h => {
-          const th = document.createElement('th');
-          th.textContent = h;
-          hrow.appendChild(th);
+        ['ID','User','Session','Created','Status','Config','Action'].forEach(h => {
+            const th = document.createElement('th');
+            th.textContent = h;
+            hrow.appendChild(th);
         });
         thead.appendChild(hrow);
         table.appendChild(thead);
         const tbody = document.createElement('tbody');
         data.tasks.forEach(t => {
           const tr = document.createElement('tr');
-          [t.id, t.user, t.created_at, t.status].forEach(val => {
+          const fullConfig = JSON.stringify(t.config);
+          const rowValues = [t.id, t.user, t.session_id, t.created_at, t.status, fullConfig];
+          rowValues.forEach((val, idx) => {
             const td = document.createElement('td');
-            td.textContent = val;
+            if (idx === 5) { // Config column
+              const shortVal = val.length > 100 ? val.slice(0, 100) + '...' : val;
+              td.textContent = shortVal;
+              td.title = val;
+              td.classList.add('config-cell');
+            } else {
+              td.textContent = val;
+            }
             tr.appendChild(td);
           });
+          const cancelTd = document.createElement('td');
+          const btn = document.createElement('button');
+          btn.textContent = 'Cancel';
+          btn.className = 'button-secondary';
+          btn.onclick = async () => {
+            if (!confirm(`Cancel task ${t.id}?`)) return;
+            try {
+              const resp = await fetch('/cancel_email_task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_id: t.id })
+              });
+              const res = await resp.json();
+              if (res.success) {
+                tr.remove();
+              } else {
+                alert('Failed to cancel: ' + (res.message || 'unknown error'));
+              }
+            } catch (err) {
+              alert('Failed to cancel: ' + err.message);
+            }
+          };
+          cancelTd.appendChild(btn);
+          tr.appendChild(cancelTd);
           tbody.appendChild(tr);
         });
         table.appendChild(tbody);
