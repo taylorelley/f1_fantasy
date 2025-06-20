@@ -12,16 +12,20 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <header>
-    <div class="header-content">
-      <h1>Sign In</h1>
-      <button class="nav-toggle" onclick="toggleNav()">&#9776;</button>
-      <nav class="nav-links">
-        <a href="/">Home</a>
-        <a href="/login" class="active">Login</a>
-      </nav>
+  <nav class="navbar navbar-expand-md navbar-dark bg-danger mb-4">
+    <div class="container">
+      <a class="navbar-brand" href="/">F1 Fantasy Optimiser</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
+          <li class="nav-item"><a href="/login" class="nav-link active">Login</a></li>
+        </ul>
+      </div>
     </div>
-  </header>
+  </nav>
   <div class="container py-5">
     <div class="row justify-content-center">
       <div class="col-md-6 col-lg-4">
@@ -62,10 +66,6 @@
 </div>
 </div>
 </div>
-  <script>
-    function toggleNav() {
-      document.querySelector('.nav-links').classList.toggle('open');
-    }
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-1CmrxMRARb6aLqgBO7yyAxTOQE2AKb9GfXnE5v5ZdbQM0PbYSbZQIuA0yJsEF1F9" crossorigin="anonymous"></script>
 </body>
 </html>

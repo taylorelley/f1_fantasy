@@ -40,39 +40,6 @@
       font-weight: 300;
     }
 
-    /* Hamburger menu button, hidden on desktop */
-    .nav-toggle {
-      display: none;
-      background: none;
-      border: none;
-      color: white;
-      font-size: 2em;
-      cursor: pointer;
-      position: absolute;
-      right: 20px;
-      top: 20px;
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 20px;
-    }
-
-    .nav-links a {
-      color: white;
-      text-decoration: none;
-      padding: 8px 16px;
-      border-radius: 4px;
-      transition: background 0.3s;
-    }
-
-    .nav-links a:hover {
-      background: rgba(255,255,255,0.2);
-    }
-
-    .nav-links a.active {
-      background: rgba(255,255,255,0.2);
-    }
 
 .section {
       background: white;
@@ -429,23 +396,6 @@ table.data-table input[type="text"] {
         align-items: flex-start;
       }
 
-        .nav-toggle {
-          display: block;
-          position: absolute;
-          right: 20px;
-          top: 20px;
-        }
-
-      .nav-links {
-        display: none;
-        flex-direction: column;
-        width: 100%;
-        margin-top: 10px;
-      }
-
-      .nav-links.open {
-        display: flex;
-      }
 
       h1 {
         font-size: 1.8em;
