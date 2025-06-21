@@ -2,6 +2,38 @@
     let sessionData = null;
     let usingDefaultData = false;
 
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container || typeof bootstrap === 'undefined') {
+        alert(message);
+        return;
+      }
+      const toastEl = document.createElement('div');
+      let classes = 'toast align-items-center text-white border-0 ';
+      if (type === 'success') {
+        classes += 'bg-success';
+      } else if (type === 'error') {
+        classes += 'bg-danger';
+      } else if (type === 'warning') {
+        classes += 'bg-warning text-dark';
+      } else {
+        classes += 'bg-info';
+      }
+      toastEl.className = classes;
+      toastEl.role = 'alert';
+      toastEl.ariaLive = 'assertive';
+      toastEl.ariaAtomic = 'true';
+      toastEl.innerHTML = `
+        <div class="d-flex">
+          <div class="toast-body">${message}</div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>`;
+      container.appendChild(toastEl);
+      const t = new bootstrap.Toast(toastEl, { delay: 5000 });
+      t.show();
+      toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+    }
+
     window.addEventListener('DOMContentLoaded', async function() {
       try {
         const hasDefault = await checkDefaultData();
@@ -114,7 +146,7 @@
           checkDriverMapping();
         })
         .catch(error => {
-          alert('Error loading default data: ' + error.message);
+          showToast('Error loading default data: ' + error.message, 'error');
         });
     }
 
@@ -352,7 +384,7 @@
         }
       }
       if (!allFilesSelected) {
-        alert('Please select both required CSV files');
+        showToast('Please select both required CSV files', 'error');
         return;
       }
 
@@ -370,7 +402,7 @@
         });
         const data = await response.json();
         if (!data.success) {
-          alert('Error: ' + data.message);
+          showToast('Error: ' + data.message, 'error');
           return;
         }
 
@@ -387,18 +419,18 @@
         }
 
         if (data.updated_default) {
-          alert('Files uploaded and saved as default data successfully!');
+          showToast('Files uploaded and saved as default data successfully!', 'success');
           await checkDefaultData();
           await checkDriverMapping();
         } else {
-          alert('Files uploaded successfully!');
+          showToast('Files uploaded successfully!', 'success');
         }
 
         loadConfig();
         document.getElementById('config-section').style.display = 'block';
         document.getElementById('upload-section').style.display = 'none';
       } catch (error) {
-        alert('Error uploading files: ' + error.message);
+        showToast('Error uploading files: ' + error.message, 'error');
       }
     }
 
@@ -431,11 +463,11 @@
         if (sel.value) drivers.push(sel.value);
       });
       if (drivers.length !== 5) {
-        alert('Please select exactly 5 drivers');
+        showToast('Please select exactly 5 drivers', 'error');
         return;
       }
       if (new Set(drivers).size !== drivers.length) {
-        alert('Each driver must be unique');
+        showToast('Each driver must be unique', 'error');
         return;
       }
 
@@ -444,11 +476,11 @@
         if (sel.value) constructors.push(sel.value);
       });
       if (constructors.length !== 2) {
-        alert('Please select exactly 2 constructors');
+        showToast('Please select exactly 2 constructors', 'error');
         return;
       }
       if (new Set(constructors).size !== constructors.length) {
-        alert('Each constructor must be unique');
+        showToast('Each constructor must be unique', 'error');
         return;
       }
 
@@ -456,7 +488,7 @@
       const mappingCheck = await fetch('/check_driver_mapping');
       const mappingData  = await mappingCheck.json();
       if (!mappingData.exists) {
-        alert('Driver mapping file is required for Race Pace Estimation. Please upload it first.');
+        showToast('Driver mapping file is required for Race Pace Estimation. Please upload it first.', 'error');
         return;
       }
 
@@ -504,10 +536,10 @@
         if (data.success) {
           displayResults(data);
         } else {
-          alert('Error: ' + data.message);
+          showToast('Error: ' + data.message, 'error');
         }
       } catch (error) {
-        alert('Error running optimization: ' + error.message);
+        showToast('Error running optimization: ' + error.message, 'error');
       } finally {
         document.getElementById('progress-section').style.display = 'none';
       }
@@ -518,12 +550,12 @@
       toggleConfigMode();
       const drivers = [];
       document.querySelectorAll('.driver-select').forEach(sel => { if (sel.value) drivers.push(sel.value); });
-      if (drivers.length !== 5) { alert('Please select exactly 5 drivers'); return; }
-      if (new Set(drivers).size !== drivers.length) { alert('Each driver must be unique'); return; }
+      if (drivers.length !== 5) { showToast('Please select exactly 5 drivers', 'error'); return; }
+      if (new Set(drivers).size !== drivers.length) { showToast('Each driver must be unique', 'error'); return; }
       const constructors = [];
       document.querySelectorAll('.constructor-select').forEach(sel => { if (sel.value) constructors.push(sel.value); });
-      if (constructors.length !== 2) { alert('Please select exactly 2 constructors'); return; }
-      if (new Set(constructors).size !== constructors.length) { alert('Each constructor must be unique'); return; }
+      if (constructors.length !== 2) { showToast('Please select exactly 2 constructors', 'error'); return; }
+      if (new Set(constructors).size !== constructors.length) { showToast('Each constructor must be unique', 'error'); return; }
       const useFP2 = true;
       const keepDrivers = [];
       document.querySelectorAll('.driver-keep').forEach((cb, idx) => { if (cb.checked && drivers[idx]) keepDrivers.push(drivers[idx]); });
@@ -555,7 +587,7 @@
               body: JSON.stringify({ opt_in: true, config })
             });
             if ((await r.json()).success) {
-              alert('Default optimisation settings updated.');
+              showToast('Default optimisation settings updated.', 'success');
             }
             return;
           }
@@ -568,7 +600,7 @@
               body: JSON.stringify({ opt_in: true, config })
             });
             if ((await r.json()).success) {
-              alert('Automatic email optimisation enabled.');
+              showToast('Automatic email optimisation enabled.', 'success');
               autoEmailOptIn = true;
             }
             return;
@@ -582,12 +614,12 @@
         });
         const data = await resp.json();
         if (data.success) {
-          alert('Optimisation scheduled. Results will be emailed to you.');
+          showToast('Optimisation scheduled. Results will be emailed to you.', 'success');
         } else {
-          alert('Error: ' + data.message);
+          showToast('Error: ' + data.message, 'error');
         }
       } catch (err) {
-        alert('Error scheduling optimisation: ' + err.message);
+        showToast('Error scheduling optimisation: ' + err.message, 'error');
       }
     }
 
