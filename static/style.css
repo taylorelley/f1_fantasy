@@ -3,11 +3,63 @@
       padding: 0;
       box-sizing: border-box;
     }
+:root {
+  --primary-color: #e10600;
+  --primary-hover-color: #b30500;
+  --background-color: #f5f5f5;
+  --text-color: #333;
+  --section-bg: #fff;
+  --border-color: #ddd;
+  --muted-text-color: #666;
+  --secondary-color: #6c757d;
+  --secondary-hover-color: #5a6268;
+  --success-color: #28a745;
+  --success-hover-color: #218838;
+  --warning-color: #ffc107;
+  --warning-hover-color: #e0a800;
+  --danger-color: #dc3545;
+  --success-bg-color: #d4edda;
+  --success-text-color: #155724;
+  --error-bg-color: #f8d7da;
+  --error-text-color: #721c24;
+  --warning-bg-color: #fff3cd;
+  --warning-text-color: #856404;
+  --info-bg-color: #d1ecf1;
+  --info-text-color: #0c5460;
+  --light-bg-color: #f0f0f0;
+  --card-bg: #f9f9f9;
+  --spinner-base-color: #f3f3f3;
+  --table-header-bg: #f8f8f8;
+  --light-border-color: #e0e0e0;
+  --link-color: #007bff;
+  --pace-bg-color: #e9ecef;
+  --pace-score-color: #495057;
+  --footer-bg-color: #333;
+  --footer-text-color: #fff;
+  --hero-gradient-end: #ff5722;
+}
+
+
+body.dark-mode {
+  --background-color: #121212;
+  --text-color: #e0e0e0;
+  --section-bg: #1e1e1e;
+  --border-color: #444;
+  --muted-text-color: #aaa;
+  --footer-bg-color: #222;
+  --footer-text-color: #eee;
+  --primary-color: #ff5722;
+  --primary-hover-color: #e64a19;
+  --card-bg: #2a2a2a;
+  --table-header-bg: #2a2a2a;
+  --light-bg-color: #2a2a2a;
+  --spinner-base-color: #444;
+}
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f5f5;
-      color: #333;
+      background: var(--background-color);
+      color: var(--text-color);
       line-height: 1.6;
     }
 
@@ -18,7 +70,7 @@
     }
 
     header {
-      background: #e10600;
+      background: var(--primary-color);
       color: white;
       padding: 20px 0;
       margin-bottom: 30px;
@@ -42,7 +94,7 @@
 
 
 .section {
-      background: white;
+      background: var(--section-bg);
       padding: 30px;
       margin-bottom: 20px;
       border-radius: 8px;
@@ -50,7 +102,7 @@
     }
 
     h2 {
-      color: #e10600;
+      color: var(--primary-color);
       margin-bottom: 20px;
       font-weight: 400;
     }
@@ -70,7 +122,7 @@ input[type="number"],
 select {
       width: 100%;
       padding: 10px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border-color);
       border-radius: 4px;
       font-size: 16px;
 }
@@ -79,8 +131,8 @@ details.admin-section {
   margin-bottom: 20px;
 }
 details.admin-section summary {
-  background: #e10600;
-  color: #fff;
+  background: var(--primary-color);
+  color: var(--footer-text-color);
   padding: 10px 15px;
   cursor: pointer;
   border-radius: 8px;
@@ -98,7 +150,7 @@ details.admin-section > .section {
 textarea {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   font-family: monospace;
   font-size: 14px;
@@ -127,11 +179,11 @@ textarea {
     }
 
     .duplicate-selection {
-      border: 2px solid #dc3545;
+      border: 2px solid var(--danger-color);
     }
 
     .button {
-      background: #e10600;
+      background: var(--primary-color);
       color: white;
       padding: 8px 20px;
       border: none;
@@ -142,7 +194,7 @@ textarea {
     }
 
     .button:hover {
-      background: #b30500;
+      background: var(--primary-hover-color);
     }
 
     .button:disabled {
@@ -151,28 +203,28 @@ textarea {
     }
 
     .button-secondary {
-      background: #6c757d;
+      background: var(--secondary-color);
     }
 
     .button-secondary:hover {
-      background: #5a6268;
+      background: var(--secondary-hover-color);
     }
 
     .button-success {
-      background: #28a745;
+      background: var(--success-color);
     }
 
     .button-success:hover {
-      background: #218838;
+      background: var(--success-hover-color);
     }
 
     .button-warning {
-      background: #ffc107;
+      background: var(--warning-color);
       color: #212529;
     }
 
     .button-warning:hover {
-      background: #e0a800;
+      background: var(--warning-hover-color);
     }
 
     /* Style for the optimisation progress box */
@@ -180,13 +232,13 @@ textarea {
       display: none;
       margin-top: 20px;
       padding: 20px;
-      background: #f0f0f0;
+      background: var(--light-bg-color);
       border-radius: 4px;
     }
 
     .progress-item {
       margin: 5px 0;
-      color: #666;
+      color: var(--muted-text-color);
     }
 
     .results {
@@ -194,15 +246,15 @@ textarea {
     }
 
     .result-card {
-      background: #f9f9f9;
+      background: var(--card-bg);
       padding: 20px;
       margin: 15px 0;
       border-radius: 4px;
-      border-left: 4px solid #e10600;
+      border-left: 4px solid var(--primary-color);
     }
 
     .swap-item {
-      background: #fff;
+      background: var(--section-bg);
       padding: 10px;
       margin: 5px 0;
       border-radius: 4px;
@@ -219,7 +271,7 @@ table.data-table {
 
 table.data-table th,
 table.data-table td {
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   padding: 6px;
 }
 
@@ -231,7 +283,7 @@ table.data-table td {
 }
 
 table.data-table th {
-  background: #f8f8f8;
+  background: var(--table-header-bg);
   text-align: left;
 }
 
@@ -243,7 +295,7 @@ table.data-table input[type="text"] {
 }
 
     .improvement {
-      color: #28a745;
+      color: var(--success-color);
       font-weight: bold;
     }
 
@@ -255,11 +307,11 @@ table.data-table input[type="text"] {
     }
 
     .team-member {
-      background: #fff;
+      background: var(--section-bg);
       padding: 10px;
       border-radius: 4px;
       text-align: center;
-      border: 1px solid #e0e0e0;
+      border: 1px solid var(--light-border-color);
     }
 
     .loading {
@@ -268,8 +320,8 @@ table.data-table input[type="text"] {
     }
 
     .spinner {
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #e10600;
+      border: 3px solid var(--spinner-base-color);
+      border-top: 3px solid var(--primary-color);
       border-radius: 50%;
       width: 40px;
       height: 40px;
@@ -283,8 +335,8 @@ table.data-table input[type="text"] {
     }
 
     .error {
-      background: #f8d7da;
-      color: #721c24;
+      background: var(--error-bg-color);
+      color: var(--error-text-color);
       padding: 15px;
       border-radius: 4px;
       margin: 15px 0;
@@ -292,24 +344,24 @@ table.data-table input[type="text"] {
     }
 
     .success {
-      background: #d4edda;
-      color: #155724;
+      background: var(--success-bg-color);
+      color: var(--success-text-color);
       padding: 15px;
       border-radius: 4px;
       margin: 15px 0;
     }
 
     .info {
-      background: #d1ecf1;
-      color: #0c5460;
+      background: var(--info-bg-color);
+      color: var(--info-text-color);
       padding: 15px;
       border-radius: 4px;
       margin: 15px 0;
     }
 
     .warning {
-      background: #fff3cd;
-      color: #856404;
+      background: var(--warning-bg-color);
+      color: var(--warning-text-color);
       padding: 15px;
       border-radius: 4px;
       margin: 15px 0;
@@ -346,7 +398,7 @@ table.data-table input[type="text"] {
     }
 
     .fp2-config h3 {
-      color: #333;
+      color: var(--text-color);
       margin-bottom: 15px;
       display: flex;
       align-items: center;
@@ -359,7 +411,7 @@ table.data-table input[type="text"] {
     }
 
     .pace-adjustment {
-      background: #e9ecef;
+      background: var(--pace-bg-color);
       padding: 8px 12px;
       margin: 5px 0;
       border-radius: 4px;
@@ -370,18 +422,18 @@ table.data-table input[type="text"] {
 
     .pace-score {
       font-weight: bold;
-      color: #495057;
+      color: var(--pace-score-color);
     }
 
     small {
       font-size: 0.875em;
-      color: #6c757d;
+      color: var(--secondary-color);
       margin-top: 5px;
       display: block;
     }
 
     small a {
-      color: #007bff;
+      color: var(--link-color);
       text-decoration: none;
     }
 
@@ -421,7 +473,7 @@ table.data-table input[type="text"] {
     }
         
         .controls {
-            background: white;
+            background: var(--section-bg);
             padding: 20px;
             margin-bottom: 20px;
             border-radius: 8px;
@@ -447,7 +499,7 @@ table.data-table input[type="text"] {
         
         select, input[type="text"] {
             padding: 8px 12px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-color);
             border-radius: 4px;
             font-size: 14px;
         }
@@ -461,7 +513,7 @@ table.data-table input[type="text"] {
         }
         
         .stat-card {
-            background: white;
+            background: var(--section-bg);
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -474,7 +526,7 @@ table.data-table input[type="text"] {
         }
         
         .stat-card.selected {
-            border: 2px solid #e10600;
+            border: 2px solid var(--primary-color);
         }
         
         .card-header {
@@ -483,16 +535,16 @@ table.data-table input[type="text"] {
             align-items: center;
             margin-bottom: 15px;
             padding-bottom: 10px;
-            border-bottom: 2px solid #f0f0f0;
+            border-bottom: 2px solid var(--light-bg-color);
         }
         
         .driver-info h3 {
-            color: #e10600;
+            color: var(--primary-color);
             margin-bottom: 5px;
         }
         
         .team-name {
-            color: #666;
+            color: var(--muted-text-color);
             font-size: 14px;
         }
         
@@ -503,18 +555,18 @@ table.data-table input[type="text"] {
         .cost {
             font-size: 18px;
             font-weight: bold;
-            color: #333;
+            color: var(--text-color);
         }
         
         .vfm-score {
             font-size: 24px;
             font-weight: bold;
-            color: #28a745;
+            color: var(--success-color);
         }
         
         .vfm-label {
             font-size: 12px;
-            color: #666;
+            color: var(--muted-text-color);
         }
         
         .stats-row {
@@ -531,7 +583,7 @@ table.data-table input[type="text"] {
         }
         
         .stat-label {
-            color: #666;
+            color: var(--muted-text-color);
             font-size: 13px;
         }
         
@@ -548,18 +600,18 @@ table.data-table input[type="text"] {
         }
         
         .trend-improving {
-            background: #d4edda;
-            color: #155724;
+            background: var(--success-bg-color);
+            color: var(--success-text-color);
         }
         
         .trend-stable {
-            background: #fff3cd;
-            color: #856404;
+            background: var(--warning-bg-color);
+            color: var(--warning-text-color);
         }
         
         .trend-declining {
-            background: #f8d7da;
-            color: #721c24;
+            background: var(--error-bg-color);
+            color: var(--error-text-color);
         }
         
         .radar-container {
@@ -584,7 +636,7 @@ table.data-table input[type="text"] {
         }
         
         .track-name {
-            color: #666;
+            color: var(--muted-text-color);
         }
         
         .track-points {
@@ -593,7 +645,7 @@ table.data-table input[type="text"] {
         
         .comparison-mode {
             display: none;
-            background: white;
+            background: var(--section-bg);
             padding: 20px;
             margin: 20px 0;
             border-radius: 8px;
@@ -608,7 +660,7 @@ table.data-table input[type="text"] {
         }
         
         .comparison-card {
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-color);
             padding: 15px;
             border-radius: 4px;
         }
@@ -625,11 +677,11 @@ table.data-table input[type="text"] {
         }
         
         .form-positive {
-            color: #28a745;
+            color: var(--success-color);
         }
         
         .form-negative {
-            color: #dc3545;
+            color: var(--danger-color);
         }
         
         #comparison-chart-container {
@@ -683,7 +735,7 @@ table.data-table input[type="text"] {
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: #ccc;
+            background-color: var(--border-color);
             transition: .4s;
             border-radius: 34px;
         }
@@ -699,7 +751,7 @@ table.data-table input[type="text"] {
             border-radius: 50%;
         }
         input:checked + .slider {
-            background-color: #e10600;
+            background-color: var(--primary-color);
         }
         input:checked + .slider:before {
             transform: translateX(26px);
@@ -721,15 +773,15 @@ table.data-table input[type="text"] {
 
 /* Home page styles */
 .hero {
-  background: linear-gradient(135deg, #e10600, #ff5722);
-  color: #fff;
+  background: linear-gradient(135deg, var(--primary-color), var(--hero-gradient-end));
+  color: var(--footer-text-color);
   text-align: center;
   padding: 80px 20px;
 }
 .hero h2 {
   font-size: 2.5em;
   margin-bottom: 10px;
-  color: #000;
+  color: var(--text-color);
 }
 .hero p {
   font-size: 1.2em;
@@ -744,15 +796,15 @@ table.data-table input[type="text"] {
   max-width: 960px;
 }
 .feature {
-  background: #fff;
+  background: var(--section-bg);
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   text-align: center;
 }
 .footer {
-  background: #333;
-  color: #fff;
+  background: var(--footer-bg-color);
+  color: var(--footer-text-color);
   padding: 20px 0;
   margin-top: 40px;
 }
@@ -762,7 +814,7 @@ table.data-table input[type="text"] {
   }
   .hero h2 {
     font-size: 2em;
-    color: #000;
+    color: var(--text-color);
   }
   .hero p {
     font-size: 1em;
