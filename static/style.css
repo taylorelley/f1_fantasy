@@ -55,6 +55,7 @@ body.dark-mode {
   --light-bg-color: #2a2a2a;
   --spinner-base-color: #444;
 }
+a:focus,button:focus,input:focus,select:focus,textarea:focus{outline:2px dashed var(--primary-color);outline-offset:2px}
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
