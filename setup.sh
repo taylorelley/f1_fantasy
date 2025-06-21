@@ -86,6 +86,14 @@ if [ ! -f "f1_optimizer.py" ]; then
     echo "Remove the main() function and if __name__ == '__main__' block."
 fi
 
+# Compile SCSS to CSS if sass is installed
+if command -v sass >/dev/null 2>&1; then
+    echo "Compiling SCSS..."
+    sass static/scss/style.scss static/style.css
+else
+    echo "Sass compiler not found. Skipping CSS build."
+fi
+
 # Make the script executable
 chmod +x setup.sh
 

@@ -313,6 +313,18 @@ The application supports four types of data persistence:
 2. Install dependencies: `pip install -r requirements.txt`
 3. Run the app: `python app.py`
 
+### Building CSS
+
+The styles are organized as SCSS partials in `static/scss`. Compile them using:
+
+```bash
+sass static/scss/style.scss static/style.css
+```
+
+`setup.sh` will automatically run this step if the `sass` command is installed.
+When building the Docker image, the `Dockerfile` installs a Sass compiler and
+runs this build step automatically.
+
 ### File Structure
 ```
 f1-optimizer/
