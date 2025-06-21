@@ -94,7 +94,7 @@ body.dark-mode {
 
 
 .section {
-      background: white;
+      background: var(--section-bg);
       padding: 30px;
       margin-bottom: 20px;
       border-radius: 8px;
@@ -473,7 +473,7 @@ table.data-table input[type="text"] {
     }
         
         .controls {
-            background: white;
+            background: var(--section-bg);
             padding: 20px;
             margin-bottom: 20px;
             border-radius: 8px;
@@ -513,7 +513,7 @@ table.data-table input[type="text"] {
         }
         
         .stat-card {
-            background: white;
+            background: var(--section-bg);
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -645,7 +645,7 @@ table.data-table input[type="text"] {
         
         .comparison-mode {
             display: none;
-            background: white;
+            background: var(--section-bg);
             padding: 20px;
             margin: 20px 0;
             border-radius: 8px;
@@ -735,7 +735,7 @@ table.data-table input[type="text"] {
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: #ccc;
+            background-color: var(--border-color);
             transition: .4s;
             border-radius: 34px;
         }
@@ -781,7 +781,7 @@ table.data-table input[type="text"] {
 .hero h2 {
   font-size: 2.5em;
   margin-bottom: 10px;
-  color: #000;
+  color: var(--text-color);
 }
 .hero p {
   font-size: 1.2em;
@@ -814,7 +814,7 @@ table.data-table input[type="text"] {
   }
   .hero h2 {
     font-size: 2em;
-    color: #000;
+    color: var(--text-color);
   }
   .hero p {
     font-size: 1em;
