@@ -1,43 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link
-    rel="icon"
-    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='90' font-size='90'%3E🏎️%3C/text%3E%3C/svg%3E"
-  >
-  <title>Administration</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-  <nav class="navbar navbar-expand-md navbar-dark bg-danger mb-4">
-    <div class="container">
-      <a class="navbar-brand" href="/">F1 Fantasy Optimiser</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav ms-auto">
-          {% if current_user.is_authenticated %}
-            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
-            <li class="nav-item"><a href="/optimizer" class="nav-link">Optimiser</a></li>
-            <li class="nav-item"><a href="/statistics" class="nav-link">Statistics</a></li>
-            {% if current_user.admin %}
-            <li class="nav-item"><a href="/manage_data" class="nav-link active">Administration</a></li>
-            {% endif %}
-            <li class="nav-item"><a href="/account" class="nav-link">Account</a></li>
-            <li class="nav-item"><a href="/logout" class="nav-link">Logout</a></li>
-          {% else %}
-            <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
-            <li class="nav-item"><a href="/login" class="nav-link">Login</a></li>
-          {% endif %}
-        </ul>
-      </div>
-    </div>
-  </nav>
-
+{% extends "base.html" %}
+{% block title %}Administration{% endblock %}
+{% block content %}
   <div class="container">
     {% if message %}
     <div class="info">{{ message }}</div>
@@ -91,7 +54,7 @@
     </details>
 
     <details class="admin-section">
-      <summary>Track Characteristics</summary>
+      <summary>Tracks</summary>
       <div class="section">
       <form method="post" action="/save_tracks_data" onsubmit="prepareTracksCsv()">
         <input type="file" accept=".csv" onchange="loadCsv(event,'tracks-table')" />
@@ -107,7 +70,7 @@
     </details>
 
     <details class="admin-section">
-      <summary>Driver Number Mapping</summary>
+      <summary>Driver Mapping</summary>
       <div class="section">
       <form method="post" action="/save_mapping_data" onsubmit="prepareMappingCsv()">
         <input type="file" accept=".csv" onchange="loadCsv(event,'mapping-table')" />
@@ -123,9 +86,9 @@
     </details>
 
     <details class="admin-section">
-      <summary>Simple Configuration Matrix</summary>
+      <summary>Simple Config Matrix</summary>
       <div class="section">
-      <form method="post" action="/save_simple_config_matrix" onsubmit="prepareSimpleMatrixCsv()">
+      <form method="post" action="/save_simple_matrix" onsubmit="prepareSimpleMatrixCsv()">
         <input type="file" accept=".csv" onchange="loadCsv(event,'simple-matrix-table')" />
         <table id="simple-matrix-table" class="data-table"></table>
         <input type="hidden" name="simple_matrix_data" id="simple-matrix-data-hidden">
@@ -139,119 +102,14 @@
     </details>
 
     <details class="admin-section">
-      <summary>Optimisation Parameters</summary>
+      <summary>Queued Optimisations</summary>
       <div class="section">
-      <form method="post" action="/save_opt_settings">
-        <div class="form-group">
-          <label for="outlier_stddev_factor">Outlier StdDev Factor</label>
-          <input type="number" step="0.1" name="outlier_stddev_factor" id="outlier_stddev_factor" value="{{ settings.outlier_stddev_factor }}">
-        </div>
-        <div class="form-group">
-          <label for="trend_slope_threshold">Trend Slope Threshold</label>
-          <input type="number" step="0.1" name="trend_slope_threshold" id="trend_slope_threshold" value="{{ settings.trend_slope_threshold }}">
-        </div>
-        <div class="form-group">
-          <label for="recent_races_fraction">Recent Races Fraction</label>
-          <input type="number" step="0.1" name="recent_races_fraction" id="recent_races_fraction" value="{{ settings.recent_races_fraction }}">
-        </div>
-        <div class="form-group">
-          <label for="long_term_weight">Long-Term Weight</label>
-          <input type="number" step="0.1" name="long_term_weight" id="long_term_weight" value="{{ settings.long_term_weight }}">
-        </div>
-        <div class="form-group">
-          <label for="interaction_weight">Interaction Weight</label>
-          <input type="number" step="0.1" name="interaction_weight" id="interaction_weight" value="{{ settings.interaction_weight }}">
-        </div>
-        <div class="form-group">
-          <label for="top_n_candidates">Candidate Pool Size</label>
-          <input type="number" name="top_n_candidates" id="top_n_candidates" value="{{ settings.top_n_candidates }}" min="1">
-        </div>
-        <div class="checkbox-group">
-          <label>
-            <input type="checkbox" name="use_ilp" id="use_ilp" {% if settings.use_ilp %}checked{% endif %}>
-            Use ILP-based optimisation (experimental)
-          </label>
-        </div>
-        <div class="button-group">
-          <button class="button" type="submit">Save Settings</button>
-        </div>
-      </form>
-      </div>
-    </details>
-
-    <details class="admin-section">
-      <summary>API Settings</summary>
-      <div class="section">
-      <form method="post" action="/save_api_settings">
-        <div class="form-group">
-          <label for="openf1_base_url">OpenF1 Base URL</label>
-          <input type="text" name="openf1_base_url" id="openf1_base_url" value="{{ settings.openf1_base_url }}">
-        </div>
-        <div class="form-group">
-          <label for="poll_interval_minutes">API Poll Interval (minutes)</label>
-          <input type="number" name="poll_interval_minutes" id="poll_interval_minutes" value="{{ settings.poll_interval_minutes }}" min="1">
-        </div>
-        <div class="form-group">
-          <label for="lap_stale_minutes">Lap Stale Threshold (minutes)</label>
-          <input type="number" name="lap_stale_minutes" id="lap_stale_minutes" value="{{ settings.lap_stale_minutes }}" min="1">
-        </div>
-        <div class="button-group">
-          <button class="button" type="submit">Save Settings</button>
-        </div>
-      </form>
-      </div>
-    </details>
-
-    <details class="admin-section">
-      <summary>SMTP Settings</summary>
-      <div class="section">
-      <form method="post" action="/save_smtp_settings">
-        <div class="form-group">
-          <label for="smtp_host">SMTP Host</label>
-          <input type="text" name="smtp_host" id="smtp_host" value="{{ settings.smtp_host }}">
-        </div>
-        <div class="form-group">
-          <label for="smtp_port">SMTP Port</label>
-          <input type="number" name="smtp_port" id="smtp_port" value="{{ settings.smtp_port }}">
-        </div>
-        <div class="form-group">
-          <label for="smtp_username">SMTP Username</label>
-          <input type="text" name="smtp_username" id="smtp_username" value="{{ settings.smtp_username }}">
-        </div>
-        <div class="form-group">
-          <label for="smtp_from">Sender Address</label>
-          <input type="text" name="smtp_from" id="smtp_from" value="{{ settings.smtp_from }}">
-        </div>
-        <div class="form-group">
-          <label for="smtp_password">SMTP Password</label>
-          <input type="password" name="smtp_password" id="smtp_password" value="{{ settings.smtp_password }}">
-        </div>
-        <div class="checkbox-group">
-          <label>
-            <input type="checkbox" name="smtp_tls" id="smtp_tls" {% if settings.smtp_tls %}checked{% endif %}>
-            Use TLS
-          </label>
-        </div>
-        <div class="button-group">
-          <button class="button" type="submit">Save Settings</button>
-          <button type="button" class="button-secondary" onclick="sendTestEmail()">Send Test Email</button>
-        </div>
-      </form>
-      </div>
-    </details>
-
-
-    <details class="admin-section">
-      <summary>Queued Email Optimisations</summary>
-      <div class="section">
-      <div class="button-group" style="margin-bottom:10px;">
-        <button type="button" class="button-secondary" onclick="loadQueuedTasks()">Refresh List</button>
-      </div>
-      <table id="tasks-table" class="data-table"></table>
+        <table id="tasks-table" class="data-table"></table>
       </div>
     </details>
   </div>
-
+{% endblock %}
+{% block scripts %}
   <script>
     const driverCSV = {{ driver_csv|tojson|safe }};
     const constructorCSV = {{ constructor_csv|tojson|safe }};
@@ -309,42 +167,23 @@
 
     function addRow(tableId) {
       const table = document.getElementById(tableId);
-      const headerCount = table.querySelectorAll('thead th').length;
-      const tr = document.createElement('tr');
-      for (let i = 0; i < headerCount; i++) {
-        const td = document.createElement('td');
-        const input = document.createElement('input');
-        input.type = 'text';
-        td.appendChild(input);
-        tr.appendChild(td);
-      }
-      table.querySelector('tbody').appendChild(tr);
+      const row = table.querySelector('tbody tr').cloneNode(true);
+      row.querySelectorAll('input').forEach(inp => inp.value = '');
+      table.querySelector('tbody').appendChild(row);
     }
 
     function addColumn(tableId) {
       const table = document.getElementById(tableId);
-      const headerRow = table.querySelector('thead tr');
-      if (!headerRow) return;
-      const colName = prompt('Column name?');
-      if (!colName) return;
       const th = document.createElement('th');
-      th.textContent = colName;
-      headerRow.appendChild(th);
+      th.textContent = 'New';
+      table.querySelector('thead tr').appendChild(th);
       table.querySelectorAll('tbody tr').forEach(tr => {
         const td = document.createElement('td');
-        const input = document.createElement('input');
-        input.type = 'text';
-        td.appendChild(input);
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        td.appendChild(inp);
         tr.appendChild(td);
       });
-    }
-
-    function loadCsv(event, tableId) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = e => buildTable(e.target.result, tableId);
-      reader.readAsText(file);
     }
 
     function prepareDriverCsv() {
@@ -371,90 +210,40 @@
       document.getElementById('simple-matrix-data-hidden').value = tableToCSV('simple-matrix-table');
     }
 
-    async function sendTestEmail() {
-      try {
-        const resp = await fetch('/send_test_email', { method: 'POST' });
-        const data = await resp.json();
-        if (data.success) {
-          alert('Test email sent. Check your inbox.');
-        } else {
-          alert('Failed to send test email: ' + (data.message || 'unknown error'));
-        }
-      } catch (err) {
-        alert('Failed to send test email: ' + err.message);
-      }
-    }
-
     async function loadQueuedTasks() {
       try {
-        const resp = await fetch('/queued_email_tasks');
+        const resp = await fetch('/api/tasks');
         const data = await resp.json();
-        const table = document.getElementById('tasks-table');
-        table.innerHTML = '';
-        if (!data.success) {
-          table.textContent = data.message || 'Failed to load tasks';
-          return;
-        }
-        if (!data.tasks.length) {
-          table.textContent = 'No tasks queued.';
-          return;
-        }
-        const thead = document.createElement('thead');
-        const hrow = document.createElement('tr');
-        ['ID','User','Session','Created','Status','Config','Action'].forEach(h => {
+        if (data.success) {
+          const tbody = document.createElement('tbody');
+          data.tasks.forEach(t => {
+            const tr = document.createElement('tr');
+            const tdId = document.createElement('td');
+            tdId.textContent = t.id;
+            const tdUser = document.createElement('td');
+            tdUser.textContent = t.user;
+            const tdCreated = document.createElement('td');
+            tdCreated.textContent = t.created;
+            tr.appendChild(tdId);
+            tr.appendChild(tdUser);
+            tr.appendChild(tdCreated);
+            tbody.appendChild(tr);
+          });
+          const table = document.getElementById('tasks-table');
+          table.innerHTML = '';
+          const thead = document.createElement('thead');
+          const headRow = document.createElement('tr');
+          ['ID','User','Created'].forEach(h => {
             const th = document.createElement('th');
             th.textContent = h;
-            hrow.appendChild(th);
-        });
-        thead.appendChild(hrow);
-        table.appendChild(thead);
-        const tbody = document.createElement('tbody');
-        data.tasks.forEach(t => {
-          const tr = document.createElement('tr');
-          const fullConfig = JSON.stringify(t.config);
-          const rowValues = [t.id, t.user, t.session_id, t.created_at, t.status, fullConfig];
-          rowValues.forEach((val, idx) => {
-            const td = document.createElement('td');
-            if (idx === 5) { // Config column
-              const shortVal = val.length > 100 ? val.slice(0, 100) + '...' : val;
-              td.textContent = shortVal;
-              td.title = val;
-              td.classList.add('config-cell');
-            } else {
-              td.textContent = val;
-            }
-            tr.appendChild(td);
+            headRow.appendChild(th);
           });
-          const cancelTd = document.createElement('td');
-          const btn = document.createElement('button');
-          btn.textContent = 'Cancel';
-          btn.className = 'button-secondary';
-          btn.onclick = async () => {
-            if (!confirm(`Cancel task ${t.id}?`)) return;
-            try {
-              const resp = await fetch('/cancel_email_task', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: t.id })
-              });
-              const res = await resp.json();
-              if (res.success) {
-                tr.remove();
-              } else {
-                alert('Failed to cancel: ' + (res.message || 'unknown error'));
-              }
-            } catch (err) {
-              alert('Failed to cancel: ' + err.message);
-            }
-          };
-          cancelTd.appendChild(btn);
-          tr.appendChild(cancelTd);
-          tbody.appendChild(tr);
-        });
-        table.appendChild(tbody);
-      } catch (err) {
-        const table = document.getElementById('tasks-table');
-        table.textContent = 'Error loading tasks: ' + err.message;
+          thead.appendChild(headRow);
+          table.appendChild(thead);
+          table.appendChild(tbody);
+        }
+      } catch(e) {
+        console.error(e);
       }
     }
 
@@ -465,9 +254,7 @@
       buildTable(tracksCSV, 'tracks-table');
       buildTable(mappingCSV, 'mapping-table');
       buildTable(simpleMatrixCSV, 'simple-matrix-table');
-  loadQueuedTasks();
-  });
+      loadQueuedTasks();
+    });
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-</body>
-</html>
+{% endblock %}
