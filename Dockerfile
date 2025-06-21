@@ -8,7 +8,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
+    sassc \
     && rm -rf /var/lib/apt/lists/*
+
+# Provide a `sass` command using sassc
+RUN ln -s /usr/bin/sassc /usr/local/bin/sass
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -22,6 +26,9 @@ COPY f1_optimizer.py .
 COPY templates/ templates/
 COPY static/ static/
 COPY default_data/ default_data/
+
+# Compile SCSS to CSS during build
+RUN sass static/scss/style.scss static/style.css
 
 # Create necessary directories
 RUN mkdir -p uploads results
